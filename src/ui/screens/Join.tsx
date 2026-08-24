@@ -20,12 +20,21 @@ export function Join({ code }: { code: string }) {
   const [taken, setTaken] = useState<BadgeId[]>([]);
 
   useEffect(() => {
-    // exclude my own badge so a reload mid-game can rejoin (rejoin ignores name/badge anyway)
-    void Promise.all([peekRoom(code), ensureSignedIn()]).then(([room, uid]) => {
-      if (room) {
-        setTaken(Object.entries(room.players).filter(([id]) => id !== uid).map(([, p]) => p.badgeId));
+    // sign in FIRST so peekRoom reuses the same uid (concurrent sign-ins can diverge),
+    // then exclude my own badge so a reload mid-game can rejoin
+    let cancelled = false;
+    (async () => {
+      try {
+        const uid = await ensureSignedIn();
+        const room = await peekRoom(code);
+        if (!cancelled && room) {
+          setTaken(Object.entries(room.players).filter(([id]) => id !== uid).map(([, p]) => p.badgeId));
+        }
+      } catch {
+        // peek is best-effort; join itself will surface real errors
       }
-    });
+    })();
+    return () => { cancelled = true; };
   }, [code]);
 
   const effBadge = badge && !taken.includes(badge) ? badge : null;
