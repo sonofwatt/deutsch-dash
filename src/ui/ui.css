@@ -1,0 +1,35 @@
+.badge-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.badge-chip { display: flex; flex-direction: column; align-items: center; gap: 2px;
+  min-height: 56px; padding: 6px 2px; border-radius: var(--radius); font-size: 11px;
+  border: 2px solid var(--line); background: var(--surface); color: var(--ink); }
+.badge-chip.selected { border-color: var(--badge); box-shadow: 0 0 0 2px var(--badge) inset; }
+.badge-chip:disabled { opacity: .3; }
+.badge-glyph { font-size: 20px; }
+.stack { display: flex; flex-direction: column; gap: 12px; max-width: 420px; width: 100%; margin: 0 auto; }
+.row { display: flex; gap: 8px; align-items: center; }
+.spacer { flex: 1; }
+.title { font-weight: 800; font-size: 28px; margin: 0; }
+.muted { color: var(--ink-soft); }
+.error { color: var(--danger); }
+.player-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; }
+.dot.off { background: var(--line); }
+.chip { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center;
+  background: color-mix(in srgb, var(--badge) 18%, transparent); }
+.code-pill { font-family: ui-monospace, monospace; letter-spacing: .2em; font-weight: 800;
+  background: var(--surface); border: 1px dashed var(--line); border-radius: var(--radius);
+  padding: 8px 14px; }
+.overlay { position: fixed; inset: 0; background: rgb(0 0 0 / .45); display: grid;
+  place-items: center; z-index: 100; padding: 16px; }
+.sheet { background: var(--bg); border-radius: 16px; padding: 20px; width: min(440px, 100%);
+  max-height: 85dvh; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+.score-row { display: grid; grid-template-columns: 28px 1fr auto auto auto; gap: 8px;
+  align-items: center; padding: 8px 10px; border-radius: var(--radius);
+  background: var(--surface); border: 1px solid var(--line); font-size: 14px; }
+.score-neg { color: var(--danger); }
+.score-total { font-weight: 800; }
+.blitz-splash { position: fixed; inset: 0; display: grid; place-items: center; z-index: 110;
+  pointer-events: none; }
+.blitz-word { font-size: clamp(48px, 18vw, 120px); font-weight: 800; letter-spacing: .02em;
+  color: var(--accent); text-shadow: 0 4px 24px rgb(0 0 0 / .25); }
