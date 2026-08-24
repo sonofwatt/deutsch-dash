@@ -1,6 +1,7 @@
 # Project Handoff — Holland Hustle (Dutch Blitz web app)
 
-_Last updated: 2026-08-24 — implementation complete on `feature/dutch-blitz`, final review verdict: READY._
+_Last updated: 2026-08-24 — merged to `main`, 77/77 tests green including full
+emulator coverage against real security rules._
 
 ## What this is
 
@@ -12,17 +13,28 @@ flip-3 cycle, stuck rotation, +1/−2 scoring to a 75-point target).
 
 ## Status
 
-**All 15 plan tasks implemented, each gated by an independent review; a final
-whole-branch review (plus two fix waves) closed with READY at commit `358f1ac`.**
+**Complete and merged to `main`.** 15 planned tasks, each gated by an independent
+review; a whole-branch review plus two fix waves; then server-side join limits
+and an emulator-verification pass.
 
-- 65 unit tests passing, 2 emulator-gated integration files (skip without
-  `EMULATOR=1`), `npm run build` and lint clean.
-- The final review caught and fixed 3 critical cross-layer bugs unit tests
-  couldn't see (all-stuck snapshot recursion, Blitz missed when emptied via a
-  post build, wood pile un-flippable after first flip) plus presence teardown,
-  score reconciliation, spec-correct tie handling, environment gating with a
-  "Not configured" banner (verified live), offline play blocking, and a compact
-  2-player tableau that fits 360px phones.
+- **77 tests pass** — 65 pure-logic unit tests plus 12 emulator integration tests
+  covering the live transaction race, the 8-player cap, badge uniqueness, and
+  rejoin. Build and lint clean.
+- Reviews caught and fixed three critical cross-layer bugs unit tests could not
+  see (all-stuck snapshot recursion, Blitz missed when emptied via a post build,
+  wood pile un-flippable after the first flip), plus presence teardown, score
+  reconciliation, spec-correct tie handling, offline play blocking, and a
+  compact 2-player tableau that fits 360px phones.
+- **Server-side enforcement is real now.** The 8-player cap and badge uniqueness
+  are enforced by Firebase rules, not just the client. The cap uses a
+  `meta/playerCount` counter written with Firebase's `increment(1)` sentinel so
+  the server resolves it atomically — `numChildren()` is unsupported by the RTDB
+  emulator's rules engine, so counting children was not an option.
+- **Emulator now tests the real rules.** The app previously connected to database
+  namespace `demo-blitz`, where the emulator serves wide-open rules, while
+  `database.rules.json` loads into `demo-blitz-default-rtdb`. Every emulator test
+  before this fix ran with rules disabled. Corrected in `src/net/firebase.ts`;
+  a regression canary test now fails loudly if it ever regresses.
 
 ## Key documents
 
@@ -37,38 +49,43 @@ whole-branch review (plus two fix waves) closed with READY at commit `358f1ac`.*
 
 ```
 npm install
-npm test        # 65 tests, no emulator needed
-npm run dev     # local dev (expects the Firebase emulator for multiplayer)
-npm run emu     # Firebase emulator — REQUIRES JAVA 11+ (not installed on this machine)
+npm test         # 65 unit tests, no emulator needed
+npm run dev      # local dev server
+npm run emu      # Firebase emulator (portable JRE at .tools/, gitignored)
+npm run test:emu # all 77 tests, emulator included
 ```
 
-## Remaining work before calling it done
+Java is not installed system-wide; a portable Temurin JRE 21 lives in `.tools/`
+(gitignored) and `scripts/with-java.mjs` puts it on PATH for the emulator
+scripts automatically. On another machine, either install Java 11+ or re-download
+that JRE.
 
-**Blocked on Java/emulator (decision needed — install Java, or approve a
-portable JRE under the project, or run on another machine):**
+## Remaining work
 
-1. `npm run test:emu` green — the two integration suites (room lifecycle, live
-   transaction race) have never executed anywhere.
-2. Implement + emulator-test the `players/$uid` `.validate` rule closing the
-   join race (8-player cap / badge uniqueness are client-side-only today);
-   proposed rule text is in the ledger under Task 8.
-3. The two-tab manual checklists from plan Tasks 11–13 (lobby/presence, game
-   input incl. wood flip + race behavior, round cycle/host transfer), plus the
-   ledgered pointer-capture re-select check.
+**Owner actions (David) — the Firebase project `holland-hustle` already exists:**
 
-**Owner actions (David):**
-
-4. Firebase setup per README (~10 min): project, Anonymous auth, RTDB, paste
-   config into `src/net/firebaseConfig.ts`, deploy `database.rules.json`.
-5. GitHub: create repo (suggest `holland-hustle`), push, Settings → Pages →
-   Source: GitHub Actions; confirm the workflow deploys green.
-6. Real-device acceptance pass (spec §7) on the live URL: iPhone Safari +
-   Android Chrome. Known item: iOS home-screen icon needs a PNG
-   `apple-touch-icon` (currently SVG, which iOS ignores).
+1. In the Firebase console: enable **Anonymous** sign-in (Authentication →
+   Sign-in method), then create a **Realtime Database** (pick the region closest
+   to your players, start in locked mode).
+2. Project settings → Your apps → add a **Web app**, copy the config values into
+   `src/net/firebaseConfig.ts`. Committing them is safe: access control lives in
+   `database.rules.json`. Until this is done the app shows a "Not configured"
+   banner instead of a white screen.
+3. Deploy the rules: `npx firebase login` then `npx firebase deploy --only database`.
+   (`.firebaserc` already points at `holland-hustle`.)
+4. GitHub: create the repo (name it `holland-hustle` so the Pages base path
+   matches), push `main`, then Settings → Pages → Source: **GitHub Actions**.
+   Confirm the workflow run goes green.
+5. Real-device acceptance pass (spec §7) on the live URL: iPhone Safari +
+   Android Chrome. Two known items to check there: the iOS home-screen icon
+   needs a PNG `apple-touch-icon` (SVG is ignored by iOS), and the ledgered
+   pointer-capture re-select check on mouse drags.
+6. The two-tab manual checklists from plan Tasks 11–13 (lobby/presence, game
+   input including wood flip and race behaviour, round cycle, host transfer).
+   These can be run locally against the emulator before deploying.
 
 **Triaged fix-later list (non-blocking, in the ledger):** ShareInvite clipboard
 try/catch; rejection-shake remounts the tableau; room-code collision check on
 create; bundle code-split; combined roundEnd→gameOver snapshot skips the final
 score breakdown; kite/bell badge hues sit near suit blue/red; host transfer
-disabled in lobby (deliberate); harmless WS retry noise behind the
-"Not configured" banner.
+disabled in lobby (deliberate).
