@@ -1,32 +1,43 @@
-# React + TypeScript + Vite
+# German Spree
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+A mobile-first multiplayer Dutch Blitz card game for 2-8 players. Create a room,
+text the invite link, race to empty your Blitz pile. React + Firebase Realtime
+Database, hosted on GitHub Pages.
 
-Currently, two official plugins are available:
+## Local development (no Firebase account needed)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Prereqs: Node 20+, Java 11+ (for the Firebase emulator).
 
-## React Compiler
+    npm install
+    npm run emu     # terminal 1: local Firebase emulator
+    npm run dev     # terminal 2: Vite dev server
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Open http://localhost:5173 in two windows (one incognito) to play yourself.
 
-## Expanding the Oxlint configuration
+Tests: `npm test` (pure logic) · `npm run test:emu` (adds emulator integration tests)
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+## One-time Firebase setup (~10 min)
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
-```
+1. https://console.firebase.google.com -> Add project (no Analytics needed).
+2. Build -> Authentication -> Get started -> enable **Anonymous**.
+3. Build -> Realtime Database -> Create database (pick the region closest to
+   your players) -> start in locked mode.
+4. Project settings -> Your apps -> Web app (</>) -> register -> copy the
+   `firebaseConfig` values into `src/net/firebaseConfig.ts`.
+5. Put your project id in `.firebaserc`, then deploy the security rules:
+   `npx firebase login` and `npx firebase deploy --only database`.
+6. Commit and push. Committing the config is safe: access control lives in
+   `database.rules.json`, not in the config values.
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## Deploy to GitHub Pages
+
+1. Push this repo to GitHub (default branch `main`).
+2. Repo Settings -> Pages -> Source: **GitHub Actions**.
+3. Push to `main` (or run the workflow manually). The site lands at
+   `https://<user>.github.io/<repo>/`.
+
+## House rules vs. the physical game
+
+16 fixed center spaces (completed piles clear to free their space) and digital
+stuck-handling: when every player is stuck, wood piles rotate automatically;
+three fruitless rotations end the round.
