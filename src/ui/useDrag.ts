@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type React from 'react'; // React.PointerEvent type only (new-JSX files do not auto-import React)
 import type { Card, PlaySource } from '../game/types';
 
@@ -18,30 +18,38 @@ export function parseDrop(el: Element | null): DropTarget | null {
 
 export function useDrag(onDrop: (source: PlaySource, target: DropTarget) => void) {
   const [drag, setDrag] = useState<DragState | null>(null);
-  const active = useRef<{ pointerId: number } | null>(null);
+  const cleanupRef = useRef<(() => void) | null>(null);
+
+  // remove window listeners if we unmount mid-drag
+  useEffect(() => () => { cleanupRef.current?.(); }, []);
 
   function startDrag(e: React.PointerEvent, card: Card, source: PlaySource) {
     e.preventDefault();
+    cleanupRef.current?.(); // a second pointer starting a drag tears down the first
     (e.target as Element).setPointerCapture?.(e.pointerId);
-    active.current = { pointerId: e.pointerId };
+    const pointerId = e.pointerId;
     setDrag({ card, source, x: e.clientX, y: e.clientY });
 
     const move = (ev: PointerEvent) => {
-      if (ev.pointerId !== active.current?.pointerId) return;
+      if (ev.pointerId !== pointerId) return;
       setDrag(d => (d ? { ...d, x: ev.clientX, y: ev.clientY } : d));
     };
     const up = (ev: PointerEvent) => {
-      if (ev.pointerId !== active.current?.pointerId) return;
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', up);
-      window.removeEventListener('pointercancel', up);
-      active.current = null;
+      if (ev.pointerId !== pointerId) return;
+      cleanup();
       setDrag(null);
       if (ev.type === 'pointerup') {
         const target = parseDrop(document.elementFromPoint(ev.clientX, ev.clientY));
         if (target) onDrop(source, target);
       }
     };
+    const cleanup = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      cleanupRef.current = null;
+    };
+    cleanupRef.current = cleanup;
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
     window.addEventListener('pointercancel', up);
