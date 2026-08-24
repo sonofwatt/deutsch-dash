@@ -8,6 +8,7 @@ export function GameOverOverlay() {
   const again = useGameStore(s => s.again);
   const host = isHost({ uid, room });
   const totals = Object.fromEntries(Object.entries(room.players).map(([id, p]) => [id, p.score]));
+  // gameOver is only entered with a unique winner (ties play another round); the join below is defensive
   const winners = winnerIds(totals, room.meta.targetScore);
   const rows = Object.entries(room.players).sort(([, a], [, b]) => b.score - a.score);
 

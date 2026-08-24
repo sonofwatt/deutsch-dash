@@ -8,6 +8,7 @@ import { reconcileTableau } from '../game/center';
 import * as netRooms from '../net/rooms';
 import * as netPlays from '../net/plays';
 import { pickNextHost, allConnectedStuck } from '../net/plays';
+import { watchConnected } from '../net/firebase';
 import type { JoinResult } from '../net/rooms';
 
 export interface Deps {
@@ -28,6 +29,7 @@ export interface Deps {
   nextRound(code: string, room: Room): Promise<void>;
   rematch(code: string, room: Room): Promise<void>;
   claimHost(code: string, uid: string): Promise<unknown>;
+  stopPresence: () => void;
 }
 
 export interface GameStore {
@@ -39,6 +41,8 @@ export interface GameStore {
   lastRejected: { card: Card; at: number } | null;
   joinPhase: 'idle' | 'joining' | 'in-room';
   joinError: string | null;
+  online: boolean;
+  setOnline(v: boolean): void;
   hostRoom(name: string, badgeId: BadgeId): Promise<string>;
   enterRoom(code: string, name: string, badgeId: BadgeId): Promise<JoinResult>;
   leave(): void;
@@ -157,7 +161,9 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
 
     return {
       uid: null, code: null, room: null, tableau: null, selection: null,
-      lastRejected: null, joinPhase: 'idle', joinError: null,
+      lastRejected: null, joinPhase: 'idle', joinError: null, online: true,
+
+      setOnline(v) { set({ online: v }); },
 
       async hostRoom(name, badgeId) {
         set({ joinPhase: 'joining', joinError: null });
@@ -180,6 +186,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         unwatch?.();
         unwatch = null;
         if (hostTimer) { clearTimeout(hostTimer); hostTimer = null; }
+        deps.stopPresence();
         set({ code: null, room: null, tableau: null, selection: null, joinPhase: 'idle' });
       },
 
@@ -189,6 +196,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
       },
 
       async playTo(target) {
+        if (!get().online) return; // spec §8: no plays while disconnected
         const { tableau, selection, code, uid, room } = get();
         if (!tableau || !selection || !code || !uid) return;
         set({ selection: null });
@@ -221,6 +229,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
       },
 
       flip() {
+        if (!get().online) return;
         const t = get().tableau;
         if (!t) return;
         const next = flipWood(t);
@@ -229,6 +238,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
       },
 
       markStuck() {
+        if (!get().online) return;
         const { code, uid, tableau, room } = get();
         if (!code || !uid || !tableau || !room?.round) return;
         if (hasLegalMove(tableau, room.round.spaces)) return; // button is a claim; verify it
@@ -263,9 +273,15 @@ const realDeps: Deps = {
   nextRound: netPlays.nextRound,
   rematch: netPlays.rematch,
   claimHost: netPlays.claimHost,
+  stopPresence: netRooms.stopPresenceNow,
 };
 
 export const gameStore = createGameStore(realDeps);
+try {
+  watchConnected(ok => gameStore.getState().setOnline(ok));
+} catch {
+  // module side effect: fine to skip when no Firebase backend is reachable (tests)
+}
 export function useGameStore<T>(selector: (s: GameStore) => T): T {
   return useStore(gameStore, selector);
 }

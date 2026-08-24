@@ -3,7 +3,7 @@ import { db } from './firebase';
 import type { Card, PlayerInfo, Room, Tableau } from '../game/types';
 import { buildDeck, deal, shuffle, type Rng } from '../game/deck';
 import { postCountForPlayers } from '../game/rules';
-import { centerPlayTxn } from '../game/center';
+import { centerPlayTxn, reconcileTableau } from '../game/center';
 import { scoreRound, winnerIds } from '../game/scoring';
 
 const r = (code: string, path = '') => ref(db, `rooms/${code}${path ? '/' + path : ''}`);
@@ -71,14 +71,21 @@ export async function incrementStuckRounds(code: string): Promise<number> {
 
 export async function commitScores(code: string, room: Room): Promise<void> {
   if (!room.round || room.round.scores) return; // idempotent
-  const scores = scoreRound(room.round.spaces, room.round.tableaus);
+  const round = room.round;
+  // Score the RECONCILED tableaus: a card whose center play committed but whose
+  // tableau persist hadn't landed yet must not count as both center and leftover.
+  const tableaus = Object.fromEntries(
+    Object.entries(round.tableaus).map(([uid, t]) => [uid, reconcileTableau(t, round.spaces)]),
+  );
+  const scores = scoreRound(round.spaces, tableaus);
   const patch: Record<string, unknown> = { 'round/scores': scores };
   const totals: Record<string, number> = {};
   for (const [uid, p] of Object.entries(room.players)) {
     totals[uid] = p.score + (scores[uid]?.delta ?? 0);
     patch[`players/${uid}/score`] = totals[uid];
   }
-  if (winnerIds(totals, room.meta.targetScore).length > 0) patch['meta/phase'] = 'gameOver';
+  // Ties at/above target play another round (spec: game ends only when someone stands alone on top)
+  if (winnerIds(totals, room.meta.targetScore).length === 1) patch['meta/phase'] = 'gameOver';
   await update(r(code), patch);
 }
 

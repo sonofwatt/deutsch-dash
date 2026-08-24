@@ -41,3 +41,6 @@ Tests: `npm test` (pure logic) · `npm run test:emu` (adds emulator integration 
 16 fixed center spaces (completed piles clear to free their space) and digital
 stuck-handling: when every player is stuck, wood piles rotate automatically;
 three fruitless rotations end the round.
+
+Tied at the target? The round simply continues to another round until someone
+stands alone on top.

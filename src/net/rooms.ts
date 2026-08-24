@@ -93,13 +93,29 @@ export function setTargetScore(code: string, target: number): Promise<void> {
   return set(ref(db, `rooms/${code}/meta/targetScore`), target);
 }
 
-export function startPresence(code: string, uid: string): void {
+let stopPresence: (() => void) | null = null;
+
+export function startPresence(code: string, uid: string): () => void {
+  stopPresenceNow(); // never leave a zombie presence writer from a previous room/session
   const connectedRef = ref(db, '.info/connected');
   const myConnected = ref(db, `rooms/${code}/players/${uid}/connected`);
-  onValue(connectedRef, snap => {
+  const off = onValue(connectedRef, snap => {
     if (snap.val() === true) {
       onDisconnect(myConnected).set(false);
       set(myConnected, true);
     }
   });
+  const teardown = () => {
+    off();
+    onDisconnect(myConnected).cancel().catch(() => {});
+    set(myConnected, false).catch(() => {});
+  };
+  stopPresence = teardown;
+  return teardown;
+}
+
+export function stopPresenceNow(): void {
+  const t = stopPresence;
+  stopPresence = null;
+  t?.();
 }

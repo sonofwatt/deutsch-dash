@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { MotionConfig } from 'framer-motion';
 import { Home } from './ui/screens/Home';
 import { RoomScreen } from './ui/screens/RoomScreen';
+import { configMissing } from './net/firebase';
 import './theme.css';
 import './ui/ui.css';
 
@@ -24,6 +25,17 @@ export function useRoute(): Route {
 
 export default function App() {
   const route = useRoute();
+  if (configMissing) {
+    return (
+      <div className="screen" style={{ justifyContent: 'center', alignItems: 'center', textAlign: 'center' }}>
+        <h1 className="title">Not configured</h1>
+        <p className="muted">
+          This deployment has no Firebase config. Paste your project config into
+          src/net/firebaseConfig.ts and redeploy.
+        </p>
+      </div>
+    );
+  }
   return (
     <MotionConfig reducedMotion="user">
       {route.screen === 'room' ? <RoomScreen code={route.code} /> : <Home />}

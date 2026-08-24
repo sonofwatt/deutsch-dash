@@ -24,6 +24,7 @@ function fakeDeps(over: Partial<Deps> = {}): Deps {
     nextRound: vi.fn(async () => {}),
     rematch: vi.fn(async () => {}),
     claimHost: vi.fn(async () => {}),
+    stopPresence: vi.fn(),
     ...over,
   };
 }
@@ -137,6 +138,31 @@ describe('selection', () => {
     expect(store.getState().selection).toEqual({ kind: 'blitz' });
     store.getState().select({ kind: 'blitz' });
     expect(store.getState().selection).toBeNull();
+  });
+});
+
+describe('offline guard', () => {
+  it('blocks playTo and flip while disconnected', async () => {
+    const deps = fakeDeps();
+    const store = createGameStore(deps);
+    const t = seededTableau();
+    const rigged: Tableau = { ...t, blitz: [...t.blitz.slice(0, -1), c(1, 'red')] };
+    store.setState({ uid: 'me', code: 'ABCDEF', room: playingRoom(rigged), tableau: rigged, online: false });
+
+    store.getState().select({ kind: 'blitz' });
+    await store.getState().playTo({ space: 0 }); // would be legal if online
+    expect(deps.playToCenter).not.toHaveBeenCalled();
+    expect(deps.persistTableau).not.toHaveBeenCalled();
+    expect(deps.clearStuck).not.toHaveBeenCalled();
+    expect(store.getState().tableau).toEqual(rigged);
+
+    const before = store.getState().tableau!.woodIndex;
+    store.getState().flip();
+    expect(store.getState().tableau!.woodIndex).toBe(before);
+
+    store.getState().setOnline(true);
+    store.getState().flip();
+    expect(store.getState().tableau!.woodIndex).toBe(before + 3); // guard lifts with reconnection
   });
 });
 

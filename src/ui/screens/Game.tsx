@@ -21,6 +21,7 @@ export function Game() {
   const flip = useGameStore(s => s.flip);
   const markStuck = useGameStore(s => s.markStuck);
   const lastRejected = useGameStore(s => s.lastRejected);
+  const online = useGameStore(s => s.online);
 
   const round = room.round;
   const me = room.players[uid];
@@ -38,7 +39,7 @@ export function Game() {
   const stuckAvailable = !hasLegalMove(tableau, round.spaces);
 
   return (
-    <div className="game">
+    <div className="game" style={{ opacity: online ? 1 : 0.6 }}>
       <div className="game-head">
         <strong>Round {room.meta.roundNumber}</strong>
         <span className="muted">{me.name} · {me.score} pts · to {room.meta.targetScore}</span>
