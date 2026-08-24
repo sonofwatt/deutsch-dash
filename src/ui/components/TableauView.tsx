@@ -1,7 +1,7 @@
 import type React from 'react';
 import { CardBack, CardView } from './CardView';
 import type { BadgeId } from '../../game/badges';
-import type { Card, PlaySource, Tableau } from '../../game/types';
+import { cardId, type Card, type PlaySource, type Tableau } from '../../game/types';
 
 export function TableauView(props: {
   t: Tableau; badgeId: BadgeId; selection: PlaySource | null; postHighlight: number[];
@@ -23,7 +23,7 @@ export function TableauView(props: {
             <div style={{ position: 'absolute', inset: 0 }}
               onClick={e => { e.stopPropagation(); props.onSelect({ kind: 'wood' }); }}
               onPointerDown={e => props.startDrag(e, woodTop, { kind: 'wood' })}>
-              <CardView card={woodTop} badgeId={badgeId} selected={isSel({ kind: 'wood' })} />
+              <CardView card={woodTop} badgeId={badgeId} selected={isSel({ kind: 'wood' })} flipKey={t.woodIndex} />
             </div>
           )}
         </div>
@@ -40,7 +40,7 @@ export function TableauView(props: {
               {top && (
                 <div onClick={e => { e.stopPropagation(); props.onSelect(source); }}
                   onPointerDown={e => props.startDrag(e, top, source)}>
-                  <CardView card={top} badgeId={badgeId} selected={isSel(source)} />
+                  <CardView card={top} badgeId={badgeId} selected={isSel(source)} layoutId={cardId(top)} />
                 </div>
               )}
             </div>
@@ -54,7 +54,7 @@ export function TableauView(props: {
           {blitzTop ? (
             <div onClick={() => props.onSelect({ kind: 'blitz' })}
               onPointerDown={e => props.startDrag(e, blitzTop, { kind: 'blitz' })}>
-              <CardView card={blitzTop} badgeId={badgeId} selected={isSel({ kind: 'blitz' })} />
+              <CardView card={blitzTop} badgeId={badgeId} selected={isSel({ kind: 'blitz' })} layoutId={cardId(blitzTop)} />
               <span className="count-bubble">{t.blitz.length}</span>
             </div>
           ) : <div className="pile-space" />}

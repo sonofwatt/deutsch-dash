@@ -26,3 +26,6 @@ button { font: inherit; }
 .btn:disabled { opacity: .4; cursor: default; }
 input.field, select.field { min-height: 48px; padding: 0 14px; border-radius: var(--radius);
   border: 1px solid var(--line); background: var(--surface); color: var(--ink); width: 100%; }
+button, [data-drop], .card { touch-action: manipulation; }
+.card, .card * { user-select: none; -webkit-user-select: none; }
+html { -webkit-text-size-adjust: 100%; }

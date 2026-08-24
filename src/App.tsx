@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { MotionConfig } from 'framer-motion';
 import { Home } from './ui/screens/Home';
 import { RoomScreen } from './ui/screens/RoomScreen';
 import './theme.css';
@@ -23,5 +24,9 @@ export function useRoute(): Route {
 
 export default function App() {
   const route = useRoute();
-  return route.screen === 'room' ? <RoomScreen code={route.code} /> : <Home />;
+  return (
+    <MotionConfig reducedMotion="user">
+      {route.screen === 'room' ? <RoomScreen code={route.code} /> : <Home />}
+    </MotionConfig>
+  );
 }

@@ -1,5 +1,6 @@
+import { AnimatePresence, motion } from 'framer-motion';
 import { CardView } from './CardView';
-import type { CenterSpace } from '../../game/types';
+import { cardId, type CenterSpace } from '../../game/types';
 import type { BadgeId } from '../../game/badges';
 
 export function CenterGrid(props: {
@@ -13,7 +14,15 @@ export function CenterGrid(props: {
         return (
           <div key={i} data-drop={`space:${i}`} onClick={() => props.onTap(i)}
             className={`pile-space${props.highlight.includes(i) ? ' glow' : ''}`}>
-            {top && <CardView card={top} badgeId={props.badgeOf(top.owner)} />}
+            <AnimatePresence>
+              {top && (
+                <motion.div key={`${i}:${s.history.length}`}
+                  exit={{ scale: 1.35, opacity: 0, transition: { duration: 0.35 } }}
+                  style={{ position: 'absolute', inset: 0 }}>
+                  <CardView card={top} badgeId={props.badgeOf(top.owner)} layoutId={cardId(top)} />
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         );
       })}

@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion';
 import { useGameStore, legalTargets, gameStore } from '../../state/store';
 import { hasLegalMove } from '../../game/rules';
 import type { BadgeId } from '../../game/badges';
@@ -19,6 +20,7 @@ export function Game() {
   const playTo = useGameStore(s => s.playTo);
   const flip = useGameStore(s => s.flip);
   const markStuck = useGameStore(s => s.markStuck);
+  const lastRejected = useGameStore(s => s.lastRejected);
 
   const round = room.round;
   const me = room.players[uid];
@@ -46,9 +48,13 @@ export function Game() {
       <CenterGrid spaces={round.spaces} highlight={targets.spaces} badgeOf={badgeOf}
         onTap={i => void playTo({ space: i })} />
       <div>
-        <TableauView t={tableau} badgeId={me.badgeId} selection={selection}
-          postHighlight={targets.posts} onSelect={select} onFlip={flip}
-          onTapPost={i => void playTo({ post: i })} startDrag={startDrag} />
+        <motion.div key={lastRejected?.at ?? 0}
+          animate={lastRejected ? { x: [0, -8, 8, -5, 5, 0] } : { x: 0 }}
+          transition={{ duration: 0.35 }}>
+          <TableauView t={tableau} badgeId={me.badgeId} selection={selection}
+            postHighlight={targets.posts} onSelect={select} onFlip={flip}
+            onTapPost={i => void playTo({ post: i })} startDrag={startDrag} />
+        </motion.div>
         <button className="btn stuck-btn" disabled={!stuckAvailable || me.stuckAt != null}
           onClick={markStuck} style={{ width: '100%', marginTop: 6 }}>
           {me.stuckAt != null ? 'Waiting for others…' : "I'm stuck"}
