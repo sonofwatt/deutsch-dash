@@ -30,3 +30,6 @@ firebase-debug.log
 database-debug.log
 ui-debug.log
 .firebase/
+
+# Claude Code session tooling
+.claude/
