@@ -126,6 +126,16 @@ describe('selection', () => {
 });
 
 describe('stale-session guards', () => {
+  const mkPlayers = () => ({
+    h:  { name: 'H', badgeId: 'star' as const,  joinedAt: 0, connected: false, stuckAt: null, score: 0 },
+    me: { name: 'D', badgeId: 'tulip' as const, joinedAt: 1, connected: true,  stuckAt: null, score: 0 },
+  });
+  const mkRoom = (): Room => ({
+    meta: { createdAt: 1, hostId: 'h', targetScore: 75, phase: 'playing', roundNumber: 1 },
+    players: mkPlayers(),
+    round: null,
+  });
+
   it('drops in-flight play continuations after leave()', async () => {
     let resolvePlay!: (v: boolean) => void;
     const deps = fakeDeps({
@@ -145,45 +155,42 @@ describe('stale-session guards', () => {
     expect(store.getState().tableau).toBeNull();
   });
 
-  it('arms the host-transfer timer and cancels it on leave()', async () => {
-    const mkPlayers = () => ({
-      h:  { name: 'H', badgeId: 'star' as const,  joinedAt: 0, connected: false, stuckAt: null, score: 0 },
-      me: { name: 'D', badgeId: 'tulip' as const, joinedAt: 1, connected: true,  stuckAt: null, score: 0 },
+  it('claims host after 5s when the host stays disconnected and I am next', async () => {
+    let cb: ((room: Room | null) => void) | undefined;
+    const deps = fakeDeps({
+      watchRoom: vi.fn((_code: string, f: (room: Room | null) => void) => { cb = f; return () => {}; }),
     });
-    const mkRoom = (): Room => ({
-      meta: { createdAt: 1, hostId: 'h', targetScore: 75, phase: 'playing', roundNumber: 1 },
-      players: mkPlayers(),
-      round: null,
-    });
-    // positive control: without leave(), the watchdog claims host after 5s
-    let cb1: ((room: Room | null) => void) | undefined;
-    const deps1 = fakeDeps({
-      watchRoom: vi.fn((_code: string, cb: (room: Room | null) => void) => { cb1 = cb; return () => {}; }),
-    });
-    const s1 = createGameStore(deps1);
-    await s1.getState().enterRoom('ABCDEF', 'D', 'tulip');
+    const store = createGameStore(deps);
+    await store.getState().enterRoom('AAAAAA', 'D', 'tulip');
     vi.useFakeTimers();
     try {
-      cb1!(mkRoom());
+      cb!(mkRoom());
       vi.advanceTimersByTime(5001);
-      expect(deps1.claimHost).toHaveBeenCalledWith('ABCDEF', 'me');
+      expect(deps.claimHost).toHaveBeenCalledWith('AAAAAA', 'me');
     } finally {
       vi.useRealTimers();
     }
+  });
 
-    // regression: leave() cancels the pending timer
-    let cb2: ((room: Room | null) => void) | undefined;
-    const deps2 = fakeDeps({
-      watchRoom: vi.fn((_code: string, cb: (room: Room | null) => void) => { cb2 = cb; return () => {}; }),
+  it('a timer armed in one room cannot fire into the next room', async () => {
+    const cbs: Array<(room: Room | null) => void> = [];
+    const deps = fakeDeps({
+      watchRoom: vi.fn((_code: string, f: (room: Room | null) => void) => { cbs.push(f); return () => {}; }),
     });
-    const s2 = createGameStore(deps2);
-    await s2.getState().enterRoom('ABCDEF', 'D', 'tulip');
+    const store = createGameStore(deps);
+    await store.getState().enterRoom('AAAAAA', 'D', 'tulip');
     vi.useFakeTimers();
     try {
-      cb2!(mkRoom());
-      s2.getState().leave();
-      vi.advanceTimersByTime(10000);
-      expect(deps2.claimHost).not.toHaveBeenCalled();
+      cbs[0]!(mkRoom());              // room A arms its watchdog (would fire at t=5000)
+      vi.advanceTimersByTime(3000);   // t=3000
+      store.getState().leave();       // must cancel room A's pending timer
+      await store.getState().enterRoom('XYZABC', 'D', 'tulip');
+      cbs[1]!(mkRoom());              // room B arms a FRESH watchdog (fires t=8000)
+      vi.advanceTimersByTime(3000);   // t=6000 - past A's old deadline, before B's
+      expect(deps.claimHost).not.toHaveBeenCalled(); // stale A-timer must not hit room B
+      vi.advanceTimersByTime(2001);   // t=8001 - B's own watchdog legitimately fires
+      expect(deps.claimHost).toHaveBeenCalledTimes(1);
+      expect(deps.claimHost).toHaveBeenCalledWith('XYZABC', 'me');
     } finally {
       vi.useRealTimers();
     }
