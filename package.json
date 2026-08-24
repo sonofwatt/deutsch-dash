@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:emu": "firebase emulators:exec --only database,auth --project demo-blitz \"cross-env EMULATOR=1 vitest run\"",
     "emu": "firebase emulators:start --only database,auth --project demo-blitz"
   },
   "dependencies": {
