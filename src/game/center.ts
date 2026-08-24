@@ -46,11 +46,12 @@ export function reconcileTableau(t: Tableau, spaces: CenterSpace[]): Tableau {
   );
   if (centerIds.size === 0) return t;
   const keep = (c: Card) => !centerIds.has(cardId(c));
+  const removedFlipped = t.wood.slice(0, t.woodIndex).filter(c => !keep(c)).length;
   return {
     ...t,
     blitz: t.blitz.filter(keep),
     post: t.post.map(s => s.filter(keep)),
     wood: t.wood.filter(keep),
-    woodIndex: Math.min(t.woodIndex, t.wood.filter(keep).length),
+    woodIndex: t.woodIndex - removedFlipped,
   };
 }

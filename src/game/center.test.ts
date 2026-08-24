@@ -56,4 +56,15 @@ describe('reconcileTableau', () => {
     expect(out.post).toEqual([[c(3, 'red', 'other')]]); // other players' ids never match mine
     expect(out.wood).toEqual([c(5, 'green', 'me')]);
   });
+  it('repositions the wood pointer when a flipped card was reclaimed by the center', () => {
+    const t = {
+      blitz: [], post: [[]],
+      wood: [c(1, 'red'), c(2, 'red'), c(3, 'red'), c(4, 'blue'), c(5, 'blue')],
+      woodIndex: 3, // flipped top is red 3
+    };
+    const spaces = normalizeSpaces({ 0: { stack: [c(3, 'red')] } }); // red 3 already in center
+    const out = reconcileTableau(t, spaces);
+    expect(out.wood).toEqual([c(1, 'red'), c(2, 'red'), c(4, 'blue'), c(5, 'blue')]);
+    expect(out.woodIndex).toBe(2); // top is now red 2, same as a normal play would leave it
+  });
 });
