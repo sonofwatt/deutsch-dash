@@ -67,6 +67,14 @@ describe('refillPosts', () => {
     const t = tab({ blitz: [], post: [[], [c(5, 'green')], []] });
     expect(refillPosts(t)).toEqual(t);
   });
+  it('fills slots in order until blitz runs out, leaving the rest empty', () => {
+    const t = tab({ blitz: [c(9, 'blue')], post: [[], [c(5, 'green')], []] });
+    const out = refillPosts(t);
+    expect(out.post[0]).toEqual([c(9, 'blue')]);
+    expect(out.post[1]).toEqual([c(5, 'green')]);
+    expect(out.post[2]).toEqual([]);
+    expect(out.blitz).toEqual([]);
+  });
 });
 
 describe('sourceTop / takeCard', () => {
