@@ -1,58 +1,74 @@
 # Project Handoff — German Spree (Dutch Blitz web app)
 
-_Last updated: 2026-08-24 (execution in progress — Task 1 of 15 complete)_
+_Last updated: 2026-08-24 — implementation complete on `feature/dutch-blitz`, final review verdict: READY._
 
 ## What this is
 
 A mobile-first multiplayer Dutch Blitz card game for 2–8 players. Host creates a
 room, texts the invite link, everyone plays in their phone browser. Frontend on
 GitHub Pages (static), Firebase Realtime Database as the only backend, anonymous
-auth. Priority requirement: flawless on iOS Safari and Android Chrome.
+auth. Verified against the official Dutch Blitz rules (post building, wood
+flip-3 cycle, stuck rotation, +1/−2 scoring to a 75-point target).
+
+## Status
+
+**All 15 plan tasks implemented, each gated by an independent review; a final
+whole-branch review (plus two fix waves) closed with READY at commit `358f1ac`.**
+
+- 65 unit tests passing, 2 emulator-gated integration files (skip without
+  `EMULATOR=1`), `npm run build` and lint clean.
+- The final review caught and fixed 3 critical cross-layer bugs unit tests
+  couldn't see (all-stuck snapshot recursion, Blitz missed when emptied via a
+  post build, wood pile un-flippable after first flip) plus presence teardown,
+  score reconciliation, spec-correct tie handling, environment gating with a
+  "Not configured" banner (verified live), offline play blocking, and a compact
+  2-player tableau that fits 360px phones.
 
 ## Key documents
 
 | Doc | Purpose |
 |---|---|
-| [Design spec](docs/superpowers/specs/2026-08-23-dutch-blitz-design.md) | Approved requirements: rules (verified against official Dutch Blitz), architecture, screens, mobile acceptance criteria |
-| [Implementation plan](docs/superpowers/plans/2026-08-23-dutch-blitz.md) | 15 TDD tasks with complete code per step; checkboxes track intent, ledger tracks truth |
-| `.superpowers/sdd/progress.md` | Execution ledger (git-ignored): which tasks are actually complete + minor findings parked for final review |
+| [Design spec](docs/superpowers/specs/2026-08-23-dutch-blitz-design.md) | Approved requirements |
+| [Implementation plan](docs/superpowers/plans/2026-08-23-dutch-blitz.md) | The 15 tasks as executed |
+| [README](README.md) | Setup, local dev, deploy, house rules |
+| `.superpowers/sdd/progress.md` | Execution ledger: per-task commits, every finding + disposition |
 
-## Status
-
-- **Done:** Task 1 — Vite + React 19 + TS(strict) scaffold, theme tokens, hash
-  router (`#/room/CODE`), Vitest wiring, GH-Pages `base` config. Committed on
-  branch `feature/dutch-blitz`.
-- **In progress:** Tasks 2–15 executing via subagent-per-task with review gates.
-- **Versions note:** scaffold uses newer majors than the plan text assumed
-  (React 19, Vite 8, Vitest 4, TS 6, zustand 5, framer-motion 13). Plan code is
-  applied on top, adapting only where typecheck demands; deviations are recorded
-  in `.superpowers/sdd/task-N-report.md` files.
-
-## How to run (current state)
+## How to run
 
 ```
 npm install
-npm test        # pure-logic tests (no emulator needed)
-npm run dev     # Vite dev server
+npm test        # 65 tests, no emulator needed
+npm run dev     # local dev (expects the Firebase emulator for multiplayer)
+npm run emu     # Firebase emulator — REQUIRES JAVA 11+ (not installed on this machine)
 ```
 
-The Firebase emulator (`npm run emu`, arrives in Task 7) needs Java 11+, which
-is NOT installed on this machine — the executor will use a portable JRE under
-the project (no system changes) or skip emulator-gated tests (they auto-skip
-without `EMULATOR=1`).
+## Remaining work before calling it done
 
-## Owner actions still ahead (David)
+**Blocked on Java/emulator (decision needed — install Java, or approve a
+portable JRE under the project, or run on another machine):**
 
-1. **Firebase project** (~10 min, after Task 15's README lands): create free
-   project, enable Anonymous auth + Realtime Database, paste config into
-   `src/net/firebaseConfig.ts`, deploy `database.rules.json` via Firebase CLI.
-2. **GitHub**: create repo (suggest `german-spree`), push, Settings → Pages →
-   Source: GitHub Actions.
-3. **Device pass**: run the plan's Task 15 real-device checklist (iPhone Safari
-   + Android Chrome) on the live URL.
+1. `npm run test:emu` green — the two integration suites (room lifecycle, live
+   transaction race) have never executed anywhere.
+2. Implement + emulator-test the `players/$uid` `.validate` rule closing the
+   join race (8-player cap / badge uniqueness are client-side-only today);
+   proposed rule text is in the ledger under Task 8.
+3. The two-tab manual checklists from plan Tasks 11–13 (lobby/presence, game
+   input incl. wood flip + race behavior, round cycle/host transfer), plus the
+   ledgered pointer-capture re-select check.
 
-## Conventions that bind all work
+**Owner actions (David):**
 
-TS strict, no `any`; last-array-element = top of every pile; Pointer Events
-only; animations `transform`/`opacity` only; hash routing only; commits end with
-`Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>`.
+4. Firebase setup per README (~10 min): project, Anonymous auth, RTDB, paste
+   config into `src/net/firebaseConfig.ts`, deploy `database.rules.json`.
+5. GitHub: create repo (suggest `german-spree`), push, Settings → Pages →
+   Source: GitHub Actions; confirm the workflow deploys green.
+6. Real-device acceptance pass (spec §7) on the live URL: iPhone Safari +
+   Android Chrome. Known item: iOS home-screen icon needs a PNG
+   `apple-touch-icon` (currently SVG, which iOS ignores).
+
+**Triaged fix-later list (non-blocking, in the ledger):** ShareInvite clipboard
+try/catch; rejection-shake remounts the tableau; room-code collision check on
+create; bundle code-split; combined roundEnd→gameOver snapshot skips the final
+score breakdown; kite/bell badge hues sit near suit blue/red; host transfer
+disabled in lobby (deliberate); harmless WS retry noise behind the
+"Not configured" banner.
