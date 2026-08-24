@@ -124,3 +124,68 @@ describe('selection', () => {
     expect(store.getState().selection).toBeNull();
   });
 });
+
+describe('stale-session guards', () => {
+  it('drops in-flight play continuations after leave()', async () => {
+    let resolvePlay!: (v: boolean) => void;
+    const deps = fakeDeps({
+      playToCenter: vi.fn(() => new Promise<boolean>(res => { resolvePlay = res; })),
+    });
+    const store = createGameStore(deps);
+    const t = seededTableau();
+    const oneLeft: Tableau = { ...t, blitz: [c(1, 'red')] };
+    store.setState({ uid: 'me', code: 'ABCDEF', room: playingRoom(oneLeft), tableau: oneLeft });
+    store.getState().select({ kind: 'blitz' });
+    const inFlight = store.getState().playTo({ space: 0 });
+    store.getState().leave();
+    resolvePlay(true);
+    await inFlight;
+    expect(deps.announceBlitz).not.toHaveBeenCalled();
+    expect(deps.persistTableau).not.toHaveBeenCalled();
+    expect(store.getState().tableau).toBeNull();
+  });
+
+  it('arms the host-transfer timer and cancels it on leave()', async () => {
+    const mkPlayers = () => ({
+      h:  { name: 'H', badgeId: 'star' as const,  joinedAt: 0, connected: false, stuckAt: null, score: 0 },
+      me: { name: 'D', badgeId: 'tulip' as const, joinedAt: 1, connected: true,  stuckAt: null, score: 0 },
+    });
+    const mkRoom = (): Room => ({
+      meta: { createdAt: 1, hostId: 'h', targetScore: 75, phase: 'playing', roundNumber: 1 },
+      players: mkPlayers(),
+      round: null,
+    });
+    // positive control: without leave(), the watchdog claims host after 5s
+    let cb1: ((room: Room | null) => void) | undefined;
+    const deps1 = fakeDeps({
+      watchRoom: vi.fn((_code: string, cb: (room: Room | null) => void) => { cb1 = cb; return () => {}; }),
+    });
+    const s1 = createGameStore(deps1);
+    await s1.getState().enterRoom('ABCDEF', 'D', 'tulip');
+    vi.useFakeTimers();
+    try {
+      cb1!(mkRoom());
+      vi.advanceTimersByTime(5001);
+      expect(deps1.claimHost).toHaveBeenCalledWith('ABCDEF', 'me');
+    } finally {
+      vi.useRealTimers();
+    }
+
+    // regression: leave() cancels the pending timer
+    let cb2: ((room: Room | null) => void) | undefined;
+    const deps2 = fakeDeps({
+      watchRoom: vi.fn((_code: string, cb: (room: Room | null) => void) => { cb2 = cb; return () => {}; }),
+    });
+    const s2 = createGameStore(deps2);
+    await s2.getState().enterRoom('ABCDEF', 'D', 'tulip');
+    vi.useFakeTimers();
+    try {
+      cb2!(mkRoom());
+      s2.getState().leave();
+      vi.advanceTimersByTime(10000);
+      expect(deps2.claimHost).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

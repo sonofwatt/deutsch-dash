@@ -168,6 +168,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
       leave() {
         unwatch?.();
         unwatch = null;
+        if (hostTimer) { clearTimeout(hostTimer); hostTimer = null; }
         set({ code: null, room: null, tableau: null, selection: null, joinPhase: 'idle' });
       },
 
@@ -197,6 +198,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         if (!taken) return;
         set({ tableau: taken.next }); // optimistic
         const committed = await deps.playToCenter(code, target.space, card);
+        if (get().code !== code) return; // session changed mid-flight (leave/rejoin) - drop the stale continuation
         if (!committed) {
           set({ tableau, lastRejected: { card, at: Date.now() } }); // rollback
           return;
