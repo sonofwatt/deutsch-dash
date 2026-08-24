@@ -1,5 +1,5 @@
 import {
-  get, onDisconnect, onValue, ref, serverTimestamp, set, update,
+  get, increment, onDisconnect, onValue, ref, serverTimestamp, set, update,
 } from 'firebase/database';
 import { db, ensureSignedIn } from './firebase';
 import { makeRoomCode } from './roomCodes';
@@ -87,11 +87,23 @@ export async function joinRoom(code: string, name: string, badgeId: BadgeId): Pr
     // join, and badge uniqueness for real, so a rejection here means another
     // client won the race (see database.rules.json for why playerCount is a
     // tracked counter rather than a live child count).
+    //
+    // playerCount uses the increment() sentinel, NOT `currentCount + 1`
+    // computed from the snapshot read above: that read can be stale by the
+    // time this write lands, so two racing joins at count 7 would both
+    // compute and send the literal value 8, and both satisfy the rule's
+    // "<= 8 and non-decreasing" validate (each sees data.val() go 7 -> 8
+    // once, then the second racer's *own* 8 >= 8 also passes) - a real,
+    // confirmed race that lets a 9th player in while the counter stays
+    // wedged at 8. increment(1) instead asks the server to add 1 to
+    // whatever value is actually committed at write time, so the second
+    // racer's write is resolved against the FIRST racer's already-committed
+    // 8, producing 9, which the <= 8 bound genuinely rejects.
     try {
       await update(roomRef(code), {
         [`players/${uid}`]: playerRecord(name, badgeId),
         [`badges/${badgeId}`]: uid,
-        'meta/playerCount': (room.meta.playerCount ?? Object.keys(room.players).length) + 1,
+        'meta/playerCount': increment(1),
       });
     } catch {
       return { ok: false, reason: 'race' };

@@ -1,7 +1,13 @@
 /// <reference types="node" />
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createRoom, joinRoom, normalizeRoom, MAX_PLAYERS } from './rooms';
-import { get, ref } from 'firebase/database';
+import { createRoom, joinRoom, normalizeRoom, peekRoom, MAX_PLAYERS } from './rooms';
+import { startRound } from './plays';
+import { makeRoomCode } from './roomCodes';
+import {
+  connectDatabaseEmulator, get, getDatabase, increment, ref, set, update, type Database,
+} from 'firebase/database';
+import { initializeApp, deleteApp, type FirebaseApp } from 'firebase/app';
+import { connectAuthEmulator, getAuth, signInAnonymously } from 'firebase/auth';
 import {
   initializeTestEnvironment, assertFails, assertSucceeds,
   type RulesTestEnvironment, type RulesTestContext,
@@ -9,6 +15,7 @@ import {
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import type { BadgeId } from '../game/badges';
 
 const emu = describe.runIf(process.env.EMULATOR === '1');
 
@@ -40,23 +47,32 @@ emu('rooms against emulator', () => {
 // so testing them honestly means proving the RULES reject/allow writes - not
 // just observing that joinRoom()'s client-side pre-checks do.
 //
-// That can't be done with the regular client SDK (firebase/database) here:
-// against a "demo-*" project's local emulator, EVERY connection - including
-// one that never signed in at all - is treated as an owner and bypasses
-// .write/.validate entirely. Confirmed empirically: an UNAUTHENTICATED
-// set() to a path whose rule is ".write": "auth != null" still succeeded,
-// and an authenticated set() against a path whose rule is
-// ".validate": "false" (an unconditional reject) still succeeded too. See
-// the report for the full isolation trail.
+// CORRECTED (see server-side-limits-report.md, Finding 1 / the correction to
+// its old Finding 2): this describe block was originally written believing
+// the regular client SDK (firebase/database) could not be used to prove rule
+// rejection here at all - "against a demo-* project's local emulator, every
+// connection is treated as an owner and bypasses .write/.validate entirely."
+// That conclusion was wrong. The real cause was a databaseURL namespace bug
+// in src/net/firebase.ts: the app's emulator config pointed at
+// `?ns=demo-blitz`, a namespace the emulator never loads database.rules.json
+// into (so it defaults to fully open), while firebase.json's declared rules
+// are only auto-loaded into `demo-blitz-default-rtdb`. Every "unauthenticated
+// write succeeded" / "invalid write succeeded" probe that led to the old
+// conclusion was run against that open, ruleless namespace. Now that
+// firebase.ts points at the correct namespace, the regular client SDK DOES
+// enforce .write/.validate for real - see the
+// 'app writes under real security rules' describe block below, whose first
+// test is written specifically as a regression canary for this exact bug.
 //
 // @firebase/rules-unit-testing's authenticatedContext()/assertFails/
-// assertSucceeds is Firebase's own supported tool for this - it drives the
-// emulator's rules-evaluation endpoint directly rather than through a
-// "trust me, I'm local" client connection, so .write/.validate are actually
-// exercised. It replaces the second-real-signed-in-identity approach (a
-// second Firebase app + signInAnonymously) for everything in this describe
-// block: authenticatedContext(uid) mints a rules-only identity directly,
-// which is both simpler and (per the above) actually meaningful here.
+// assertSucceeds remains the right tool for THIS describe block, though: it
+// drives the emulator's rules-evaluation endpoint directly and lets each test
+// below mutate one rules.json clause at a time and observe exactly one test
+// fail (see the report's "how I confirmed each one bites" section) without
+// needing a second real signed-in identity for every case. The describe
+// block below this one uses real second identities (a second Firebase app +
+// signInAnonymously) instead, specifically to prove the app's own code paths
+// - not just the rules engine in isolation.
 const rulesPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../database.rules.json');
 
 emu('server-side player cap and badge uniqueness (database.rules.json)', () => {
@@ -68,7 +84,23 @@ emu('server-side player cap and badge uniqueness (database.rules.json)', () => {
 
   beforeAll(async () => {
     testEnv = await initializeTestEnvironment({
-      projectId: 'demo-blitz',
+      // Deliberately NOT 'demo-blitz' (the app's real projectId/demoConfig,
+      // see ./firebase): @firebase/rules-unit-testing's .database() pushes
+      // the given `rules` directly into `?ns=<projectId>` (its own source
+      // comment says so - "otherwise the RTDB SDK will by default use
+      // `${projectId}-default-rtdb`, which is treated as a different DB").
+      // Confirmed empirically that this matters: with this projectId set to
+      // 'demo-blitz', temporarily reverting src/net/firebase.ts's emulator
+      // databaseURL to the old buggy `?ns=demo-blitz` (the Finding-1 bug)
+      // did NOT make the new 'app writes under real security rules' canary
+      // test below fail when the full suite ran - because THIS beforeAll,
+      // running first in the same file, had already pushed real rules into
+      // that exact namespace as a side effect, masking the very bug the
+      // canary exists to catch. A dedicated projectId here keeps this
+      // describe block's rules-injection completely out of any namespace
+      // the app itself (or the tests that drive it as a real client) ever
+      // touches, so a regression in EITHER place is caught independently.
+      projectId: 'demo-blitz-rules-test',
       database: { host: '127.0.0.1', port: 9000, rules: readFileSync(rulesPath, 'utf8') },
     });
     hostCtx = testEnv.authenticatedContext(HOST);
@@ -199,5 +231,256 @@ emu('server-side player cap and badge uniqueness (database.rules.json)', () => {
       },
       'meta/playerCount': 2,
     }));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Finding 3 (server-side-limits-report.md): the app's REAL client path,
+// against the REAL namespace, is now the primary evidence that
+// database.rules.json actually protects this app - not just that the rules
+// engine rejects synthetic writes in isolation (the block above), and not
+// just that ordinary app calls "still pass" (open rules would too; see the
+// first describe block in this file, none of which asserts a rejection).
+//
+// Every test below drives ordinary firebase/database client connections -
+// no @firebase/rules-unit-testing here - against demo-blitz-default-rtdb,
+// the exact namespace src/net/firebase.ts now points the emulator config at.
+// ---------------------------------------------------------------------------
+
+emu('app writes under real security rules (regular client SDK, correct namespace)', () => {
+  const createdApps: FirebaseApp[] = [];
+
+  beforeAll(async () => {
+    const { ensureSignedIn } = await import('./firebase');
+    await ensureSignedIn();
+  });
+
+  afterAll(async () => {
+    await Promise.all(createdApps.map(a => deleteApp(a)));
+  });
+
+  // A second, genuinely concurrent, genuinely-signed-in identity - needed for
+  // every test below - can't be had from the singleton `auth`/`db` in
+  // ./firebase (it's always whichever single user that module is currently
+  // signed in as). A second Firebase app instance is the standard way to get
+  // a second live connection with its own auth session against the same
+  // emulator, mirroring two different browser tabs.
+  async function secondaryIdentity(name: string): Promise<{ app: FirebaseApp; db: Database; uid: string }> {
+    const { demoConfig } = await import('./firebase');
+    const app = initializeApp(demoConfig, name);
+    const secAuth = getAuth(app);
+    connectAuthEmulator(secAuth, 'http://127.0.0.1:9099', { disableWarnings: true });
+    const secDb = getDatabase(app);
+    connectDatabaseEmulator(secDb, '127.0.0.1', 9000);
+    const uid = (await signInAnonymously(secAuth)).user.uid;
+    // Force the new connection's websocket handshake (and auth-token
+    // attachment) to finish now, not during the timed race below: a
+    // freshly-constructed Database/Auth pair still has to open and
+    // authenticate its own socket to the emulator, and racing that
+    // cold-start against the primary db (already warm from every earlier
+    // operation in this file) isn't a real concurrency test - it's just
+    // measuring connection setup time, and the warm side always "wins"
+    // regardless of which mechanism either side uses. Confirmed
+    // empirically: without this, a debug-logged race consistently showed
+    // the fresh secondary identity's read landing AFTER the warm primary
+    // identity's entire read+write had already completed. A nonexistent
+    // room path is a harmless, always-authorized (`rooms/$code`'s .read is
+    // `auth != null`) real round trip - `.info/connected` looked like a
+    // cheaper option but get() doesn't support that synthetic path.
+    await get(ref(secDb, 'rooms/__warmup__/meta'));
+    return { app, db: secDb, uid };
+  }
+
+  // Mirrors joinRoom()'s real logic (src/net/rooms.ts) - including its
+  // branch between a brand-new join (players/$uid + badges/$badgeId +
+  // meta/playerCount via increment(1), all one atomic update) and a rejoin
+  // (connected:true only) - against an explicit Database handle instead of
+  // the singleton primary one. joinRoom() itself is bound to ./firebase's
+  // module-level db/auth, so it can only ever act as whichever single uid
+  // that module is currently signed in as; it cannot be called "as" a second
+  // concurrent identity, which every race test below needs. This sends the
+  // exact writes joinRoom() sends, just addressed at a different connection.
+  async function joinAs(
+    database: Database, code: string, uid: string, name: string, badgeId: BadgeId,
+  ): Promise<'ok' | 'rejected'> {
+    const snap = await get(ref(database, `rooms/${code}`));
+    const room = normalizeRoom(snap.val());
+    const rejoining = !!room && uid in room.players;
+    try {
+      if (rejoining) {
+        await update(ref(database, `rooms/${code}/players/${uid}`), { connected: true });
+      } else {
+        await update(ref(database, `rooms/${code}`), {
+          [`players/${uid}`]: { name, badgeId, joinedAt: Date.now(), connected: true, stuckAt: null, score: 0 },
+          [`badges/${badgeId}`]: uid,
+          'meta/playerCount': increment(1),
+        });
+      }
+      return 'ok';
+    } catch {
+      return 'rejected';
+    }
+  }
+
+  // Mirrors createRoom()'s real two-step write (meta first via set(), then
+  // players+badges via update() - see src/net/rooms.ts and the report's
+  // Finding 3 on why the order matters) against an explicit Database handle,
+  // for the same reason joinAs() exists: createRoom() is bound to the
+  // singleton primary db/auth. Used below only to seat a THIRD identity as
+  // room owner, freeing the primary identity to be a genuine racer through
+  // the real, exported joinRoom() instead of always being "the host."
+  async function createRoomAs(
+    database: Database, uid: string, name: string, badgeId: BadgeId,
+  ): Promise<string> {
+    const code = makeRoomCode();
+    await set(ref(database, `rooms/${code}/meta`), {
+      createdAt: Date.now(), hostId: uid, targetScore: 75, phase: 'lobby', roundNumber: 0, playerCount: 1,
+    });
+    await update(ref(database, `rooms/${code}`), {
+      [`players/${uid}`]: { name, badgeId, joinedAt: Date.now(), connected: true, stuckAt: null, score: 0 },
+      [`badges/${badgeId}`]: uid,
+    });
+    return code;
+  }
+
+  it('CANARY: a non-host cannot write another player\'s round/tableaus - proves rules are ON in this namespace', async () => {
+    const code = await createRoom('Host', 'tulip');
+    const hostRoom = (await peekRoom(code))!;
+    const hostUid = hostRoom.meta.hostId;
+
+    const p2 = await secondaryIdentity('canary-p2');
+    createdApps.push(p2.app);
+    expect(await joinAs(p2.db, code, p2.uid, 'P2', 'bicycle')).toBe('ok');
+
+    // Real host-only round write (the other thing Finding 1 asked to check
+    // carefully) - must still succeed under real rules for this test to mean
+    // anything beyond "writes are rejected."
+    const room = (await peekRoom(code))!;
+    await startRound(code, room);
+
+    let rejected = false;
+    try {
+      await set(ref(p2.db, `rooms/${code}/round/tableaus/${hostUid}`), {
+        blitz: [], post: [[], [], []], wood: [], woodIndex: 0,
+      });
+    } catch {
+      rejected = true;
+    }
+    expect(
+      rejected,
+      'A non-host, non-owner write to round/tableaus/<hostUid> SUCCEEDED through the ' +
+      'ordinary client SDK. Either database.rules.json stopped protecting this path, or ' +
+      "- the exact Finding-1 bug - the app's emulator databaseURL " +
+      "(src/net/firebase.ts) is no longer pointed at the namespace database.rules.json " +
+      'is actually loaded into (?ns=demo-blitz-default-rtdb).',
+    ).toBe(true);
+  });
+
+  it('genuine cap race: two distinct identities racing for the 8th seat - exactly one wins, playerCount lands on 8', async () => {
+    // Room owner is a THIRD identity (not primary), specifically so racer A
+    // below can be the primary identity going through the REAL, exported
+    // joinRoom() - not just joinAs()'s mirror - as a genuine new joiner
+    // rather than the room's own host. That matters here more than in the
+    // other tests in this block: this is the one race that Finding 2's fix
+    // in src/net/rooms.ts (the increment() sentinel) exists to close, so
+    // this test should exercise that real code, not only its mirror.
+    const owner = await secondaryIdentity('cap-owner');
+    createdApps.push(owner.app);
+    const code = await createRoomAs(owner.db, owner.uid, 'Owner', 'tulip');
+    // Top up to MAX_PLAYERS - 1 total (owner + placeholders), through the
+    // real client SDK, as the owner/host - who has write access to any
+    // players/$uid. Each write is the exact players/$uid +
+    // meta/playerCount(increment(1)) shape a real join sends; badges/* is
+    // deliberately left untouched for these placeholders (only 8 badges
+    // exist total, and this test needs 2 spare ones for the actual racers
+    // below - the badge race is covered by its own, separate test).
+    for (let i = 0; i < MAX_PLAYERS - 2; i++) {
+      await update(ref(owner.db, `rooms/${code}`), {
+        [`players/seed-${i}`]: {
+          name: `Seed${i}`, badgeId: 'star', joinedAt: i, connected: true, stuckAt: null, score: 0,
+        },
+        'meta/playerCount': increment(1),
+      });
+    }
+    const before = (await peekRoom(code))!;
+    expect(Object.keys(before.players)).toHaveLength(MAX_PLAYERS - 1);
+    expect(before.meta.playerCount).toBe(MAX_PLAYERS - 1);
+
+    const racerB = await secondaryIdentity('cap-racer-b');
+    createdApps.push(racerB.app);
+
+    const [realResA, resB] = await Promise.all([
+      joinRoom(code, 'RacerA', 'anchor'),                      // the real, exported function
+      joinAs(racerB.db, code, racerB.uid, 'RacerB', 'acorn'),  // distinct badge: isolates the
+    ]);                                                         // cap from badge uniqueness
+    // Not asserting *which* JoinResult.reason the loser gets: depending on
+    // exact timing, joinRoom()'s pre-check can itself observe the room
+    // already full (reason 'full') just as validly as the rules rejecting
+    // its update() (reason 'race') - both are the client correctly
+    // reporting "you didn't get a seat," which is the property under test.
+    const results: Array<'ok' | 'rejected'> = [realResA.ok ? 'ok' : 'rejected', resB];
+    expect(results.filter(r => r === 'ok')).toHaveLength(1);
+    expect(results.filter(r => r === 'rejected')).toHaveLength(1);
+
+    const after = (await peekRoom(code))!;
+    expect(Object.keys(after.players)).toHaveLength(MAX_PLAYERS);
+    expect(after.meta.playerCount).toBe(MAX_PLAYERS);
+  });
+
+  it('badge race: two distinct identities claiming the same badge - exactly one wins', async () => {
+    // Deliberately NOT routed through the real joinRoom() the way the cap
+    // race above is: joinRoom()'s badge-taken pre-check is a stale client
+    // read, and empirically (confirmed while building this test, with
+    // logging) the primary connection's read+write consistently completes
+    // fast enough that the OTHER racer's pre-check - not database.rules.json
+    // - ends up deciding the winner, which would mean this test was
+    // actually exercising joinRoom()'s client-side shortcut instead of the
+    // rule it's meant to prove. joinAs() has no such pre-check for a new
+    // badge claim - it always attempts the write and lets the server
+    // decide - so using it for BOTH sides guarantees database.rules.json's
+    // badges/$badgeId validate (specifically its
+    // "!data.exists() || data.val() === auth.uid" clause) is the only thing
+    // that can produce the rejection, regardless of which side is faster.
+    const code = await createRoom('Host', 'tulip'); // plenty of cap headroom: isolates badge uniqueness
+
+    const claimantA = await secondaryIdentity('badge-racer-a');
+    const claimantB = await secondaryIdentity('badge-racer-b');
+    createdApps.push(claimantA.app, claimantB.app);
+
+    const [resA, resB] = await Promise.all([
+      joinAs(claimantA.db, code, claimantA.uid, 'ClaimA', 'bell'),
+      joinAs(claimantB.db, code, claimantB.uid, 'ClaimB', 'bell'), // same badge as A
+    ]);
+    const results: Array<'ok' | 'rejected'> = [resA, resB];
+    expect(results.filter(r => r === 'ok')).toHaveLength(1);
+    expect(results.filter(r => r === 'rejected')).toHaveLength(1);
+
+    const { db: primaryDb } = await import('./firebase');
+    const winnerUid = resA === 'ok' ? claimantA.uid : claimantB.uid;
+    const badgeSnap = await get(ref(primaryDb, `rooms/${code}/badges/bell`));
+    expect(badgeSnap.val()).toBe(winnerUid);
+
+    const room = (await peekRoom(code))!;
+    expect(Object.keys(room.players)).toHaveLength(2); // host + exactly one claimant
+  });
+
+  it('happy path: createRoom -> joinRoom (second identity) -> rejoin, all succeed end-to-end under real rules', async () => {
+    const code = await createRoom('Host', 'tulip');
+    const p2 = await secondaryIdentity('happy-p2');
+    createdApps.push(p2.app);
+
+    expect(await joinAs(p2.db, code, p2.uid, 'P2', 'bicycle')).toBe('ok');
+    let room = (await peekRoom(code))!;
+    expect(Object.keys(room.players)).toHaveLength(2);
+    expect(room.meta.playerCount).toBe(2);
+
+    // Rejoin: same secondary uid, already a member - must still succeed, and
+    // must NOT bump playerCount again (this exercises the data.exists()
+    // branch of players/$uid's validate, and the auth.uid === $uid branch of
+    // its .write, for a real NON-host uid, not the room's creator).
+    expect(await joinAs(p2.db, code, p2.uid, 'P2 renamed', 'bicycle')).toBe('ok');
+    room = (await peekRoom(code))!;
+    expect(Object.keys(room.players)).toHaveLength(2);
+    expect(room.meta.playerCount).toBe(2);
   });
 });

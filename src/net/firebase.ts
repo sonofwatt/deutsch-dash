@@ -11,7 +11,10 @@ const forceEmu = typeof process !== 'undefined' && process.env?.EMULATOR === '1'
 export const usingEmulator = forceEmu || (!isConfigured && import.meta.env.DEV);
 export const configMissing = !isConfigured && !usingEmulator;
 
-const demoConfig = { apiKey: 'demo', projectId: 'demo-blitz', databaseURL: 'http://127.0.0.1:9000?ns=demo-blitz' };
+// Exported so emulator tests can spin up a *second* signed-in identity
+// (initializeApp(demoConfig, 'secondary')) against the exact same
+// namespace the app itself uses - see rooms.emu.test.ts.
+export const demoConfig = { apiKey: 'demo', projectId: 'demo-blitz', databaseURL: 'http://127.0.0.1:9000?ns=demo-blitz-default-rtdb' };
 
 // An unconfigured production build must still initialize with SOMETHING routable
 // (the demo config) rather than crash on firebaseConfig's placeholder databaseURL -
