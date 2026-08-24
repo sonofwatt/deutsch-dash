@@ -38,7 +38,7 @@ export async function playToCenter(code: string, spaceIndex: number, card: Card)
   const result = await runTransaction(
     r(code, `round/spaces/${spaceIndex}`), centerPlayTxn(card), { applyLocally: false },
   );
-  if (result.committed) void set(r(code, 'round/stuckRounds'), 0);
+  if (result.committed) set(r(code, 'round/stuckRounds'), 0).catch(() => {}); // best-effort reset; a lost reset only delays the stall counter
   return result.committed;
 }
 
@@ -58,10 +58,12 @@ export function announceBlitz(code: string, uid: string): Promise<void> {
   return update(r(code), { 'round/blitzedBy': uid, 'meta/phase': 'roundEnd' });
 }
 
+// Called by the host client by convention; not security-enforced (casual trust model, see database.rules.json).
 export function endRoundStalled(code: string): Promise<void> {
   return update(r(code), { 'round/blitzedBy': null, 'meta/phase': 'roundEnd' });
 }
 
+// Called by the host client by convention; not security-enforced (casual trust model, see database.rules.json).
 export async function incrementStuckRounds(code: string): Promise<number> {
   const res = await runTransaction(r(code, 'round/stuckRounds'), (n: number | null) => (n ?? 0) + 1);
   return (res.snapshot.val() as number) ?? 0;
