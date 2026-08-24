@@ -65,7 +65,8 @@ rooms/{roomCode}/
   players/{uid}/   { name, badgeId, joinedAt, connected, stuckAt, score }
   round/
     piles/{0..15}/ { suit, cards: [{ v, suit, owner }] }   // center grid spaces
-    tableaus/{uid}/{ blitz: [card], post: [card|null], wood: [card], woodIndex }
+    tableaus/{uid}/{ blitz: [card], post: [[card]], wood: [card], woodIndex }
+                   // post is an array of stacks (descending, alternating face group)
     blitzedBy      uid | null
     startedAt
 ```
@@ -88,28 +89,38 @@ rooms/{roomCode}/
 ## 4. Game rules implemented
 
 - Each of up to 8 players uses a 40-card deck: values 1–10 in the four shared suit colors
-  (red, blue, green, yellow).
+  (red, blue, green, yellow). Every card also belongs to one of two **face groups** —
+  red & blue ("boy" in the physical game) and yellow & green ("girl") — which governs
+  post-pile building. Our design shows the group as a subtle, colorblind-safe face
+  marking (e.g. two distinct corner glyph shapes).
 - **Badges:** each player picks one of 8 badge combos (distinct hue + unique symbol,
   e.g. windmill, tulip, clog, bicycle, lantern, plough, wheat sheaf, star). The badge
   appears on card backs, as a small corner mark on played faces, and on avatars. Badge
   hues must stay distinguishable from the four suit colors and from each other
   (final palette chosen during visual design against a contrast checklist).
-- **Setup per round:** 10 cards to the Blitz pile (top face up); post slots — 3 for 4+
-  players, 4 for 3 players, 5 for 2 players — one face-up card each; the rest is the
-  face-down wood pile, flipped three at a time (top of the flipped three is playable).
-  When the wood pile is exhausted it is turned over unshuffled and reused.
-- **Playable cards:** any post card, the Blitz top, or the current wood flip top. Played
-  post slots refill immediately from the Blitz top. There is no building on post slots
-  (Dutch Blitz, not Nertz).
+- **Setup per round:** 10 cards to the Blitz pile (face up, top card playable); post
+  piles — 3, or 5 in a 2-player game — one face-up card each; the rest is the face-down
+  wood pile, flipped three at a time (top of the flipped three is playable). When the
+  wood pile is exhausted it is turned over unshuffled and reused.
+- **Playable to the center:** the top card of any post pile, the Blitz top, or the
+  current wood flip top.
+- **Post-pile building (official rule):** a player may also move the Blitz top, the wood
+  flip top, or the top card of one of their own post piles onto another of their own
+  post piles, one card at a time, in **descending sequence, alternating face group**
+  (e.g. yellow 7 on red 8 is legal; blue 7 on red 8 is not). When a post pile empties
+  completely, the slot refills immediately from the Blitz top.
 - **Center grid:** fixed 4×4 = 16 spaces. A 1 of any suit starts a pile in any empty
-  space; piles build 1→10 in a single suit. A pile that reaches 10 auto-clears after a
-  short celebratory animation, freeing its space.
+  space; piles build 1→10 in a single suit. Officially the 10 "finishes" a pile; as a
+  digital adaptation for the fixed grid, a finished pile auto-clears after a short
+  celebratory animation, freeing its space (played cards still count for scoring).
 - **Round end:** first player to empty their Blitz pile ends the round ("Blitz!" splash
   for everyone). Scoring: +1 per own card in the center, −2 per card left in own Blitz
   pile. Running scoreboard; first to the target (default 75, host-configurable in lobby)
   wins the game. Ties at/above target: highest total wins; if still tied, play another round.
-- **Stuck handling:** an "I'm stuck" button. When every connected player is stuck, all
-  wood piles rotate one card (top card moves to bottom) and stuck flags clear. If three
+- **Stuck handling:** an "I'm stuck" button (stuck = no legal play to the center *and*
+  no legal post-pile build). When every connected player is stuck, all wood piles rotate
+  one card (top card moves to bottom, shifting the flip-of-three cycle — the official
+  standstill rule) and stuck flags clear. If three
   consecutive rotations produce zero plays, the round ends and is scored with no Blitz
   bonus to anyone.
 
@@ -134,7 +145,8 @@ rooms/{roomCode}/
 
 - **Input:** Pointer Events only (one code path for touch + mouse). Two equal ways to
   play a card: drag-and-drop with valid-target highlighting, or tap-to-select then
-  tap-a-space. Wood pile flips on tap.
+  tap-a-target. Valid targets include center spaces and the player's own post piles
+  (post builds). Wood pile flips on tap.
 - **Touch requirements:** touch/drag targets ≥ 44px; generous drop zones (nearest valid
   space within a radius); no hover-dependent affordances.
 - **Animations (Framer Motion, `transform`/`opacity` only):** 3D flip for wood-pile
@@ -176,7 +188,8 @@ Every feature is verified on real iOS Safari and Android Chrome before it counts
 ## 9. Testing strategy
 
 1. **Unit (Vitest):** everything in `src/game/` — deck construction, legal moves, post
-   refill, wood flip/rotate cycle, scoring, stuck/round-end detection, badge uniqueness.
+   refill, post-build legality (descending + alternating face group), wood flip/rotate
+   cycle, scoring, stuck/round-end detection, badge uniqueness.
 2. **Integration (Firebase Emulator Suite):** security rules (players can't write others'
    tableaus), pile transactions under simulated races, host transfer.
 3. **Manual device pass per milestone:** scripted multi-tab desktop playtest + real
