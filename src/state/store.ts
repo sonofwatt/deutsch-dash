@@ -75,6 +75,7 @@ export function myPlayer(s: { uid: string | null; room: Room | null }): PlayerIn
 export function createGameStore(deps: Deps): StoreApi<GameStore> {
   let unwatch: (() => void) | null = null;
   let hostTimer: ReturnType<typeof setTimeout> | null = null;
+  let inSnapshot = false;
 
   const store = createStore<GameStore>((set, get) => {
 
@@ -87,54 +88,64 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
       const s = get();
       set({ room });
       if (!room || !s.uid) return;
-      const me = s.uid;
-      const phase = room.meta.phase;
+      // Firebase raises local onValue events SYNCHRONOUSLY from inside set()/update(),
+      // so the side effects below can re-enter this handler before it returns.
+      // Re-entrant snapshots still update state (above) but must not re-run side effects.
+      if (inSnapshot) return;
+      inSnapshot = true;
+      try {
+        const me = s.uid;
+        const phase = room.meta.phase;
 
-      // (1) adopt tableau on (re)join
-      if (phase === 'playing' && !get().tableau && room.round?.tableaus[me]) {
-        const adopted = reconcileTableau(room.round.tableaus[me], room.round.spaces);
-        set({ tableau: adopted });
-        void persist(adopted);
-      }
-      if (phase !== 'playing' && get().tableau) set({ tableau: null, selection: null });
-
-      // (3) all-stuck rotation
-      const meP = room.players[me];
-      if (phase === 'playing' && meP?.stuckAt != null && allConnectedStuck(room.players)) {
-        const t = get().tableau;
-        if (t) {
-          const rotated = rotateWood(t);
-          set({ tableau: rotated });
-          void persist(rotated);
+        // (1) adopt tableau on (re)join
+        if (phase === 'playing' && !get().tableau && room.round?.tableaus[me]) {
+          const adopted = reconcileTableau(room.round.tableaus[me], room.round.spaces);
+          set({ tableau: adopted });
+          void persist(adopted);
         }
-        void deps.clearStuck(get().code!, me);
-        if (isHost({ uid: me, room })) {
-          void deps.incrementStuckRounds(get().code!).then(n => {
-            if (n >= 3) void deps.endRoundStalled(get().code!);
-          });
-        }
-      }
+        if (phase !== 'playing' && get().tableau) set({ tableau: null, selection: null });
 
-      // (4) host commits scores once
-      if (isHost({ uid: me, room }) && phase === 'roundEnd' && room.round && !room.round.scores) {
-        void deps.commitScores(get().code!, room);
-      }
-
-      // (5) host transfer watchdog
-      const hostP = room.players[room.meta.hostId];
-      if (hostP && !hostP.connected && phase !== 'lobby') {
-        hostTimer ??= setTimeout(() => {
-          hostTimer = null;
-          const cur = get().room;
-          if (!cur) return;
-          const curHost = cur.players[cur.meta.hostId];
-          if (curHost && !curHost.connected && pickNextHost(cur.players) === me) {
-            void deps.claimHost(get().code!, me);
+        // (3) all-stuck rotation
+        const meP = room.players[me];
+        if (phase === 'playing' && meP?.stuckAt != null && allConnectedStuck(room.players)) {
+          // clear first: a snapshot raised synchronously by the writes below must not see me still stuck
+          void deps.clearStuck(get().code!, me);
+          const t = get().tableau;
+          if (t) {
+            const rotated = rotateWood(t);
+            set({ tableau: rotated });
+            void persist(rotated);
           }
-        }, 5000);
-      } else if (hostTimer) {
-        clearTimeout(hostTimer);
-        hostTimer = null;
+          if (isHost({ uid: me, room })) {
+            void deps.incrementStuckRounds(get().code!).then(n => {
+              if (n >= 3) void deps.endRoundStalled(get().code!);
+            });
+          }
+        }
+
+        // (4) host commits scores once
+        if (isHost({ uid: me, room }) && phase === 'roundEnd' && room.round && !room.round.scores) {
+          void deps.commitScores(get().code!, room);
+        }
+
+        // (5) host transfer watchdog
+        const hostP = room.players[room.meta.hostId];
+        if (hostP && !hostP.connected && phase !== 'lobby') {
+          hostTimer ??= setTimeout(() => {
+            hostTimer = null;
+            const cur = get().room;
+            if (!cur) return;
+            const curHost = cur.players[cur.meta.hostId];
+            if (curHost && !curHost.connected && pickNextHost(cur.players) === me) {
+              void deps.claimHost(get().code!, me);
+            }
+          }, 5000);
+        } else if (hostTimer) {
+          clearTimeout(hostTimer);
+          hostTimer = null;
+        }
+      } finally {
+        inSnapshot = false;
       }
     }
 
@@ -188,6 +199,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
           set({ tableau: next });
           void persist(next);
           void deps.clearStuck(code, uid);
+          if (next.blitz.length === 0) void deps.announceBlitz(code, uid);
           return;
         }
 

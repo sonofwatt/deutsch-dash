@@ -17,15 +17,16 @@ export function TableauView(props: {
   return (
     <div className="tableau-zone">
       <div>
-        <div style={{ position: 'relative' }} onClick={props.onFlip}>
-          {t.wood.length > t.woodIndex ? <CardBack badgeId={badgeId} /> : <div className="pile-space" />}
-          {woodTop && (
-            <div style={{ position: 'absolute', inset: 0 }}
-              onClick={e => { e.stopPropagation(); props.onSelect({ kind: 'wood' }); }}
+        <div className="row" style={{ gap: 4 }}>
+          <div onClick={props.onFlip}>
+            {t.wood.length > t.woodIndex ? <CardBack badgeId={badgeId} /> : <div className="pile-space" />}
+          </div>
+          {woodTop ? (
+            <div onClick={() => props.onSelect({ kind: 'wood' })}
               onPointerDown={e => props.startDrag(e, woodTop, { kind: 'wood' })}>
               <CardView card={woodTop} badgeId={badgeId} selected={isSel({ kind: 'wood' })} flipKey={t.woodIndex} />
             </div>
-          )}
+          ) : <div className="pile-space" />}
         </div>
         <div className="pile-label">wood {t.wood.length}</div>
       </div>

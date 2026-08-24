@@ -101,6 +101,21 @@ describe('optimistic play', () => {
     expect(deps.announceBlitz).toHaveBeenCalledWith('ABCDEF', 'me');
   });
 
+  it('announces blitz when the last blitz card builds onto a post', async () => {
+    const deps = fakeDeps();
+    const store = createGameStore(deps);
+    const t: Tableau = { blitz: [c(7, 'green')],
+                         post: [[c(8, 'red')], [c(2, 'blue')], [c(5, 'yellow')]], wood: [], woodIndex: 0 };
+    store.setState({ uid: 'me', code: 'ABCDEF', room: playingRoom(t), tableau: t });
+
+    store.getState().select({ kind: 'blitz' });
+    await store.getState().playTo({ post: 0 }); // green 7 builds on red 8
+
+    expect(store.getState().tableau!.blitz).toHaveLength(0);
+    expect(deps.announceBlitz).toHaveBeenCalledWith('ABCDEF', 'me');
+    expect(deps.clearStuck).toHaveBeenCalledWith('ABCDEF', 'me');
+  });
+
   it('illegal target is a no-op (no net call, tableau unchanged)', async () => {
     const deps = fakeDeps();
     const store = createGameStore(deps);
@@ -122,6 +137,31 @@ describe('selection', () => {
     expect(store.getState().selection).toEqual({ kind: 'blitz' });
     store.getState().select({ kind: 'blitz' });
     expect(store.getState().selection).toBeNull();
+  });
+});
+
+describe('all-stuck rotation re-entrancy', () => {
+  it('a snapshot raised synchronously by clearStuck/persist rotates wood exactly once', async () => {
+    let cb!: (room: Room | null) => void;
+    const woodTab: Tableau = { blitz: [c(9, 'red')], post: [[], [], []],
+                               wood: [c(1, 'red'), c(2, 'blue'), c(3, 'green')], woodIndex: 0 };
+    const room = playingRoom(woodTab);
+    room.players.me.stuckAt = 123; // every connected player is stuck
+    // Firebase's set() raises local onValue events synchronously - model that:
+    const reRaise = () => { cb(room); return Promise.resolve(); };
+    const deps = fakeDeps({
+      watchRoom: vi.fn((_code: string, f: (room: Room | null) => void) => { cb = f; return () => {}; }),
+      clearStuck: vi.fn(reRaise),
+      persistTableau: vi.fn(reRaise),
+    });
+    const store = createGameStore(deps);
+    await store.getState().enterRoom('ABCDEF', 'D', 'tulip');
+    store.setState({ tableau: woodTab });
+
+    cb(room);
+
+    expect(store.getState().tableau!.wood.map(w => w.v)).toEqual([2, 3, 1]); // rotated by exactly one card
+    expect(deps.incrementStuckRounds).toHaveBeenCalledTimes(1); // I am host; at most once
   });
 });
 
