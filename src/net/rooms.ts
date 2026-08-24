@@ -9,11 +9,13 @@ import { normalizeSpaces, normalizeTableau } from '../game/center';
 import { postCountForPlayers } from '../game/rules';
 
 export const ROOM_TTL_MS = 24 * 60 * 60 * 1000;
+// Mirrored in database.rules.json's rooms/$code/meta/playerCount .validate
+// rule (the literal 8 there) - keep the two in sync.
 export const MAX_PLAYERS = 8;
 
 export type JoinResult =
   | { ok: true; code: string }
-  | { ok: false; reason: 'not-found' | 'expired' | 'full' | 'badge-taken' | 'started' };
+  | { ok: false; reason: 'not-found' | 'expired' | 'full' | 'badge-taken' | 'started' | 'race' };
 
 const roomRef = (code: string) => ref(db, `rooms/${code}`);
 
@@ -52,8 +54,16 @@ export async function createRoom(name: string, badgeId: BadgeId): Promise<string
   const code = makeRoomCode();
   const meta: Omit<RoomMeta, 'createdAt'> & { createdAt: object } = {
     createdAt: serverTimestamp(), hostId: uid, targetScore: 75, phase: 'lobby', roundNumber: 0,
+    playerCount: 1,
   };
-  await set(roomRef(code), { meta, players: { [uid]: playerRecord(name, badgeId) } });
+  // Two sequential writes, not one atomic set(): the players/$uid .validate
+  // rule reads meta/phase to gate new joins, and (verified empirically
+  // against the emulator - see the report) that cross-reference is only
+  // reliable when meta is data ALREADY COMMITTED, not part of the SAME
+  // write as the player being validated. Safe to split here (unlike
+  // joinRoom) because nobody else can be racing a code nobody has seen yet.
+  await set(ref(db, `rooms/${code}/meta`), meta);
+  await update(roomRef(code), { [`players/${uid}`]: playerRecord(name, badgeId), [`badges/${badgeId}`]: uid });
   startPresence(code, uid);
   return code;
 }
@@ -71,7 +81,21 @@ export async function joinRoom(code: string, name: string, badgeId: BadgeId): Pr
     if (Object.values(room.players).some(p => p.badgeId === badgeId)) {
       return { ok: false, reason: 'badge-taken' };
     }
-    await set(ref(db, `rooms/${code}/players/${uid}`), playerRecord(name, badgeId));
+    // Atomic: the player record, the badge claim, and the playerCount bump
+    // must land together, and the checks above are only a fast/friendly
+    // pre-check - database.rules.json enforces the 8-player cap, lobby-only
+    // join, and badge uniqueness for real, so a rejection here means another
+    // client won the race (see database.rules.json for why playerCount is a
+    // tracked counter rather than a live child count).
+    try {
+      await update(roomRef(code), {
+        [`players/${uid}`]: playerRecord(name, badgeId),
+        [`badges/${badgeId}`]: uid,
+        'meta/playerCount': (room.meta.playerCount ?? Object.keys(room.players).length) + 1,
+      });
+    } catch {
+      return { ok: false, reason: 'race' };
+    }
   } else {
     await update(ref(db, `rooms/${code}/players/${uid}`), { connected: true });
   }

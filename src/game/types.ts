@@ -19,6 +19,9 @@ export type Phase = 'lobby' | 'playing' | 'roundEnd' | 'gameOver';
 
 export interface RoomMeta {
   createdAt: number; hostId: string; targetScore: number; phase: Phase; roundNumber: number;
+  // Optional: rooms created before this field existed (and ad-hoc test fixtures) omit it.
+  // rooms.ts keeps it in sync with the actual player count - see MAX_PLAYERS in net/rooms.ts.
+  playerCount?: number;
 }
 
 import type { BadgeId } from './badges';

@@ -9,6 +9,7 @@ const REASONS: Record<string, string> = {
   'not-found': 'No room with that code.', expired: 'This room has expired.',
   full: 'Room is full (8 players).', 'badge-taken': 'That badge is taken - pick another.',
   started: 'This game already started without you.',
+  race: 'Someone just took that spot — try again.',
 };
 
 export function Join({ code }: { code: string }) {

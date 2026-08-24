@@ -33,3 +33,4 @@ ui-debug.log
 
 # Claude Code session tooling
 .claude/
+.tools/

@@ -10,8 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:emu": "firebase emulators:exec --only database,auth --project demo-blitz \"cross-env EMULATOR=1 vitest run\"",
-    "emu": "firebase emulators:start --only database,auth --project demo-blitz"
+    "test:emu": "node scripts/with-java.mjs firebase emulators:exec --only database,auth --project demo-blitz \"cross-env EMULATOR=1 vitest run\"",
+    "emu": "node scripts/with-java.mjs firebase emulators:start --only database,auth --project demo-blitz"
   },
   "dependencies": {
     "firebase": "^12.18.0",
@@ -21,6 +21,7 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
