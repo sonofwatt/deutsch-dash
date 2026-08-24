@@ -3,6 +3,7 @@ import { MotionConfig } from 'framer-motion';
 import { Home } from './ui/screens/Home';
 import { RoomScreen } from './ui/screens/RoomScreen';
 import { configMissing } from './net/firebase';
+import { gameStore } from './state/store';
 import './theme.css';
 import './ui/ui.css';
 
@@ -25,6 +26,11 @@ export function useRoute(): Route {
 
 export default function App() {
   const route = useRoute();
+  useEffect(() => {
+    const s = gameStore.getState();
+    if (route.screen === 'home' && s.joinPhase !== 'idle') s.leave();
+    if (route.screen === 'room' && s.code && s.code !== route.code) s.leave();
+  }, [route]);
   if (configMissing) {
     return (
       <div className="screen" style={{ justifyContent: 'center', alignItems: 'center', textAlign: 'center' }}>

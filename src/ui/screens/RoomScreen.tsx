@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { gameStore, useGameStore } from '../../state/store';
+import { useGameStore } from '../../state/store';
 import { Join } from './Join';
 import { Lobby } from './Lobby';
 import { Game } from './Game';
@@ -10,12 +10,6 @@ import { GameOverOverlay } from '../components/GameOverOverlay';
 export function RoomScreen({ code }: { code: string }) {
   const joinPhase = useGameStore(s => s.joinPhase);
   const room = useGameStore(s => s.room);
-  const leave = useGameStore(s => s.leave);
-  // Hash-navigating away from the room must tear the session down (watcher + presence),
-  // or the player lingers as a connected zombie.
-  useEffect(() => () => {
-    if (gameStore.getState().joinPhase === 'in-room') leave();
-  }, [leave]);
   const phase = room?.meta.phase;
   const blitzedBy = room?.round?.blitzedBy ?? null;
   const [splashUntil, setSplashUntil] = useState(0);

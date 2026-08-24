@@ -24,6 +24,7 @@
 .glow { border-color: #22c55e; border-style: solid; box-shadow: 0 0 0 3px rgb(34 197 94 / .35); }
 .tableau-zone { display: flex; gap: 10px; align-items: flex-end; justify-content: center;
   padding-bottom: 4px; }
+.tableau-zone.tight { gap: 6px; --card-w: clamp(44px, 11.5vw, 58px); }
 .pile-label { font-size: 10px; text-align: center; color: var(--ink-soft); margin-top: 3px; }
 .count-bubble { position: absolute; top: -6px; right: -6px; background: var(--accent);
   color: var(--bg); font-size: 11px; font-weight: 800; border-radius: 999px;

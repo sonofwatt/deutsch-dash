@@ -11,11 +11,13 @@ const forceEmu = typeof process !== 'undefined' && process.env?.EMULATOR === '1'
 export const usingEmulator = forceEmu || (!isConfigured && import.meta.env.DEV);
 export const configMissing = !isConfigured && !usingEmulator;
 
-const app = initializeApp(
-  usingEmulator
-    ? { apiKey: 'demo', projectId: 'demo-blitz', databaseURL: 'http://127.0.0.1:9000?ns=demo-blitz' }
-    : firebaseConfig,
-);
+const demoConfig = { apiKey: 'demo', projectId: 'demo-blitz', databaseURL: 'http://127.0.0.1:9000?ns=demo-blitz' };
+
+// An unconfigured production build must still initialize with SOMETHING routable
+// (the demo config) rather than crash on firebaseConfig's placeholder databaseURL -
+// the configMissing banner in App.tsx needs to render, and nothing behind it
+// actually connects (usingEmulator gates the emulator wiring below).
+const app = initializeApp(usingEmulator || configMissing ? demoConfig : firebaseConfig);
 
 export const db: Database = getDatabase(app);
 export const auth: Auth = getAuth(app);

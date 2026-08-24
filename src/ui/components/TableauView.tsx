@@ -15,9 +15,9 @@ export function TableauView(props: {
   const isSel = (s: PlaySource) => sel === JSON.stringify(s);
 
   return (
-    <div className="tableau-zone">
+    <div className={`tableau-zone${t.post.length >= 5 ? ' tight' : ''}`}>
       <div>
-        <div className="row" style={{ gap: 4 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <div onClick={props.onFlip}>
             {t.wood.length > t.woodIndex ? <CardBack badgeId={badgeId} /> : <div className="pile-space" />}
           </div>
