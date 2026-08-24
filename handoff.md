@@ -1,4 +1,4 @@
-# Project Handoff — German Spree (Dutch Blitz web app)
+# Project Handoff — Holland Hustle (Dutch Blitz web app)
 
 _Last updated: 2026-08-24 — implementation complete on `feature/dutch-blitz`, final review verdict: READY._
 
@@ -60,7 +60,7 @@ portable JRE under the project, or run on another machine):**
 
 4. Firebase setup per README (~10 min): project, Anonymous auth, RTDB, paste
    config into `src/net/firebaseConfig.ts`, deploy `database.rules.json`.
-5. GitHub: create repo (suggest `german-spree`), push, Settings → Pages →
+5. GitHub: create repo (suggest `holland-hustle`), push, Settings → Pages →
    Source: GitHub Actions; confirm the workflow deploys green.
 6. Real-device acceptance pass (spec §7) on the live URL: iPhone Safari +
    Android Chrome. Known item: iOS home-screen icon needs a PNG

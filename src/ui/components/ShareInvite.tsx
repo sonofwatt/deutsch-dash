@@ -9,7 +9,7 @@ export function ShareInvite({ code }: { code: string }) {
   const url = inviteUrl(code);
   async function share() {
     if (navigator.share) {
-      try { await navigator.share({ title: 'German Spree', text: `Join my game! ${url}` }); } catch { /* user cancelled */ }
+      try { await navigator.share({ title: 'Holland Hustle', text: `Join my game! ${url}` }); } catch { /* user cancelled */ }
     } else {
       await navigator.clipboard.writeText(url);
       setCopied(true);

@@ -1,4 +1,4 @@
-# German Spree
+# Holland Hustle
 
 A mobile-first multiplayer Dutch Blitz card game for 2-8 players. Create a room,
 text the invite link, race to empty your Blitz pile. React + Firebase Realtime
@@ -31,7 +31,7 @@ Tests: `npm test` (pure logic) · `npm run test:emu` (adds emulator integration 
 
 ## Deploy to GitHub Pages
 
-1. Push this repo to GitHub (default branch `main`).
+1. Push this repo to GitHub (suggested repo name `holland-hustle`; default branch `main`).
 2. Repo Settings -> Pages -> Source: **GitHub Actions**.
 3. Push to `main` (or run the workflow manually). The site lands at
    `https://<user>.github.io/<repo>/`.

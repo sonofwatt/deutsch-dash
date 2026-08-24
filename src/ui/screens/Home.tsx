@@ -27,7 +27,7 @@ export function Home() {
 
   return (
     <div className="screen stack">
-      <h1 className="title">German Spree</h1>
+      <h1 className="title">Holland Hustle</h1>
       <p className="muted">Fast-paced multiplayer card racing. Create a room, text the link, play.</p>
       <input className="field" placeholder="Your name" maxLength={14}
         value={name} onChange={e => setName(e.target.value)} />
