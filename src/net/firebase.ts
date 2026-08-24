@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { connectAuthEmulator, getAuth, signInAnonymously, type Auth } from 'firebase/auth';
-import { connectDatabaseEmulator, getDatabase, type Database } from 'firebase/database';
+import { connectDatabaseEmulator, getDatabase, onValue, ref, type Database } from 'firebase/database';
 import { firebaseConfig, isConfigured } from './firebaseConfig';
 
 export const usingEmulator = !isConfigured;
@@ -22,4 +22,8 @@ if (usingEmulator) {
 export function ensureSignedIn(): Promise<string> {
   if (auth.currentUser) return Promise.resolve(auth.currentUser.uid);
   return signInAnonymously(auth).then(cred => cred.user.uid);
+}
+
+export function watchConnected(cb: (ok: boolean) => void): () => void {
+  return onValue(ref(db, '.info/connected'), snap => cb(snap.val() === true));
 }
