@@ -40,7 +40,7 @@ export function TableauView(props: {
               {top && (
                 <div onClick={e => { e.stopPropagation(); props.onSelect(source); }}
                   onPointerDown={e => props.startDrag(e, top, source)}>
-                  <CardView card={top} badgeId={badgeId} selected={isSel(source)} layoutId={cardId(top)} />
+                  <CardView key={cardId(top)} card={top} badgeId={badgeId} selected={isSel(source)} layoutId={cardId(top)} />
                 </div>
               )}
             </div>
@@ -54,7 +54,7 @@ export function TableauView(props: {
           {blitzTop ? (
             <div onClick={() => props.onSelect({ kind: 'blitz' })}
               onPointerDown={e => props.startDrag(e, blitzTop, { kind: 'blitz' })}>
-              <CardView card={blitzTop} badgeId={badgeId} selected={isSel({ kind: 'blitz' })} layoutId={cardId(blitzTop)} />
+              <CardView key={cardId(blitzTop)} card={blitzTop} badgeId={badgeId} selected={isSel({ kind: 'blitz' })} layoutId={cardId(blitzTop)} />
               <span className="count-bubble">{t.blitz.length}</span>
             </div>
           ) : <div className="pile-space" />}

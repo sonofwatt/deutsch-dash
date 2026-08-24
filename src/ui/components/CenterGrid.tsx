@@ -19,7 +19,7 @@ export function CenterGrid(props: {
                 <motion.div key={`${i}:${s.history.length}`}
                   exit={{ scale: 1.35, opacity: 0, transition: { duration: 0.35 } }}
                   style={{ position: 'absolute', inset: 0 }}>
-                  <CardView card={top} badgeId={props.badgeOf(top.owner)} layoutId={cardId(top)} />
+                  <CardView key={cardId(top)} card={top} badgeId={props.badgeOf(top.owner)} layoutId={cardId(top)} />
                 </motion.div>
               )}
             </AnimatePresence>
