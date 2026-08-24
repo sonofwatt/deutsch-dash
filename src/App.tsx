@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
+import { Home } from './ui/screens/Home';
+import { RoomScreen } from './ui/screens/RoomScreen';
 import './theme.css';
+import './ui/ui.css';
 
 export type Route = { screen: 'home' } | { screen: 'room'; code: string };
 
@@ -20,10 +23,5 @@ export function useRoute(): Route {
 
 export default function App() {
   const route = useRoute();
-  return (
-    <div className="screen">
-      <h1>German Spree</h1>
-      <p>{route.screen === 'room' ? `Room ${route.code}` : 'Home'}</p>
-    </div>
-  );
+  return route.screen === 'room' ? <RoomScreen code={route.code} /> : <Home />;
 }

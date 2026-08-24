@@ -83,6 +83,12 @@ export function watchRoom(code: string, cb: (room: Room | null) => void): () => 
   return onValue(roomRef(code), snap => cb(normalizeRoom(snap.val())));
 }
 
+export async function peekRoom(code: string): Promise<Room | null> {
+  await ensureSignedIn();
+  const snap = await get(roomRef(code));
+  return normalizeRoom(snap.val());
+}
+
 export function setTargetScore(code: string, target: number): Promise<void> {
   return set(ref(db, `rooms/${code}/meta/targetScore`), target);
 }
