@@ -6,7 +6,7 @@
 .badge-chip:disabled { opacity: .3; }
 .badge-glyph { font-size: 20px; }
 .stack { display: flex; flex-direction: column; gap: 12px; max-width: 420px; width: 100%; margin: 0 auto; }
-.row { display: flex; gap: 8px; align-items: center; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .spacer { flex: 1; }
 .title { font-weight: 800; font-size: 28px; margin: 0; }
 .muted { color: var(--ink-soft); }
