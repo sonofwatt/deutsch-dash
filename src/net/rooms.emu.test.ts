@@ -232,6 +232,20 @@ emu('server-side player cap and badge uniqueness (database.rules.json)', () => {
       'meta/playerCount': 2,
     }));
   });
+
+  // Task 5 (host-continuity): meta/hostId's new .validate must reject promoting
+  // a uid that isn't actually a player in this room, while still allowing a
+  // real one - covering both the ordinary claimHost() path (players already
+  // exist) and, via the "createRoom still succeeds" test above (meta written
+  // before players, same seedRoom/createRoomAs two-step shape this rule must
+  // tolerate), the room-creation bootstrap path where no players exist yet.
+  it('hostId validate: rejects a uid that is not a player in the room, allows an existing one', async () => {
+    const code = 'HOSTVALID';
+    await seedRoom(code, 1); // HOST + 'seed-0'
+    const db = hostCtx.database();
+    await assertFails(db.ref(`rooms/${code}/meta/hostId`).set('not-a-player-in-this-room'));
+    await assertSucceeds(db.ref(`rooms/${code}/meta/hostId`).set('seed-0'));
+  });
 });
 
 // ---------------------------------------------------------------------------

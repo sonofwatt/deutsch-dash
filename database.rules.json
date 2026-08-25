@@ -7,6 +7,9 @@
         ".read": "auth != null",
         "meta": {
           ".write": "auth != null",
+          "hostId": {
+            ".validate": "root.child('rooms').child($code).child('players').child(newData.val()).exists() || !root.child('rooms').child($code).child('players').exists()"
+          },
           "playerCount": {
             ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 8 && (!data.exists() || newData.val() >= data.val())"
           }
