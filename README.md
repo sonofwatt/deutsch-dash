@@ -19,6 +19,12 @@ Open http://localhost:5173 in two windows (one incognito) to play yourself.
 
 Tests: `npm test` (pure logic) · `npm run test:emu` (adds emulator integration tests)
 
+**Dev and tests always use the emulator, never the live database** — even with a
+real config committed. That keeps `npm run dev` from writing real rooms and stops
+unit tests opening a socket to production. A production build (`npm run build`)
+always uses the real project. To point the dev server at the live backend
+deliberately, run `VITE_USE_PROD=1 npm run dev`.
+
 ## One-time Firebase setup (~10 min)
 
 1. https://console.firebase.google.com -> Add project (no Analytics needed).

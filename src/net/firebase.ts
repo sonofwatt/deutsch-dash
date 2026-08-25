@@ -4,11 +4,15 @@ import { connectAuthEmulator, getAuth, signInAnonymously, type Auth } from 'fire
 import { connectDatabaseEmulator, getDatabase, onValue, ref, type Database } from 'firebase/database';
 import { firebaseConfig, isConfigured } from './firebaseConfig';
 
-// Emulator only when explicitly forced (npm run test:emu) or when unconfigured in dev.
-// A pasted config always wins in dev/test unless EMULATOR=1; an unconfigured
-// production build must NOT silently point at 127.0.0.1 - it surfaces configMissing.
+// Local work (dev server, unit tests, test:emu) uses the emulator; a production
+// BUILD uses the real project. Dev must never default to the live database - that
+// would write real rooms on every `npm run dev` and make unit tests open a socket
+// to production. Opt into the real backend from dev with VITE_USE_PROD=1.
+// An unconfigured production build must NOT silently point at 127.0.0.1 either -
+// it surfaces configMissing so App.tsx can render the "Not configured" banner.
 const forceEmu = typeof process !== 'undefined' && process.env?.EMULATOR === '1';
-export const usingEmulator = forceEmu || (!isConfigured && import.meta.env.DEV);
+const forceProd = import.meta.env.VITE_USE_PROD === '1';
+export const usingEmulator = forceEmu || (import.meta.env.DEV && !forceProd);
 export const configMissing = !isConfigured && !usingEmulator;
 
 // Exported so emulator tests can spin up a *second* signed-in identity
