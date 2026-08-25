@@ -27,6 +27,7 @@ export function normalizeRoom(raw: unknown): Room | null {
   for (const [uid, p] of Object.entries(r.players)) {
     players[uid] = { ...p, stuckAt: p.stuckAt ?? null, connected: p.connected ?? false, score: p.score ?? 0 };
   }
+  const meta: RoomMeta = { ...r.meta, creatorId: r.meta.creatorId ?? r.meta.hostId };
   const postCount = postCountForPlayers(Object.keys(players).length);
   let round: RoundState | null = null;
   if (r.round && typeof r.round === 'object') {
@@ -42,7 +43,7 @@ export function normalizeRoom(raw: unknown): Room | null {
       startedAt: rr.startedAt ?? 0,
     };
   }
-  return { meta: r.meta, players, round };
+  return { meta, players, round };
 }
 
 function playerRecord(name: string, badgeId: BadgeId): Omit<PlayerInfo, 'joinedAt'> & { joinedAt: object } {
@@ -53,7 +54,7 @@ export async function createRoom(name: string, badgeId: BadgeId): Promise<string
   const uid = await ensureSignedIn();
   const code = makeRoomCode();
   const meta: Omit<RoomMeta, 'createdAt'> & { createdAt: object } = {
-    createdAt: serverTimestamp(), hostId: uid, targetScore: 75, phase: 'lobby', roundNumber: 0,
+    createdAt: serverTimestamp(), hostId: uid, creatorId: uid, targetScore: 75, phase: 'lobby', roundNumber: 0,
     playerCount: 1,
   };
   // Two sequential writes, not one atomic set(): the players/$uid .validate

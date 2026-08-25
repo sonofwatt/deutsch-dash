@@ -13,7 +13,7 @@ emu('center transactions against emulator', () => {
     const { db, ensureSignedIn } = await import('./firebase');
     const uid = await ensureSignedIn();
     const room: Room = {
-      meta: { createdAt: Date.now(), hostId: uid, targetScore: 75, phase: 'lobby', roundNumber: 0 },
+      meta: { createdAt: Date.now(), hostId: uid, creatorId: uid, targetScore: 75, phase: 'lobby', roundNumber: 0 },
       players: { [uid]: { name: 'Host', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, score: 0 } },
       round: null,
     };

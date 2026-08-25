@@ -9,6 +9,7 @@ export function Lobby({ code }: { code: string }) {
   const setTarget = useGameStore(s => s.setTarget);
   const start = useGameStore(s => s.start);
   const players = Object.entries(room.players).sort(([, a], [, b]) => a.joinedAt - b.joinedAt);
+  const hostConnected = room.players[room.meta.hostId]?.connected ?? true;
 
   return (
     <div className="screen stack">
@@ -35,7 +36,9 @@ export function Lobby({ code }: { code: string }) {
         ? <button className="btn btn-primary" disabled={players.length < 2} onClick={start}>
             {players.length < 2 ? 'Waiting for players…' : 'Start game'}
           </button>
-        : <p className="muted">Waiting for the host to start…</p>}
+        : <p className="muted">
+            {hostConnected ? 'Waiting for the host to start…' : 'Host is away — someone else can start shortly…'}
+          </p>}
     </div>
   );
 }

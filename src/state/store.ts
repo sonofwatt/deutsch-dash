@@ -11,6 +11,12 @@ import { pickNextHost, allConnectedStuck } from '../net/plays';
 import { watchConnected } from '../net/firebase';
 import type { JoinResult } from '../net/rooms';
 
+// How long the host may stay disconnected in the watchdog below before a stand-in claims
+// host. Long enough that a quick app-switch (e.g. the native share sheet for "Invite
+// friends") usually does not churn host; cheap when it does anyway, because the true
+// creator reclaims host immediately on return (see onSnapshot) rather than waiting this out.
+export const HOST_AWAY_MS = 15000;
+
 export interface Deps {
   ensureSignedIn(): Promise<string>;
   watchRoom(code: string, cb: (room: Room | null) => void): () => void;
@@ -132,9 +138,21 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
           void deps.commitScores(get().code!, room);
         }
 
-        // (5) host transfer watchdog
+        // (5) creator reclaim: the creator is host whenever present, no timer needed.
+        // Not gated on players[me].connected - this code executing at all means the
+        // creator (me) is present; my own presence write may simply not have landed
+        // yet. claimHost aborts when the caller is already host, so this cannot loop.
+        if (room.meta.creatorId === me && room.meta.hostId !== me) {
+          void deps.claimHost(get().code!, me);
+        }
+
+        // (6) stand-in transfer watchdog: while the host is away (including in the
+        // lobby - a dead host there must be recoverable too), the longest-present
+        // connected player stands in after HOST_AWAY_MS. A creator reclaim above
+        // resolves this quickly when the creator returns; this covers the case
+        // where they don't.
         const hostP = room.players[room.meta.hostId];
-        if (hostP && !hostP.connected && phase !== 'lobby') {
+        if (hostP && !hostP.connected) {
           hostTimer ??= setTimeout(() => {
             hostTimer = null;
             const cur = get().room;
@@ -143,7 +161,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
             if (curHost && !curHost.connected && pickNextHost(cur.players) === me) {
               void deps.claimHost(get().code!, me);
             }
-          }, 5000);
+          }, HOST_AWAY_MS);
         } else if (hostTimer) {
           clearTimeout(hostTimer);
           hostTimer = null;

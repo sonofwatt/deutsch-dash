@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
-import { createGameStore, legalTargets, type Deps } from './store';
+import { createGameStore, legalTargets, HOST_AWAY_MS, type Deps } from './store';
 import { deal, buildDeck } from '../game/deck';
-import type { Card, Suit, Room, Tableau } from '../game/types';
+import type { Card, PlayerInfo, RoomMeta, Suit, Room, Tableau } from '../game/types';
 
 const c = (v: number, suit: Suit, owner = 'me'): Card => ({ v, suit, owner });
 
@@ -33,7 +33,7 @@ const seededTableau = (): Tableau => deal(buildDeck('me'), 3);
 
 function playingRoom(tableau: Tableau): Room {
   return {
-    meta: { createdAt: 1, hostId: 'me', targetScore: 75, phase: 'playing', roundNumber: 1 },
+    meta: { createdAt: 1, hostId: 'me', creatorId: 'me', targetScore: 75, phase: 'playing', roundNumber: 1 },
     players: { me: { name: 'D', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, score: 0 } },
     round: { spaces: Array.from({ length: 16 }, () => ({ stack: [], history: [] })),
              tableaus: { me: tableau }, blitzedBy: null, scores: null, stuckRounds: 0, startedAt: 1 },
@@ -192,13 +192,17 @@ describe('all-stuck rotation re-entrancy', () => {
 });
 
 describe('stale-session guards', () => {
-  const mkPlayers = () => ({
-    h:  { name: 'H', badgeId: 'star' as const,  joinedAt: 0, connected: false, stuckAt: null, score: 0 },
-    me: { name: 'D', badgeId: 'tulip' as const, joinedAt: 1, connected: true,  stuckAt: null, score: 0 },
+  // Defaults model the plain stand-in scenario: 'h' both created the room and holds
+  // host, and is disconnected. Pass metaOverrides for phase/creatorId, and
+  // hConnected=true to model the host reconnecting.
+  const mkPlayers = (hConnected = false): Record<string, PlayerInfo> => ({
+    h:  { name: 'H', badgeId: 'star',  joinedAt: 0, connected: hConnected, stuckAt: null, score: 0 },
+    me: { name: 'D', badgeId: 'tulip', joinedAt: 1, connected: true,       stuckAt: null, score: 0 },
   });
-  const mkRoom = (): Room => ({
-    meta: { createdAt: 1, hostId: 'h', targetScore: 75, phase: 'playing', roundNumber: 1 },
-    players: mkPlayers(),
+  const mkRoom = (metaOverrides: Partial<RoomMeta> = {}, hConnected = false): Room => ({
+    meta: { createdAt: 1, hostId: 'h', creatorId: 'h', targetScore: 75, phase: 'playing', roundNumber: 1,
+            ...metaOverrides },
+    players: mkPlayers(hConnected),
     round: null,
   });
 
@@ -221,7 +225,7 @@ describe('stale-session guards', () => {
     expect(store.getState().tableau).toBeNull();
   });
 
-  it('claims host after 5s when the host stays disconnected and I am next', async () => {
+  it('claims host after HOST_AWAY_MS when the host stays disconnected and I am next', async () => {
     let cb: ((room: Room | null) => void) | undefined;
     const deps = fakeDeps({
       watchRoom: vi.fn((_code: string, f: (room: Room | null) => void) => { cb = f; return () => {}; }),
@@ -231,7 +235,56 @@ describe('stale-session guards', () => {
     vi.useFakeTimers();
     try {
       cb!(mkRoom());
-      vi.advanceTimersByTime(5001);
+      vi.advanceTimersByTime(HOST_AWAY_MS + 1);
+      expect(deps.claimHost).toHaveBeenCalledWith('AAAAAA', 'me');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('claims host after HOST_AWAY_MS when the host is disconnected in the lobby (previously impossible)', async () => {
+    let cb: ((room: Room | null) => void) | undefined;
+    const deps = fakeDeps({
+      watchRoom: vi.fn((_code: string, f: (room: Room | null) => void) => { cb = f; return () => {}; }),
+    });
+    const store = createGameStore(deps);
+    await store.getState().enterRoom('AAAAAA', 'D', 'tulip');
+    vi.useFakeTimers();
+    try {
+      cb!(mkRoom({ phase: 'lobby' })); // the old `phase !== 'lobby'` guard made this case impossible
+      vi.advanceTimersByTime(HOST_AWAY_MS + 1);
+      expect(deps.claimHost).toHaveBeenCalledWith('AAAAAA', 'me');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a host who reconnects before the grace period elapses does not lose host', async () => {
+    // Two disconnect cycles, not one: a single reconnect-then-wait can pass even if
+    // the pending timer is never actually cancelled, because the timer's own
+    // fire-time re-check (get().room at fire time) independently no-ops when it
+    // finds the host connected. Only a SECOND disconnect - which must arm a fresh
+    // full-length timer rather than silently reuse a stale, uncleared one - proves
+    // cancellation itself happened, per spec item 3 ("must still cancel when the
+    // host reconnects").
+    let cb: ((room: Room | null) => void) | undefined;
+    const deps = fakeDeps({
+      watchRoom: vi.fn((_code: string, f: (room: Room | null) => void) => { cb = f; return () => {}; }),
+    });
+    const store = createGameStore(deps);
+    await store.getState().enterRoom('AAAAAA', 'D', 'tulip');
+    vi.useFakeTimers();
+    try {
+      cb!(mkRoom({ phase: 'lobby' }));               // t=0: host away - e.g. backgrounded for the invite share sheet
+      vi.advanceTimersByTime(HOST_AWAY_MS / 2);       // t=H/2
+      cb!(mkRoom({ phase: 'lobby' }, true));          // host reconnects - the pending timer must be cancelled outright
+      vi.advanceTimersByTime(HOST_AWAY_MS / 4);       // t=3H/4
+      cb!(mkRoom({ phase: 'lobby' }));                // host goes away again - must arm a FRESH full HOST_AWAY_MS timer
+      vi.advanceTimersByTime(HOST_AWAY_MS / 4 + 1);   // t=H+1: past the FIRST disconnect's now-stale original deadline.
+      // An uncancelled first timer would fire right here against this second,
+      // disconnected snapshot - transferring host ~3/4 of a grace period early.
+      expect(deps.claimHost).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(HOST_AWAY_MS * 3 / 4);   // t=7H/4+1: the fresh (second) timer's real deadline
       expect(deps.claimHost).toHaveBeenCalledWith('AAAAAA', 'me');
     } finally {
       vi.useRealTimers();
@@ -247,18 +300,61 @@ describe('stale-session guards', () => {
     await store.getState().enterRoom('AAAAAA', 'D', 'tulip');
     vi.useFakeTimers();
     try {
-      cbs[0]!(mkRoom());              // room A arms its watchdog (would fire at t=5000)
-      vi.advanceTimersByTime(3000);   // t=3000
-      store.getState().leave();       // must cancel room A's pending timer
+      cbs[0]!(mkRoom());                                 // room A arms its watchdog (fires at t=HOST_AWAY_MS)
+      vi.advanceTimersByTime(HOST_AWAY_MS * 3 / 5);       // t=0.6*HOST_AWAY_MS
+      store.getState().leave();                           // must cancel room A's pending timer
       await store.getState().enterRoom('XYZABC', 'D', 'tulip');
-      cbs[1]!(mkRoom());              // room B arms a FRESH watchdog (fires t=8000)
-      vi.advanceTimersByTime(3000);   // t=6000 - past A's old deadline, before B's
-      expect(deps.claimHost).not.toHaveBeenCalled(); // stale A-timer must not hit room B
-      vi.advanceTimersByTime(2001);   // t=8001 - B's own watchdog legitimately fires
+      cbs[1]!(mkRoom());                                   // room B arms a FRESH watchdog (fires t=1.6*HOST_AWAY_MS)
+      vi.advanceTimersByTime(HOST_AWAY_MS * 3 / 5);       // t=1.2*HOST_AWAY_MS - past A's old deadline, before B's
+      expect(deps.claimHost).not.toHaveBeenCalled();      // stale A-timer must not hit room B
+      vi.advanceTimersByTime(HOST_AWAY_MS * 2 / 5 + 1);   // t=1.6*HOST_AWAY_MS+1 - B's own watchdog legitimately fires
       expect(deps.claimHost).toHaveBeenCalledTimes(1);
       expect(deps.claimHost).toHaveBeenCalledWith('XYZABC', 'me');
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('creator reclaim', () => {
+  it('the creator reclaims host immediately (no timer advance) when a snapshot shows a different hostId', async () => {
+    let cb: ((room: Room | null) => void) | undefined;
+    const deps = fakeDeps({
+      watchRoom: vi.fn((_code: string, f: (room: Room | null) => void) => { cb = f; return () => {}; }),
+    });
+    const store = createGameStore(deps);
+    await store.getState().enterRoom('AAAAAA', 'D', 'tulip');
+    const room: Room = {
+      meta: { createdAt: 1, hostId: 'h', creatorId: 'me', targetScore: 75, phase: 'lobby', roundNumber: 0 },
+      // my own presence write may not have landed yet - reclaim must not depend on it
+      players: {
+        h:  { name: 'H', badgeId: 'star',  joinedAt: 0, connected: true,  stuckAt: null, score: 0 },
+        me: { name: 'D', badgeId: 'tulip', joinedAt: 1, connected: false, stuckAt: null, score: 0 },
+      },
+      round: null,
+    };
+    // no vi.useFakeTimers(), no time advance at all: claimHost must already have
+    // been called synchronously inside cb(), proving this is not the setTimeout path.
+    cb!(room);
+    expect(deps.claimHost).toHaveBeenCalledWith('AAAAAA', 'me');
+  });
+
+  it('a non-creator does not reclaim on that same snapshot shape', async () => {
+    let cb: ((room: Room | null) => void) | undefined;
+    const deps = fakeDeps({
+      watchRoom: vi.fn((_code: string, f: (room: Room | null) => void) => { cb = f; return () => {}; }),
+    });
+    const store = createGameStore(deps);
+    await store.getState().enterRoom('AAAAAA', 'D', 'tulip');
+    const room: Room = {
+      meta: { createdAt: 1, hostId: 'h', creatorId: 'someone-else', targetScore: 75, phase: 'lobby', roundNumber: 0 },
+      players: {
+        h:  { name: 'H', badgeId: 'star',  joinedAt: 0, connected: true,  stuckAt: null, score: 0 },
+        me: { name: 'D', badgeId: 'tulip', joinedAt: 1, connected: false, stuckAt: null, score: 0 },
+      },
+      round: null,
+    };
+    cb!(room);
+    expect(deps.claimHost).not.toHaveBeenCalled();
   });
 });

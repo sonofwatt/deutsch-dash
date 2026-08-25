@@ -18,7 +18,12 @@ export interface CenterSpace { stack: Card[]; history: Card[][] }
 export type Phase = 'lobby' | 'playing' | 'roundEnd' | 'gameOver';
 
 export interface RoomMeta {
-  createdAt: number; hostId: string; targetScore: number; phase: Phase; roundNumber: number;
+  createdAt: number; hostId: string;
+  // The room's creator: host whenever present, source of truth for reclaim (see store.ts's
+  // onSnapshot watchdog). Always populated - normalizeRoom defaults a missing value (rooms
+  // written before this field existed) to hostId, so downstream code never sees it absent.
+  creatorId: string;
+  targetScore: number; phase: Phase; roundNumber: number;
   // Optional: rooms created before this field existed (and ad-hoc test fixtures) omit it.
   // rooms.ts keeps it in sync with the actual player count - see MAX_PLAYERS in net/rooms.ts.
   playerCount?: number;
