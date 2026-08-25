@@ -60,29 +60,44 @@ Java is not installed system-wide; a portable Temurin JRE 21 lives in `.tools/`
 scripts automatically. On another machine, either install Java 11+ or re-download
 that JRE.
 
+## Verified against production (2026-08-25)
+
+Firebase project `holland-hustle` is wired and its rules are deployed. A live
+two-client test through the production build confirmed the whole path works:
+anonymous auth issuing two distinct identities, room creation, a second client
+joining (with the host's badge correctly greyed out), real-time lobby sync, the
+host deal (5 post piles for a 2-player game, 25-card wood, 10-card blitz), and a
+card played to the centre landing on the opponent's screen with the correct owner
+badge. No console errors at any point.
+
+Two test rooms (`WMTGGM`, `DX44BC`) are left in the database; they are harmless
+and ignored after the 24h expiry check.
+
+**Known behaviour found during that test:** host transfer is disabled while a room
+is in the lobby (`phase !== 'lobby'` in the store's watchdog). If the host closes
+their tab before starting, the room cannot be started by anyone and the group must
+create a new one. Deliberate per the plan, but it triggers easily in real use —
+worth revisiting.
+
 ## Remaining work
 
 **Owner actions (David) — the Firebase project `holland-hustle` already exists:**
 
-1. In the Firebase console: enable **Anonymous** sign-in (Authentication →
-   Sign-in method), then create a **Realtime Database** (pick the region closest
-   to your players, start in locked mode).
-2. Project settings → Your apps → add a **Web app**, copy the config values into
-   `src/net/firebaseConfig.ts`. Committing them is safe: access control lives in
-   `database.rules.json`. Until this is done the app shows a "Not configured"
-   banner instead of a white screen.
-3. Deploy the rules: `npx firebase login` then `npx firebase deploy --only database`.
-   (`.firebaserc` already points at `holland-hustle`.)
-4. GitHub: create the repo (name it `holland-hustle` so the Pages base path
+~~Anonymous auth, Realtime Database, config paste, rules deploy~~ — all done.
+
+1. GitHub: create the repo (name it `holland-hustle` so the Pages base path
    matches), push `main`, then Settings → Pages → Source: **GitHub Actions**.
    Confirm the workflow run goes green.
-5. Real-device acceptance pass (spec §7) on the live URL: iPhone Safari +
+2. Real-device acceptance pass (spec §7) on the live URL: iPhone Safari +
    Android Chrome. Two known items to check there: the iOS home-screen icon
    needs a PNG `apple-touch-icon` (SVG is ignored by iOS), and the ledgered
    pointer-capture re-select check on mouse drags.
-6. The two-tab manual checklists from plan Tasks 11–13 (lobby/presence, game
-   input including wood flip and race behaviour, round cycle, host transfer).
-   These can be run locally against the emulator before deploying.
+3. A full multi-round game with real players — the production test above covered
+   setup and a single play, not a round played to completion (blitz call,
+   scoring overlay, next round, rematch) or the stuck-rotation path.
+
+Note on PowerShell: `npx` is blocked by the execution policy on this machine; use
+`npx.cmd` (or Git Bash) for `firebase` commands.
 
 **Triaged fix-later list (non-blocking, in the ledger):** ShareInvite clipboard
 try/catch; rejection-shake remounts the tableau; room-code collision check on
