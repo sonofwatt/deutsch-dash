@@ -1,4 +1,4 @@
-# Project Handoff — Flemish Fury (Dutch Blitz web app)
+# Project Handoff — Deutsch Dash (Dutch Blitz web app)
 
 _Last updated: 2026-08-24 — merged to `main`, 77/77 tests green including full
 emulator coverage against real security rules._
@@ -119,9 +119,11 @@ Still outstanding:
 2. **Real-device acceptance pass (spec §7)** beyond copy-link: a full round on
    iPhone Safari and Android Chrome, checking no pull-to-refresh, no rubber-band
    scroll, no double-tap zoom, and no text selection while dragging cards.
-3. **iOS home-screen icon needs a PNG** `apple-touch-icon` — iOS ignores the SVG
-   currently referenced, so add-to-home-screen will show a blank icon.
-4. The ledgered pointer-capture re-select check on mouse drags.
+3. The ledgered pointer-capture re-select check on mouse drags.
+
+~~iOS home-screen icon~~ — fixed 2026-08-25: `public/icon-180.png` (apple-touch-icon)
+and `public/icon-512.png` are generated from the same design as `icon.svg` by
+`scripts/make-icons.py`; re-run it if the artwork changes.
 
 Note on PowerShell: `npx` is blocked by the execution policy on this machine; use
 `npx.cmd` (or Git Bash) for `firebase` commands.

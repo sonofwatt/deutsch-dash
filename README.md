@@ -1,4 +1,4 @@
-# Flemish Fury
+# Deutsch Dash
 
 A mobile-first multiplayer Dutch Blitz card game for 2-8 players. Create a room,
 text the invite link, race to empty your Blitz pile. React + Firebase Realtime

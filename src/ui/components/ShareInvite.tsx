@@ -13,7 +13,7 @@ export function ShareInvite({ code }: { code: string }) {
 
   async function share() {
     try {
-      await navigator.share({ title: 'Flemish Fury', text: `Join my game! ${url}` });
+      await navigator.share({ title: 'Deutsch Dash', text: `Join my game! ${url}` });
     } catch {
       // user dismissed the share sheet
     }
