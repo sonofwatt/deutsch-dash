@@ -15,7 +15,7 @@ import type { JoinResult } from '../net/rooms';
 // host. Long enough that a quick app-switch (e.g. the native share sheet for "Invite
 // friends") usually does not churn host; cheap when it does anyway, because the true
 // creator reclaims host immediately on return (see onSnapshot) rather than waiting this out.
-export const HOST_AWAY_MS = 15000;
+export const HOST_AWAY_MS = 30000;
 
 export interface Deps {
   ensureSignedIn(): Promise<string>;

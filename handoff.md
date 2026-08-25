@@ -80,23 +80,23 @@ the longest-present connected player stands in.**
 
 - `meta.creatorId` is immutable and set at room creation. The creator reclaims host
   automatically the moment they are back — no button, no timer.
-- If the host goes quiet, a stand-in takes over after `HOST_AWAY_MS` (15s, exported
+- If the host goes quiet, a stand-in takes over after `HOST_AWAY_MS` (30s, exported
   from `src/state/store.ts`). Transfer now works in the lobby too, so a host who
   closes their tab before starting no longer kills the room.
-- The 15s grace exists because tapping "Invite friends" opens the mobile share
+- The 30s grace exists because tapping "Invite friends" opens the mobile share
   sheet, which backgrounds the tab and drops the socket. Most invite round-trips
   finish inside it; if one doesn't, reclaim puts things right anyway.
 - Non-hosts see "Host is away — someone else can start shortly…" instead of an
   unexplained wait.
+- **Auto-resume:** anyone already in a room who reopens its link goes straight back
+  in (brief "Rejoining…" state) instead of re-picking a name and badge. Players who
+  are not members still get the normal join form, with taken badges greyed out.
 
 Verified live against production, two clients on separate origins: host away →
-grace held at 2s and 10s → stand-in took over at 20s and could start → original
-host returned and reclaimed instantly.
-
-**Remaining wrinkle:** a returning host lands on the Join screen rather than
-resuming straight into the room. Name and badge are pre-filled from localStorage,
-so it is one tap, but the screen says "Join room" to someone who never really left.
-Auto-resume when a stored identity already belongs to the room would be tidier.
+grace held → stand-in took over and could start → original host returned and
+reclaimed instantly. Auto-resume verified separately: closing and reopening the
+host's tab lands directly in the lobby, still host, while a different identity
+opening the same link still sees the join form.
 
 ## Remaining work
 

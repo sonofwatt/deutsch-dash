@@ -19,6 +19,7 @@ export function Join({ code }: { code: string }) {
   const [name, setName] = useState(localStorage.getItem('bz.name') ?? '');
   const [badge, setBadge] = useState<BadgeId | null>(localStorage.getItem('bz.badge') as BadgeId | null);
   const [taken, setTaken] = useState<BadgeId[]>([]);
+  const [resuming, setResuming] = useState(false);
 
   useEffect(() => {
     // sign in FIRST so peekRoom reuses the same uid (concurrent sign-ins can diverge),
@@ -28,15 +29,27 @@ export function Join({ code }: { code: string }) {
       try {
         const uid = await ensureSignedIn();
         const room = await peekRoom(code);
-        if (!cancelled && room) {
-          setTaken(Object.entries(room.players).filter(([id]) => id !== uid).map(([, p]) => p.badgeId));
+        if (cancelled || !room) return;
+        // Already a member (reload, tab closed to text the invite, phone locked):
+        // resume straight in rather than making them re-pick a name and badge they
+        // already own. joinRoom's rejoin path ignores these values anyway, but pass
+        // the stored ones so nothing is misrepresented if that ever changes.
+        const mine = room.players[uid];
+        if (mine) {
+          setResuming(true);
+          const res = await enterRoom(code, mine.name, mine.badgeId);
+          if (!cancelled && !res.ok) setResuming(false); // fall back to the form so the error shows
+          return;
         }
+        // keep excluding my own badge: if the resume above fails we fall back to
+        // this form while still being a member, and must not grey out my own badge
+        setTaken(Object.entries(room.players).filter(([id]) => id !== uid).map(([, p]) => p.badgeId));
       } catch {
         // peek is best-effort; join itself will surface real errors
       }
     })();
     return () => { cancelled = true; };
-  }, [code]);
+  }, [code, enterRoom]);
 
   const effBadge = badge && !taken.includes(badge) ? badge : null;
   const ready = name.trim().length > 0 && effBadge != null;
@@ -45,6 +58,16 @@ export function Join({ code }: { code: string }) {
     localStorage.setItem('bz.name', name.trim());
     localStorage.setItem('bz.badge', effBadge!);
     await enterRoom(code, name.trim(), effBadge!);
+  }
+
+  if (resuming) {
+    return (
+      <div className="screen stack">
+        <h1 className="title">Rejoining…</h1>
+        <div className="code-pill">{code}</div>
+        <p className="muted">Putting you back in the room.</p>
+      </div>
+    );
   }
 
   return (
