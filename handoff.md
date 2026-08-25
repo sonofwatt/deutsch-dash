@@ -100,20 +100,28 @@ opening the same link still sees the join form.
 
 ## Remaining work
 
-**Owner actions (David) — the Firebase project `holland-hustle` already exists:**
+~~Anonymous auth, Realtime Database, config paste, rules deploy, GitHub repo,
+Pages deploy~~ — all done.
 
-~~Anonymous auth, Realtime Database, config paste, rules deploy~~ — all done.
+**Live at https://sonofwatt.github.io/flemish-fury/** — repo `sonofwatt/flemish-fury`,
+deployed by GitHub Actions on every push to `main` (CI runs the tests first).
+Verified on the live origin: anonymous auth works from `sonofwatt.github.io`,
+rules enforce (authenticated room read returns data, unauthenticated returns 401),
+and the deployed bundle carries the current code. Copy-link confirmed on a real
+phone.
 
-1. GitHub: create the repo (name it `holland-hustle` so the Pages base path
-   matches), push `main`, then Settings → Pages → Source: **GitHub Actions**.
-   Confirm the workflow run goes green.
-2. Real-device acceptance pass (spec §7) on the live URL: iPhone Safari +
-   Android Chrome. Two known items to check there: the iOS home-screen icon
-   needs a PNG `apple-touch-icon` (SVG is ignored by iOS), and the ledgered
-   pointer-capture re-select check on mouse drags.
-3. A full multi-round game with real players — the production test above covered
-   setup and a single play, not a round played to completion (blitz call,
-   scoring overlay, next round, rematch) or the stuck-rotation path.
+Still outstanding:
+
+1. **A full multi-round game with real players.** Production testing covered
+   setup, joining, dealing and a single card play — not a round played to
+   completion (blitz call, scoring overlay, next round, rematch) or the
+   stuck-rotation path. This is the last untested behaviour of any size.
+2. **Real-device acceptance pass (spec §7)** beyond copy-link: a full round on
+   iPhone Safari and Android Chrome, checking no pull-to-refresh, no rubber-band
+   scroll, no double-tap zoom, and no text selection while dragging cards.
+3. **iOS home-screen icon needs a PNG** `apple-touch-icon` — iOS ignores the SVG
+   currently referenced, so add-to-home-screen will show a blank icon.
+4. The ledgered pointer-capture re-select check on mouse drags.
 
 Note on PowerShell: `npx` is blocked by the execution policy on this machine; use
 `npx.cmd` (or Git Bash) for `firebase` commands.
