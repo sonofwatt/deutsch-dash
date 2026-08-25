@@ -1,4 +1,4 @@
-# Project Handoff — Holland Hustle (Dutch Blitz web app)
+# Project Handoff — Flemish Fury (Dutch Blitz web app)
 
 _Last updated: 2026-08-24 — merged to `main`, 77/77 tests green including full
 emulator coverage against real security rules._

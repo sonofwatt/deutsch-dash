@@ -1,7 +1,7 @@
 # Dutch Blitz Web App — Design Spec
 
 **Date:** 2026-08-23
-**Working name:** Holland Hustle (final name, chosen 2026-08-24; repo directory still reads "german spree")
+**Working name:** Flemish Fury (final name, chosen 2026-08-25; repo `flemish-fury`, Firebase project id `holland-hustle`, working directory still reads "german spree")
 **Status:** Approved by David 2026-08-23
 
 ## 1. Summary
