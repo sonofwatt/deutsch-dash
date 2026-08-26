@@ -98,11 +98,9 @@
   color: var(--bg); font-size: 11px; font-weight: 800; border-radius: 999px;
   min-width: 20px; height: 20px; display: grid; place-items: center; padding: 0 4px; }
 
-/* Recycle affordance: appears once the face-down wood is exhausted. */
-.recycle { position: absolute; bottom: 3px; left: 3px; z-index: 2; width: 22px; height: 22px;
-  border-radius: 999px; border: 1px solid var(--pile-line); background: var(--surface);
-  color: var(--ink); font-size: 14px; line-height: 1; display: grid; place-items: center;
-  padding: 0; cursor: pointer; box-shadow: var(--shadow); }
+/* Recycle affordance: the empty draw slot, once the face-down wood is exhausted.
+   Tapping it flips. There is deliberately no button on the face-up card - see
+   TableauView. */
 .pile-space.recycle-slot { border-style: solid; color: var(--ink-soft); cursor: pointer;
   font-size: calc(var(--card-w) * .4); }
 

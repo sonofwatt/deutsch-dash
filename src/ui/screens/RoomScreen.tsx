@@ -3,13 +3,14 @@ import { useGameStore } from '../../state/store';
 import { Join } from './Join';
 import { Lobby } from './Lobby';
 import { Game } from './Game';
-import { BlitzSplash } from '../components/BlitzSplash';
+import { BlitzSplash, splashVariant } from '../components/BlitzSplash';
 import { RoundEndOverlay } from '../components/RoundEndOverlay';
 import { GameOverOverlay } from '../components/GameOverOverlay';
 
 export function RoomScreen({ code }: { code: string }) {
   const joinPhase = useGameStore(s => s.joinPhase);
   const room = useGameStore(s => s.room);
+  const uid = useGameStore(s => s.uid);
   const phase = room?.meta.phase;
   const blitzedBy = room?.round?.blitzedBy ?? null;
   const [splashUntil, setSplashUntil] = useState(0);
@@ -33,7 +34,8 @@ export function RoomScreen({ code }: { code: string }) {
   return (
     <>
       <Game />
-      {splashing && blitzerName && <BlitzSplash name={blitzerName} />}
+      {splashing && blitzerName && blitzedBy &&
+        <BlitzSplash name={blitzerName} variant={splashVariant(room.players, blitzedBy, uid)} />}
       {!splashing && phase === 'roundEnd' && <RoundEndOverlay />}
       {!splashing && phase === 'gameOver' && <GameOverOverlay />}
     </>

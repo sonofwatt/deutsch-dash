@@ -44,10 +44,10 @@ describe('TableauView', () => {
     expect(html.indexOf('>blitz<')).toBeLessThan(html.indexOf('>wood '));
   });
   it('offers the recycle control only once the face-down wood runs out', () => {
-    expect(renderTableau(tableau({ woodIndex: 3 }))).not.toContain('class="recycle"');
-    const spent = renderTableau(tableau({ woodIndex: 12 }));
-    expect(spent).toContain('class="recycle"');
-    expect(spent).toContain('recycle-slot'); // the empty draw slot advertises it too
+    expect(renderTableau(tableau({ woodIndex: 3 }))).not.toContain('recycle-slot');
+    // The empty draw slot IS the control - there is no button on the face-up card,
+    // which is why this asserts the slot and nothing else.
+    expect(renderTableau(tableau({ woodIndex: 12 }))).toContain('recycle-slot');
   });
 });
 
@@ -134,3 +134,4 @@ describe('ScoreRow', () => {
     expect(renderRow(player())).toBe('🌷 Dave 47');
   });
 });
+

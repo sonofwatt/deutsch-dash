@@ -18,7 +18,8 @@ export function TableauView(props: {
   const faceDown = t.wood.length - t.woodIndex; // still to be turned over
   const faceUp = t.woodIndex;                   // already turned over, top is playable
   // Every wood card has been turned over at least once: the next flip recycles the
-  // pile from the start and deals 3 again (or whatever is left, see flipWood).
+  // pile from the start and deals 3 again (or whatever is left, see flipWood). The
+  // empty draw slot is the only thing that says so - tapping it is the recycle.
   const canRecycle = faceDown === 0 && t.wood.length > 0;
 
   return (
@@ -72,17 +73,13 @@ export function TableauView(props: {
                 </div>}
           </PileStack>
           <PileStack layers={Math.min(2, faceUp - 1)}>
+            {/* No recycle button on the face-up card. It sat on top of the card the
+                thumb reaches for, covering .card-badge entirely at every card size,
+                and the empty draw slot beside it already carries the ↻. */}
             {woodTop ? (
-              <div style={{ position: 'relative' }}>
-                <div onClick={() => props.onSelect({ kind: 'wood' })}
-                  onPointerDown={e => props.startDrag(e, woodTop, { kind: 'wood' })}>
-                  <CardView card={woodTop} badgeId={badgeId} selected={isSel({ kind: 'wood' })} flipKey={t.woodIndex} />
-                </div>
-                {canRecycle && (
-                  <button className="recycle" title="Recycle wood and deal 3"
-                    onClick={e => { e.stopPropagation(); props.onFlip(); }}
-                    onPointerDown={e => e.stopPropagation()}>↻</button>
-                )}
+              <div onClick={() => props.onSelect({ kind: 'wood' })}
+                onPointerDown={e => props.startDrag(e, woodTop, { kind: 'wood' })}>
+                <CardView card={woodTop} badgeId={badgeId} selected={isSel({ kind: 'wood' })} flipKey={t.woodIndex} />
               </div>
             ) : <div className="pile-space" />}
           </PileStack>
