@@ -21,8 +21,27 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      # The emulator suite is the ONLY thing that exercises database.rules.json,
+      # and `firebase emulators:exec` needs a JVM to run the database emulator.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      # The database emulator jar (~30MB) is fetched on first run; cache it so a
+      # slow or flaky CDN cannot turn the rules tests into a red build.
+      - name: Cache Firebase emulator jars
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ runner.os }}
       - run: npm ci
-      - run: npm test
+      # test:emu, NOT `npm test`. It runs the same 15 files plus the emulator, so
+      # it is a strict superset - and it is the only run in which the rules tests
+      # execute at all. They gate on EMULATOR=1 via describe.runIf and otherwise
+      # SKIP, which reports green: without this step a change that broke
+      # database.rules.json would sail through CI unnoticed. The guard in
+      # src/net/emulatorCoverage.test.ts fails if this line ever goes away.
+      - run: npm run test:emu
       - run: npm run build
       - uses: actions/upload-pages-artifact@v3
         with:

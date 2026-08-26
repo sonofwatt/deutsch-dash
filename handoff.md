@@ -1,8 +1,8 @@
 # Project Handoff — Deutsch Dash
 
-_Last updated: 2026-08-26. **131 tests green** (115 unit + 16 emulator). Working
-tree clean, `main` == `origin/main` at `d1c85b4`, and the live site is
-byte-identical to that commit._
+_Last updated: 2026-08-26. **134 tests green** (118 unit + 16 emulator). This is
+the only place in the repo that quotes a count — it drifted three separate ways
+when it lived in four places, so keep it here and nowhere else._
 
 A mobile-first multiplayer Dutch Blitz game for 2–8 players, plus AI opponents.
 Host creates a room, texts the invite link, everyone plays in their phone
@@ -17,8 +17,8 @@ anonymous auth. No server of our own.
 
 ```
 npm install
-npm test         # 115 unit tests. The 16 emulator tests report as SKIPPED.
-npm run test:emu # all 131, emulator included. Run this before pushing.
+npm test         # fast path: no Java, no emulator. The rules tests SKIP.
+npm run test:emu # everything, emulator included. What CI runs.
 npm run dev      # local dev server, always against the emulator
 npm run emu      # Firebase emulator on its own
 npm run build    # tsc -b then vite build
@@ -60,14 +60,25 @@ test at once. Hydrate preferences inside a component (as `Home.tsx` and
 Also: `include` is `src/**/*.test.ts`, so a test file named `.test.tsx` is
 silently never collected.
 
-### CI does not run the emulator suite
+### CI runs the emulator suite — keep it that way
 
-`.github/workflows` runs `npm ci`, `npm test`, `npm run build`. It never runs
-`npm run test:emu`. Because the emulator files open with
-`describe.runIf(process.env.EMULATOR === '1')`, their 16 tests **skip silently**
-rather than fail — so **a change that breaks `database.rules.json` passes CI
-green**. Run `test:emu` locally before pushing anything touching `src/net/` or
-the rules. Adding the emulator suite to CI is unclaimed work.
+The emulator files gate every describe on
+`describe.runIf(process.env.EMULATOR === '1')`. Without that variable their tests
+**skip, and a skipped test reports green**. That is the right trade for the fast
+local loop, but it means the only tests that exercise `database.rules.json` —
+including the CANARY proving the rules are loaded at all — are invisible unless
+something deliberately turns them on.
+
+So CI runs `npm run test:emu`, not `npm test`. It is a strict superset, and
+running the plain suite alongside it would just execute everything twice.
+
+`src/net/emulatorCoverage.test.ts` guards this. It reads the workflow rather than
+checking env vars, so it fails in **any** run the moment the two drift apart,
+rather than only in the environment that already broke. Delete the CI step and
+`npm test` goes red locally. (Verified by doing exactly that.)
+
+Locally, `npm test` skipping the rules tests is still fine and intended — but run
+`test:emu` before pushing anything touching `src/net/` or the rules.
 
 ### Firebase and the emulator
 
@@ -408,10 +419,9 @@ game is frozen, including the bot. That is inherent to a serverless design.
 
 ## Known gaps, not blocking
 
-- **The emulator suite is invisible to CI** (see above). Highest-value unclaimed
-  chore.
-- `handoff.md`'s test counts drifted three times before this rewrite — the numbers
-  live in `npm test` output, not in prose. Re-check when you edit.
+- Test counts are quoted in the header of this file and nowhere else, because
+  they drifted three separate ways when they lived in four places. If you add
+  tests, update that one line or delete the number.
 - Bundle is one 586 kB chunk, over Vite's 500 kB warning threshold. No code-split.
 - `oxlint` reports 7 warnings, all `react(only-export-components)` fast-refresh
   hints plus two pre-existing `RoomScreen` warnings. Zero errors.
