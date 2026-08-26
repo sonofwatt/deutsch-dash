@@ -1,6 +1,6 @@
 import { useGameStore, isHost } from '../../state/store';
-import { BADGES } from '../../game/badges';
 import { winnerIds } from '../../game/scoring';
+import { ScoreRow } from './ScoreRow';
 
 export function GameOverOverlay() {
   const room = useGameStore(s => s.room)!;
@@ -25,20 +25,7 @@ export function GameOverOverlay() {
         <p className="muted" style={{ margin: 0, fontSize: 13 }}>
           Final round · played to {room.meta.targetScore} points
         </p>
-        {rows.map(([id, p]) => {
-          const s = scores?.[id];
-          return (
-            <div className="score-row" key={id}>
-              <span className="chip" style={{ ['--badge' as string]: BADGES[p.badgeId].color }}>
-                {BADGES[p.badgeId].glyph}
-              </span>
-              <span>{p.name}</span>
-              <span>{s ? `+${s.centerCount}` : ''}</span>
-              <span className="score-neg">{s ? `-${2 * s.blitzLeft}` : ''}</span>
-              <span className="score-total">{p.score}</span>
-            </div>
-          );
-        })}
+        {rows.map(([id, p]) => <ScoreRow key={id} player={p} score={scores?.[id]} />)}
         {actionError && <p className="error" style={{ margin: 0 }}>{actionError}</p>}
         {host
           ? <button className="btn btn-primary" onClick={again}>Rematch</button>

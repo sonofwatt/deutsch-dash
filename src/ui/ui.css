@@ -27,11 +27,19 @@
   place-items: center; z-index: 100; padding: 16px; }
 .sheet { background: var(--bg); border-radius: 16px; padding: 20px; width: min(440px, 100%);
   max-height: 85dvh; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
-.score-row { display: grid; grid-template-columns: 28px 1fr auto auto auto; gap: 8px;
-  align-items: center; padding: 8px 10px; border-radius: var(--radius);
+/* badge · name · -blitz · +center · = · round · total. The name track must be
+   minmax(0, 1fr), not 1fr: a 14-character name against six other columns on a
+   360px phone otherwise overflows the sheet into a horizontal scrollbar instead
+   of ellipsing. */
+.score-row { display: grid; grid-template-columns: 28px minmax(0, 1fr) repeat(5, auto);
+  gap: 6px; align-items: center; padding: 8px 10px; border-radius: var(--radius);
   background: var(--surface); border: 1px solid var(--line); font-size: 14px; }
+.score-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.score-math { font-variant-numeric: tabular-nums; }
 .score-neg { color: var(--danger); }
-.score-total { font-weight: 800; }
+.score-delta { font-weight: 600; }
+/* The running total, set apart from the round's arithmetic to its left. */
+.score-total { font-weight: 800; padding-left: 6px; border-left: 1px solid var(--line); }
 .blitz-splash { position: fixed; inset: 0; display: grid; place-items: center; z-index: 110;
   pointer-events: none; }
 .blitz-word { font-size: clamp(48px, 18vw, 120px); font-weight: 800; letter-spacing: .02em;

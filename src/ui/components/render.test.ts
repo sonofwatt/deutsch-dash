@@ -4,7 +4,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { TableauView } from './TableauView';
 import { CenterGrid, gridColumns } from './CenterGrid';
 import { OpponentStrip } from './OpponentStrip';
-import type { Card, CenterSpace, Suit, Tableau } from '../../game/types';
+import { ScoreRow } from './ScoreRow';
+import type { Card, CenterSpace, PlayerInfo, RoundScore, Suit, Tableau } from '../../game/types';
 
 const c = (v: number, suit: Suit, owner = 'me'): Card => ({ v, suit, owner });
 const run = (suit: Suit) => Array.from({ length: 10 }, (_, i) => c(i + 1, suit));
@@ -99,5 +100,37 @@ describe('OpponentStrip', () => {
     // the count bubble, is the first of them
     const slotsBeforeCount = html.slice(0, html.indexOf('opp-count')).split('opp-slot').length - 1;
     expect(slotsBeforeCount).toBe(1);
+  });
+});
+
+describe('ScoreRow', () => {
+  const player = (p: Partial<PlayerInfo> = {}): PlayerInfo => ({
+    name: 'Dave', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, score: 47, ...p,
+  });
+  // Tag boundaries become spaces, so the assertions below read as the row reads.
+  const renderRow = (player: PlayerInfo, score?: RoundScore) =>
+    renderToStaticMarkup(createElement(ScoreRow, { player, score }))
+      .replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+
+  it('spells the round out as arithmetic, then the running total', () => {
+    const text = renderRow(player(), { centerCount: 6, blitzLeft: 2, delta: 2 });
+    expect(text).toContain('Dave -4 +6 = +2 47');
+  });
+  it('takes the sum from the committed delta instead of recomputing it', () => {
+    // delta is the exact number commitScores added to player.score. Recomputing
+    // from the components here would let the row show a sum that disagrees with
+    // the total beside it; this fixture disagrees on purpose to pin that.
+    const text = renderRow(player(), { centerCount: 6, blitzLeft: 2, delta: 9 });
+    expect(text).toContain('= +9 47');
+  });
+  it('leaves zero unsigned and signs a losing round', () => {
+    const blitzer = renderRow(player({ name: 'Ann', score: 56 }), { centerCount: 9, blitzLeft: 0, delta: 9 });
+    expect(blitzer).toContain('Ann 0 +9 = +9 56'); // not "-0", which reads as a typo
+    const loser = renderRow(player(), { centerCount: 3, blitzLeft: 4, delta: -5 });
+    expect(loser).toContain('Dave -8 +3 = -5 47');
+  });
+  it('degrades to a name and a total when there is no round breakdown', () => {
+    // Game over can render from a snapshot with no round/scores.
+    expect(renderRow(player())).toBe('🌷 Dave 47');
   });
 });

@@ -1,5 +1,5 @@
 import { useGameStore, isHost } from '../../state/store';
-import { BADGES } from '../../game/badges';
+import { ScoreRow } from './ScoreRow';
 
 export function RoundEndOverlay() {
   const room = useGameStore(s => s.room)!;
@@ -17,20 +17,7 @@ export function RoundEndOverlay() {
     <div className="overlay">
       <div className="sheet">
         <h2 style={{ margin: 0 }}>{blitzer ? `${blitzer} blitzed!` : 'Round over (all stuck)'}</h2>
-        {rows.map(([id, p]) => {
-          const s = scores[id];
-          return (
-            <div className="score-row" key={id}>
-              <span className="chip" style={{ ['--badge' as string]: BADGES[p.badgeId].color }}>
-                {BADGES[p.badgeId].glyph}
-              </span>
-              <span>{p.name}</span>
-              <span>+{s?.centerCount ?? 0}</span>
-              <span className="score-neg">-{2 * (s?.blitzLeft ?? 0)}</span>
-              <span className="score-total">{p.score}</span>
-            </div>
-          );
-        })}
+        {rows.map(([id, p]) => <ScoreRow key={id} player={p} score={scores[id]} />)}
         {actionError && <p className="error" style={{ margin: 0 }}>{actionError}</p>}
         {host
           ? <button className="btn btn-primary" onClick={next}>Next round</button>
