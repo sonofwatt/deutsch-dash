@@ -54,15 +54,18 @@ describe('chooseBotAction', () => {
       if (a && a.kind !== 'flip') expect(legal).toContainEqual(a);
     }
   });
-  it('an easy bot sometimes fumbles the turn entirely', () => {
-    expect(chooseBotAction(t, spaces(2), 'easy', scripted(0.01))).toBeNull();
-    expect(chooseBotAction(t, spaces(2), 'hard', scripted(0.01))).not.toBeNull(); // hard never dithers
+  it('fumbles a whole turn far more often on easy than on hard', () => {
+    // a roll of 0.2 is inside easy's dither band and well outside hard's
+    expect(chooseBotAction(t, spaces(2), 'easy', scripted(0.2))).toBeNull();
+    expect(chooseBotAction(t, spaces(2), 'hard', scripted(0.2))).not.toBeNull();
   });
   it('turns wood over when nothing is playable, and gives up when there is none', () => {
+    // explicit rng: every level can dither now, so Math.random would make this flaky
     const stuck = tab({ blitz: [c(9, 'red')], wood: [c(9, 'blue')], woodIndex: 1 });
-    expect(chooseBotAction(stuck, spaces(1, { 0: [c(1, 'red')] }), 'hard')).toEqual({ kind: 'flip' });
+    expect(chooseBotAction(stuck, spaces(1, { 0: [c(1, 'red')] }), 'hard', scripted(0.99)))
+      .toEqual({ kind: 'flip' });
     const bare = tab({ blitz: [c(9, 'red')] });
-    expect(chooseBotAction(bare, spaces(1, { 0: [c(1, 'red')] }), 'hard')).toBeNull();
+    expect(chooseBotAction(bare, spaces(1, { 0: [c(1, 'red')] }), 'hard', scripted(0.99))).toBeNull();
   });
 });
 
@@ -75,6 +78,25 @@ describe('difficulty is mostly speed', () => {
     }
     expect(BOT_PROFILES.hard.maxDelay).toBeLessThan(BOT_PROFILES.medium.maxDelay);
     expect(BOT_PROFILES.medium.maxDelay).toBeLessThan(BOT_PROFILES.easy.maxDelay);
+  });
+
+  it('every handicap moves the same way, so the levels cannot cross over', () => {
+    const [easy, medium, hard] = [BOT_PROFILES.easy, BOT_PROFILES.medium, BOT_PROFILES.hard];
+    for (const knob of ['sloppiness', 'dither', 'distracted'] as const) {
+      expect(easy[knob]).toBeGreaterThan(medium[knob]);
+      expect(medium[knob]).toBeGreaterThan(hard[knob]);
+    }
+  });
+
+  it('every level is slower than the first cut, which beat a casual human on easy', () => {
+    // effective seconds per action = mean delay / (1 - dither); previously 3.3 / 1.3 / 0.5
+    const rate = (l: 'easy' | 'medium' | 'hard') => {
+      const p = BOT_PROFILES[l];
+      return (p.minDelay + p.maxDelay) / 2 / 1000 / (1 - p.dither);
+    };
+    expect(rate('easy')).toBeGreaterThan(4);
+    expect(rate('medium')).toBeGreaterThan(2);
+    expect(rate('hard')).toBeGreaterThan(1);
   });
 });
 

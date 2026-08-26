@@ -105,8 +105,13 @@ that rule would lock out the entire game.
 
 The host can add AI players in the lobby at Easy, Medium or Hard. Difficulty is
 mostly hands, not brains: every level only ever makes legal moves, and the levels
-differ in how fast they act (`BOT_PROFILES` in `src/game/bot.ts`) and how often
-they take a worse legal move than the best one available. Move quality is ranked
+differ in how fast they act (`BOT_PROFILES` in `src/game/bot.ts`), how often they
+take a worse legal move than the best one available, how often they fumble a turn
+entirely, and how often they turn wood over instead of noticing the play in front
+of them. Effective rate works out at roughly one action every 4.9s / 2.3s / 1.1s.
+All three were tuned down after the first game against them — a bot punches above
+its settings because it never plays illegally and never loses track of the board,
+so speed and attention are the only honest handicaps. Move quality is ranked
 the way the game actually rewards — anything that takes a card off the Blitz pile,
 or empties a post so the Blitz pile refills it, beats an equivalent wood play.
 

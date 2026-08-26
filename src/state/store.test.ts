@@ -388,7 +388,7 @@ describe('AI players', () => {
     await store.getState().enterRoom('ABCDEF', 'D', 'tulip');
     vi.useFakeTimers();
     cb(roomWithBot(hostId));
-    await vi.advanceTimersByTimeAsync(4000);
+    await vi.advanceTimersByTimeAsync(9000); // bots are slower now: ~6 hard turns
     store.getState().leave();
     vi.useRealTimers();
     return deps;
@@ -397,8 +397,14 @@ describe('AI players', () => {
   it('the host plays the bot hand on a timer', async () => {
     const deps = await run('me');
     // deal(buildDeck) puts blue 1 on the bot's first post, the only card it can
-    // legally place with the centre empty
-    expect(deps.playToCenter).toHaveBeenCalledWith('ABCDEF', 0, { v: 1, suit: 'blue', owner: 'bot_star' });
+    // legally place with the centre empty. WHICH space it lands in is deliberately
+    // left open: on a sloppy roll the bot takes a random legal move, and with an
+    // empty centre every space is legal for an Ace. Pinning it to space 0 made
+    // this test fail about one run in six.
+    expect(deps.playToCenter).toHaveBeenCalledWith(
+      'ABCDEF', expect.any(Number), { v: 1, suit: 'blue', owner: 'bot_star' });
+    const picked = vi.mocked(deps.playToCenter).mock.calls.map(call => call[1]);
+    expect(picked.every(i => Number.isInteger(i) && i >= 0 && i < 16)).toBe(true);
     expect(deps.persistTableau).toHaveBeenCalledWith('ABCDEF', 'bot_star', expect.anything());
   });
 

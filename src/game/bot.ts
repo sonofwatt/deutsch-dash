@@ -15,12 +15,26 @@ export interface BotProfile {
   sloppiness: number;
   /** chance of fumbling a turn entirely and doing nothing */
   dither: number;
+  /** when being sloppy, chance of turning wood over instead of playing at all */
+  distracted: number;
 }
 
+/**
+ * Tuned down across the board after the first game against them (2026-08-25):
+ * Easy was still beating a casual human. The reason a bot punches above its
+ * settings is that it never makes an ILLEGAL move and never loses track of the
+ * board, so the only honest handicaps are speed and attention - hence every knob
+ * here being slower and more distractible than the first cut.
+ *
+ * What matters is the effective rate, delay divided by (1 - dither):
+ *   easy ~4.9s per action, medium ~2.3s, hard ~1.1s.
+ * The old numbers were 3.3s / 1.3s / 0.5s, so hard is now roughly where medium
+ * used to be, and easy genuinely dawdles.
+ */
 export const BOT_PROFILES: Record<BotLevel, BotProfile> = {
-  easy:   { minDelay: 1700, maxDelay: 3200, sloppiness: 0.8, dither: 0.25 },
-  medium: { minDelay: 750,  maxDelay: 1600, sloppiness: 0.3, dither: 0.07 },
-  hard:   { minDelay: 300,  maxDelay: 750,  sloppiness: 0.04, dither: 0 },
+  easy:   { minDelay: 2600, maxDelay: 4800, sloppiness: 0.9,  dither: 0.25, distracted: 0.45 },
+  medium: { minDelay: 1400, maxDelay: 2600, sloppiness: 0.5,  dither: 0.12, distracted: 0.25 },
+  hard:   { minDelay: 650,  maxDelay: 1400, sloppiness: 0.15, dither: 0.03, distracted: 0.1 },
 };
 
 export type BotAction =
@@ -84,8 +98,8 @@ export function chooseBotAction(
     return t.wood.length > 0 ? { kind: 'flip' } : null;
   }
   if (rng() < p.sloppiness) {
-    // a sloppy bot sometimes turns wood over instead of spotting the move in front of it
-    if (t.wood.length > t.woodIndex && rng() < 0.25) return { kind: 'flip' };
+    // a distracted bot turns wood over instead of spotting the move in front of it
+    if (t.wood.length > t.woodIndex && rng() < p.distracted) return { kind: 'flip' };
     return moves[Math.floor(rng() * moves.length)];
   }
   let best = moves[0];

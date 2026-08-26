@@ -242,9 +242,11 @@ hard-refresh before assuming a code fault.
 - A full round to completion on the new board — blitz call, scoring overlay, next
   round, rematch. Carried over from the previous session and still true.
 - **AI players end to end.** The bot loop has only ever run against fake deps and
-  fake timers: whether Easy/Medium/Hard feel distinct, whether a bot's blitz
-  announces correctly, and whether host transfer hands the bots over cleanly are
-  all unknown.
+  fake timers: whether a bot's blitz announces correctly, and whether host transfer
+  hands the bots over cleanly, are both unknown. Difficulty has had one real game
+  against it — Easy beat a casual human, so all three levels were slowed
+  (2026-08-25) and now need re-checking for whether they feel distinct and whether
+  Easy is now beatable without being inert.
 - Automatic stuck detection firing in a real game, and the all-stuck rotation
   with bots in the room.
 - The snap band by touch drag, and by tap.
