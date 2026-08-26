@@ -2,6 +2,7 @@ import { CardView } from './CardView';
 import { depthLayers } from './PileStack';
 import { cardId, type Card, type CenterSpace } from '../../game/types';
 import type { BadgeId } from '../../game/badges';
+import type { RaceFlash } from '../raceFlash';
 
 /**
  * Columns for a board of `count` spaces (4 x players, capped - see
@@ -40,6 +41,8 @@ function DoneRail({ runs }: { runs: Card[][] }) {
 export function CenterGrid(props: {
   spaces: CenterSpace[]; highlight: number[]; badgeOf: (owner: string) => BadgeId;
   onTap: (i: number) => void; snapping?: boolean; onSnapTap: () => void;
+  // Optional: a board with nobody racing passes nothing at all.
+  races?: Record<number, RaceFlash>;
 }) {
   const done = props.spaces.flatMap(s => s.history);
   // split alternately so both rails grow together rather than one filling first
@@ -65,6 +68,14 @@ export function CenterGrid(props: {
                 ))}
                 {top && (
                   <CardView key={cardId(top)} card={top} badgeId={props.badgeOf(top.owner)} layoutId={cardId(top)} />
+                )}
+                {/* Keyed by the race, so a new one remounts the span and replays
+                    the animation. The element then simply sits at opacity 0 - no
+                    timer clears it, which is why nothing here needs a clock. */}
+                {props.races?.[i] && (
+                  <span key={props.races[i].at} className="race-flash">
+                    {props.races[i].kind === 'angry' ? '😠' : '😇'}
+                  </span>
                 )}
               </div>
             );

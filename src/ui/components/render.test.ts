@@ -8,6 +8,7 @@ import { ScoreRow } from './ScoreRow';
 import { BlitzSplash } from './BlitzSplash';
 import { ScoreList } from './ScoreList';
 import { rankRows } from '../scoreRanks';
+import { raceFlashes } from '../raceFlash';
 import { splashVariant } from '../splashVariant';
 import type { Card, CenterSpace, PlayerInfo, RoundScore, Suit, Tableau } from '../../game/types';
 
@@ -243,5 +244,57 @@ describe('ScoreList', () => {
     }));
     expect(html.indexOf('Bo')).toBeLessThan(html.indexOf('Ann'));
     expect(html).not.toContain('moved-');
+  });
+});
+
+describe('raceFlashes', () => {
+  const space = (...owners: string[]): CenterSpace => ({
+    stack: owners.map((owner, i) => c(i + 1, 'red', owner)), history: [],
+  });
+
+  it('haloes the player whose card is on top of a space someone lost', () => {
+    const flashes = raceFlashes({
+      races: { 1: { by: 'bo', at: 99 } }, spaces: [space('me'), space('me', 'me')], uid: 'me',
+    });
+    expect(flashes).toEqual({ 1: { kind: 'angel', at: 99 } });
+  });
+  it('haloes nobody when the winner was somebody else', () => {
+    // ann won that race. From my seat it never happened.
+    expect(raceFlashes({
+      races: { 1: { by: 'bo', at: 99 } }, spaces: [space('me'), space('ann')], uid: 'me',
+    })).toEqual({});
+  });
+  it('never haloes the loser for their own report', () => {
+    expect(raceFlashes({
+      races: { 0: { by: 'me', at: 99 } }, spaces: [space('me')], uid: 'me',
+    })).toEqual({});
+  });
+  it('scowls at the space this client just lost, from local state', () => {
+    // No record needed: the loser knows, and it must land even if the write fails.
+    expect(raceFlashes({
+      races: null, spaces: [space('ann')], uid: 'me', lastRejected: { space: 0, at: 7 },
+    })).toEqual({ 0: { kind: 'angry', at: 7 } });
+  });
+  it('prefers the scowl when this client both won and later lost the same space', () => {
+    expect(raceFlashes({
+      races: { 0: { by: 'bo', at: 1 } }, spaces: [space('me')], uid: 'me',
+      lastRejected: { space: 0, at: 2 },
+    })).toEqual({ 0: { kind: 'angry', at: 2 } });
+  });
+  it('shows a spectator with no uid nothing at all', () => {
+    expect(raceFlashes({
+      races: { 0: { by: 'bo', at: 1 } }, spaces: [space('me')], uid: null,
+    })).toEqual({});
+  });
+
+  it('puts the face over the space it belongs to', () => {
+    const html = renderToStaticMarkup(createElement(CenterGrid, {
+      spaces: [space('me'), space('ann'), space()], highlight: [],
+      badgeOf: () => 'star' as const, onTap: noop, onSnapTap: noop,
+      races: { 0: { kind: 'angel' as const, at: 1 }, 1: { kind: 'angry' as const, at: 2 } },
+    }));
+    expect(html).toContain('😇');
+    expect(html).toContain('😠');
+    expect(html.indexOf('😇')).toBeLessThan(html.indexOf('😠')); // space 0 before space 1
   });
 });

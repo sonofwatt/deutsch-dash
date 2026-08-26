@@ -41,9 +41,18 @@ export interface PlayerInfo {
 
 export interface RoundScore { centerCount: number; blitzLeft: number; delta: number }
 
+/**
+ * "I lost the race for this space." Written by the LOSER, keyed by space index,
+ * so every client can work out the winner from data it already holds: whoever's
+ * card is on top of that space now. `at` is only ever a nonce - it marks a fresh
+ * race, and is never compared across devices, whose clocks do not agree.
+ */
+export interface RaceRecord { by: string; at: number }
+
 export interface RoundState {
   spaces: CenterSpace[]; tableaus: Record<string, Tableau>;
   blitzedBy: string | null; scores: Record<string, RoundScore> | null;
+  races: Record<string, RaceRecord> | null;
   stuckRounds: number; startedAt: number;
 }
 

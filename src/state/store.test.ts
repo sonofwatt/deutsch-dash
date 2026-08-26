@@ -14,6 +14,7 @@ function fakeDeps(over: Partial<Deps> = {}): Deps {
     setTargetScore: vi.fn(async () => {}),
     startRound: vi.fn(async () => {}),
     playToCenter: vi.fn(async () => true),
+    reportRace: vi.fn(async () => {}),
     persistTableau: vi.fn(async () => {}),
     declareStuck: vi.fn(async () => {}),
     clearStuck: vi.fn(async () => {}),
@@ -38,7 +39,7 @@ function playingRoom(tableau: Tableau): Room {
     meta: { createdAt: 1, hostId: 'me', creatorId: 'me', targetScore: 75, phase: 'playing', roundNumber: 1 },
     players: { me: { name: 'D', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, score: 0 } },
     round: { spaces: Array.from({ length: 16 }, () => ({ stack: [], history: [] })),
-             tableaus: { me: tableau }, blitzedBy: null, scores: null, stuckRounds: 0, startedAt: 1 },
+             tableaus: { me: tableau }, blitzedBy: null, scores: null, races: null, stuckRounds: 0, startedAt: 1 },
   };
 }
 
@@ -89,6 +90,10 @@ describe('optimistic play', () => {
 
     expect(store.getState().tableau).toEqual(rigged); // rolled back
     expect(store.getState().lastRejected?.card).toEqual(c(1, 'red'));
+    expect(store.getState().lastRejected?.space).toBe(0);   // which space to scowl at
+    // The loser is the only client that knows a race happened - a winning
+    // transaction looks exactly like an uncontested play - so it announces it.
+    expect(deps.reportRace).toHaveBeenCalledWith('ABCDEF', 0, 'me');
   });
 
   it('announces blitz when the last blitz card is played', async () => {
@@ -374,7 +379,7 @@ describe('AI players', () => {
       round: {
         spaces: Array.from({ length: 16 }, () => ({ stack: [], history: [] })),
         tableaus: { me: deal(buildDeck('me'), 3), bot_star: deal(buildDeck('bot_star'), 3) },
-        blitzedBy: null, scores: null, stuckRounds: 0, startedAt: 1,
+        blitzedBy: null, scores: null, races: null, stuckRounds: 0, startedAt: 1,
       },
     };
   }
@@ -426,7 +431,7 @@ describe('automatic stuck detection', () => {
     return {
       meta: { createdAt: 1, hostId: 'me', creatorId: 'me', targetScore: 75, phase: 'playing', roundNumber: 1 },
       players: { me: { name: 'D', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt, score: 0 } },
-      round: { spaces: blocked(), tableaus: { me: t }, blitzedBy: null, scores: null,
+      round: { spaces: blocked(), tableaus: { me: t }, blitzedBy: null, scores: null, races: null,
                stuckRounds: 0, startedAt: 1 },
     };
   }

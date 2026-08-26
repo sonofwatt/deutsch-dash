@@ -8,6 +8,7 @@ import { TableauView } from '../components/TableauView';
 import { OpponentStrip } from '../components/OpponentStrip';
 import { ConnectionPill } from '../components/ConnectionPill';
 import { nearestSpace, useDrag, type DropTarget, type Point } from '../useDrag';
+import { raceFlashes } from '../raceFlash';
 import type { PlaySource } from '../../game/types';
 import '../game.css';
 
@@ -50,6 +51,7 @@ export function Game() {
 
   if (!round || !tableau) return <div className="screen"><p className="muted">dealing…</p></div>;
 
+  const races = raceFlashes({ races: round.races, spaces: round.spaces, uid, lastRejected });
   const active = drag ? drag.source : selection;
   const targets = active ? legalTargets(tableau, active, round.spaces) : { spaces: [], posts: [] };
   const stuckAvailable = !hasLegalMove(tableau, round.spaces);
@@ -63,7 +65,7 @@ export function Game() {
       </div>
       <OpponentStrip me={uid} players={room.players} tableaus={round.tableaus} />
       <CenterGrid spaces={round.spaces} highlight={targets.spaces} badgeOf={badgeOf}
-        onTap={i => void playTo({ space: i })}
+        onTap={i => void playTo({ space: i })} races={races}
         snapping={targets.spaces.length > 0}
         onSnapTap={() => { if (targets.spaces.length) void playTo({ space: targets.spaces[0] }); }} />
       <div>

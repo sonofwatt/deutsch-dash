@@ -26,6 +26,7 @@ export interface Deps {
   setTargetScore(code: string, n: number): Promise<void>;
   startRound(code: string, room: Room): Promise<void>;
   playToCenter(code: string, space: number, card: Card): Promise<boolean>;
+  reportRace(code: string, space: number, uid: string): Promise<void>;
   persistTableau(code: string, uid: string, t: Tableau): Promise<void>;
   declareStuck(code: string, uid: string): Promise<void>;
   clearStuck(code: string, uid: string): Promise<void>;
@@ -47,7 +48,7 @@ export interface GameStore {
   room: Room | null;
   tableau: Tableau | null;
   selection: PlaySource | null;
-  lastRejected: { card: Card; at: number } | null;
+  lastRejected: { card: Card; at: number; space: number } | null;
   joinPhase: 'idle' | 'joining' | 'in-room';
   joinError: string | null;
   // Hands of the AI players this client is driving. Only ever populated on the
@@ -216,6 +217,8 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
       const committed = await deps.playToCenter(code, action.space, card);
       if (get().code !== code) return; // room changed mid-flight
       if (committed) commit(taken.next);
+      // A bot losing a race is still a race: the human who beat it earned the halo.
+      else void deps.reportRace(code, action.space, id).catch(() => {});
     }
 
     function scheduleBot(id: string, level: BotLevel) {
@@ -430,7 +433,8 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         const committed = await deps.playToCenter(code, target.space, card);
         if (get().code !== code) return; // session changed mid-flight (leave/rejoin) - drop the stale continuation
         if (!committed) {
-          set({ tableau, lastRejected: { card, at: Date.now() } }); // rollback
+          set({ tableau, lastRejected: { card, at: Date.now(), space: target.space } }); // rollback
+          void deps.reportRace(code, target.space, uid).catch(() => {});
           return;
         }
         void persist(taken.next);
@@ -494,6 +498,7 @@ const realDeps: Deps = {
   setTargetScore: netRooms.setTargetScore,
   startRound: netPlays.startRound,
   playToCenter: netPlays.playToCenter,
+  reportRace: netPlays.reportRace,
   persistTableau: netPlays.persistTableau,
   declareStuck: netPlays.declareStuck,
   clearStuck: netPlays.clearStuck,

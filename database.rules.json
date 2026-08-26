@@ -30,6 +30,7 @@
           "spaces": { ".write": "auth != null" },
           "blitzedBy": { ".write": "auth != null" },
           "scores": { ".write": "auth != null" },
+          "races": { ".write": "auth != null" },
           "stuckRounds": { ".write": "auth != null" },
           "startedAt": { ".write": "auth != null" },
           ".write": "auth != null && root.child('rooms').child($code).child('meta').child('hostId').val() === auth.uid",

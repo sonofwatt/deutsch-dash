@@ -41,6 +41,7 @@ export function normalizeRoom(raw: unknown): Room | null {
       ),
       blitzedBy: rr.blitzedBy ?? null,
       scores: rr.scores ?? null,
+      races: rr.races ?? null,
       stuckRounds: rr.stuckRounds ?? 0,
       startedAt: rr.startedAt ?? 0,
     };

@@ -54,7 +54,7 @@ emu('game-over threshold against emulator', () => {
     const room: Room = {
       meta, players,
       round: { spaces, tableaus: { [uid]: { blitz: [], post: [[], [], []], wood: [], woodIndex: 0 } },
-               blitzedBy: uid, scores: null, stuckRounds: 0, startedAt: 1 },
+               blitzedBy: uid, scores: null, races: null, stuckRounds: 0, startedAt: 1 },
     };
     await commitScores(code, room);
     const snap = await get(ref(db, `rooms/${code}`));
@@ -108,7 +108,7 @@ emu('the round shown in the 2026-08-25 playtest screenshot', () => {
           [dave]: { blitz: [], post: [[], [], [], [], []], wood: [], woodIndex: 0 },
           [other]: { blitz: owned(other, 10, 8), post: [[], [], [], [], []], wood: [], woodIndex: 0 },
         },
-        blitzedBy: dave, scores: null, stuckRounds: 0, startedAt: 1,
+        blitzedBy: dave, scores: null, races: null, stuckRounds: 0, startedAt: 1,
       },
     };
 

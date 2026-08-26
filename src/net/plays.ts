@@ -44,6 +44,16 @@ export async function playToCenter(code: string, spaceIndex: number, card: Card)
   return result.committed;
 }
 
+/**
+ * Announce a lost race so the winner's client can celebrate it. Written by the
+ * loser because the loser is the only client that knows a race happened at all -
+ * a winning transaction looks exactly like an uncontested play. Best-effort: a
+ * failure costs a halo, nothing more.
+ */
+export function reportRace(code: string, space: number, uid: string): Promise<void> {
+  return set(r(code, `round/races/${space}`), { by: uid, at: serverTimestamp() });
+}
+
 export function persistTableau(code: string, uid: string, t: Tableau): Promise<void> {
   return set(r(code, `round/tableaus/${uid}`), t);
 }
