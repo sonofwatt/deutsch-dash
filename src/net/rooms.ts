@@ -42,8 +42,10 @@ export function normalizeRoom(raw: unknown): Room | null {
       blitzedBy: rr.blitzedBy ?? null,
       scores: rr.scores ?? null,
       races: rr.races ?? null,
+      duels: rr.duels ?? null,
       stuckRounds: rr.stuckRounds ?? 0,
       startedAt: rr.startedAt ?? 0,
+      endedAt: rr.endedAt ?? null,
     };
   }
   return { meta, players, round };

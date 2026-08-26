@@ -23,7 +23,9 @@ emu('center transactions against emulator', () => {
       playToCenter(code, 0, one),
       playToCenter(code, 0, one), // same card racing itself: second must abort
     ]);
-    expect(results.filter(Boolean)).toHaveLength(1);
+    expect(results.filter(r => r.committed)).toHaveLength(1);
+    // The loser is told who beat it, off the aborted transaction's own snapshot.
+    expect(results.find(r => !r.committed)!.winner).toBe(uid);
     const snap = await get(ref(db, `rooms/${code}/round/spaces/0/stack`));
     expect(snap.val()).toHaveLength(1);
   });
@@ -54,7 +56,7 @@ emu('game-over threshold against emulator', () => {
     const room: Room = {
       meta, players,
       round: { spaces, tableaus: { [uid]: { blitz: [], post: [[], [], []], wood: [], woodIndex: 0 } },
-               blitzedBy: uid, scores: null, races: null, stuckRounds: 0, startedAt: 1 },
+               blitzedBy: uid, scores: null, races: null, duels: null, endedAt: null, stuckRounds: 0, startedAt: 1 },
     };
     await commitScores(code, room);
     const snap = await get(ref(db, `rooms/${code}`));
@@ -108,7 +110,7 @@ emu('the round shown in the 2026-08-25 playtest screenshot', () => {
           [dave]: { blitz: [], post: [[], [], [], [], []], wood: [], woodIndex: 0 },
           [other]: { blitz: owned(other, 10, 8), post: [[], [], [], [], []], wood: [], woodIndex: 0 },
         },
-        blitzedBy: dave, scores: null, races: null, stuckRounds: 0, startedAt: 1,
+        blitzedBy: dave, scores: null, races: null, duels: null, endedAt: null, stuckRounds: 0, startedAt: 1,
       },
     };
 

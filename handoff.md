@@ -1,10 +1,10 @@
 # Project Handoff — Deutsch Dash
 
-_Last updated: 2026-08-26 at `676e946`. Working tree clean, `main` ==
+_Last updated: 2026-08-26 at `4619481`. Working tree clean, `main` ==
 `origin/main`, CI green including the emulator suite, and the live site matches
 `HEAD`._
 
-_**160 tests green** (143 unit + 17 emulator). This is the only place in the repo
+_**175 tests green** (158 unit + 17 emulator). This is the only place in the repo
 that quotes a count — it drifted three separate ways when it lived in four
 places, so keep it here and nowhere else._
 
@@ -63,6 +63,35 @@ test at once. Hydrate preferences inside a component (as `Home.tsx` and
 `Join.tsx` already do) or guard with `typeof localStorage !== 'undefined'`.
 Also: `include` is `src/**/*.test.ts`, so a test file named `.test.tsx` is
 silently never collected.
+
+### The score sheets talk, and the rules live in one file
+
+`src/ui/commentary.ts` turns a finished round into up to six remarks; the sheets
+rotate them one at a time (`Commentary.tsx`). Adding a line is one `add(...)` call
+in there - an id, a priority, two or more phrasings, and who it is about.
+
+Three things about it that are not obvious:
+
+- **No `Math.random`, ever.** The carousel re-renders on a timer, so a random
+  phrasing would change mid-rotation, and oxlint's `react(purity)` rule objects to
+  it during render anyway. Variants are picked by hashing `id:roundNumber:subject`,
+  which means the same situation reads differently next round and never flickers
+  within one.
+- **`about` is load-bearing.** The rules overlap heavily on whoever had the big
+  round, so the final pass drops a remark once *every* player it names has already
+  had two. Naming both parties in a rivalry is what lets it survive that pass on
+  the strength of the quieter one.
+- **Two RTDB fields exist only for this.** `round/duels[loser][winner]` counts
+  races (written by the loser, in the same write as the race flash, so the two can
+  never disagree) and `round/endedAt` is stamped by `commitScores` to give the
+  round a length. `duels` needs its own rules clause - the loser is usually not
+  the host - and `endedAt` does not, because only the host writes it.
+
+Candidates written but not built, in rough order of how much they would add:
+last-place streaks, biggest single-round swing in the game so far, a player who
+never once lost a race, longest gap between two players' blitz times, and "you
+have all been stuck at the same time N times this game". Each needs history the
+round does not currently keep.
 
 ### Any emoji the app prints needs `EMOJI` after it
 

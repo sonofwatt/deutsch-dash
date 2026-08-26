@@ -30,6 +30,21 @@ export function normalizeTableau(raw: unknown, postCount: number): Tableau {
   };
 }
 
+/**
+ * Whose card is on top of this space - which is to say, who won any race for it.
+ *
+ * The stack is normally the answer, but a 10 completes the pile and the
+ * transaction below archives the run and clears the stack on the spot, so the
+ * most contested card in a pile is exactly the one that leaves nothing on top.
+ * Fall back to the last card of the run that just finished.
+ */
+export function spaceOwner(space: CenterSpace | null | undefined): string | null {
+  if (!space) return null;
+  if (space.stack?.length) return space.stack[space.stack.length - 1].owner;
+  const done = space.history?.[space.history.length - 1];
+  return done?.[done.length - 1]?.owner ?? null;
+}
+
 export function centerPlayTxn(card: Card) {
   return (raw: unknown): CenterSpace | undefined => {
     const space = normalizeSpace(raw);

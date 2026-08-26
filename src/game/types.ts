@@ -53,7 +53,12 @@ export interface RoundState {
   spaces: CenterSpace[]; tableaus: Record<string, Tableau>;
   blitzedBy: string | null; scores: Record<string, RoundScore> | null;
   races: Record<string, RaceRecord> | null;
+  // How often each player lost a space to each other player this round, loser
+  // first: duels[loser][winner]. Only the commentary reads it.
+  duels: Record<string, Record<string, number>> | null;
   stuckRounds: number; startedAt: number;
+  // Stamped when the host commits the scores, so the round has a length.
+  endedAt: number | null;
 }
 
 export interface Room { meta: RoomMeta; players: Record<string, PlayerInfo>; round: RoundState | null }

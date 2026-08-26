@@ -1,6 +1,8 @@
 import { useGameStore, isHost } from '../../state/store';
 import { winnerIds } from '../../game/scoring';
 import { ScoreList } from './ScoreList';
+import { Commentary } from './Commentary';
+import { remarksForRoom } from '../commentary';
 
 export function GameOverOverlay() {
   const room = useGameStore(s => s.room)!;
@@ -25,6 +27,7 @@ export function GameOverOverlay() {
           Final round · played to {room.meta.targetScore} points
         </p>
         <ScoreList players={room.players} scores={scores} />
+        <Commentary remarks={remarksForRoom(room, true)} />
         {actionError && <p className="error" style={{ margin: 0 }}>{actionError}</p>}
         {host
           ? <button className="btn btn-primary" onClick={again}>Rematch</button>

@@ -59,6 +59,19 @@
   0%, 55% { background: var(--fall); border-color: var(--fall); }
   100% { background: var(--surface); border-color: var(--line); }
 }
+/* Commentary carousel under the scores. The floor is two lines' worth, so the
+   sheet does not jump as remarks of different lengths rotate through; a rare
+   three-liner grows the box rather than being clipped, because a cut-off joke is
+   worse than a slightly taller sheet. overflow is for the slide, not the text. */
+.commentary { min-height: 62px; display: grid; align-content: center; gap: 6px;
+  padding: 8px 12px; border-radius: var(--radius); border: 1px dashed var(--line);
+  overflow: hidden; }
+.commentary-line { margin: 0; font-size: 13px; line-height: 1.35; text-align: center;
+  color: var(--ink-soft); }
+.commentary-dots { display: flex; gap: 4px; justify-content: center; }
+.commentary-dots span { width: 4px; height: 4px; border-radius: 999px; background: var(--line); }
+.commentary-dots span.on { background: var(--ink-soft); }
+
 .blitz-splash { position: fixed; inset: 0; display: grid; place-items: center; z-index: 110;
   pointer-events: none; }
 .blitz-word { font-size: clamp(48px, 18vw, 120px); font-weight: 800; letter-spacing: .02em;

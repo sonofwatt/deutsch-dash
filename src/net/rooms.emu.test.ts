@@ -164,8 +164,11 @@ emu('server-side player cap and badge uniqueness (database.rules.json)', () => {
     // The loser of a race is by definition not the host most of the time, and has
     // to be able to say so - round/races is written by whoever lost.
     await assertSucceeds(db.ref(`rooms/${code}/round/races/3`).set({ by: RACER, at: 1 }));
-    // But races is a hole in the host-only round node, not a door: a non-host
-    // still cannot write the round itself and wipe the board through it.
+    // The tally the commentary reads goes in the same write, so it needs the same
+    // permission - a rivalry can only be counted if the loser can record it.
+    await assertSucceeds(db.ref(`rooms/${code}/round/duels/${RACER}/${HOST}`).set(2));
+    // But these are holes in the host-only round node, not a door: a non-host
+    // still cannot write the round itself and wipe the board through them.
     await assertFails(db.ref(`rooms/${code}/round`).set({ races: { 3: { by: RACER, at: 1 } } }));
   });
 

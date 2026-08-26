@@ -8,6 +8,7 @@ import { reconcileTableau } from '../game/center';
 import { botDelay, chooseBotAction, type BotLevel } from '../game/bot';
 import * as netRooms from '../net/rooms';
 import * as netPlays from '../net/plays';
+import type { PlayResult } from '../net/plays';
 import { pickNextHost, allConnectedStuck } from '../net/plays';
 import { reconnect, watchConnected } from '../net/firebase';
 import type { JoinResult } from '../net/rooms';
@@ -25,8 +26,8 @@ export interface Deps {
   createRoom(name: string, badgeId: BadgeId): Promise<string>;
   setTargetScore(code: string, n: number): Promise<void>;
   startRound(code: string, room: Room): Promise<void>;
-  playToCenter(code: string, space: number, card: Card): Promise<boolean>;
-  reportRace(code: string, space: number, uid: string): Promise<void>;
+  playToCenter(code: string, space: number, card: Card): Promise<PlayResult>;
+  reportRace(code: string, space: number, loser: string, winner: string | null): Promise<void>;
   persistTableau(code: string, uid: string, t: Tableau): Promise<void>;
   declareStuck(code: string, uid: string): Promise<void>;
   clearStuck(code: string, uid: string): Promise<void>;
@@ -214,11 +215,11 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
       if (!taken) return;
       // Not optimistic, unlike a human's play: a bot has no rejection animation
       // to roll back, and losing the race just means it retries next tick.
-      const committed = await deps.playToCenter(code, action.space, card);
+      const res = await deps.playToCenter(code, action.space, card);
       if (get().code !== code) return; // room changed mid-flight
-      if (committed) commit(taken.next);
+      if (res.committed) commit(taken.next);
       // A bot losing a race is still a race: the human who beat it earned the halo.
-      else void deps.reportRace(code, action.space, id).catch(() => {});
+      else void deps.reportRace(code, action.space, id, res.winner).catch(() => {});
     }
 
     function scheduleBot(id: string, level: BotLevel) {
@@ -433,11 +434,11 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         const taken = takeCard(tableau, selection);
         if (!taken) return;
         set({ tableau: taken.next }); // optimistic
-        const committed = await deps.playToCenter(code, target.space, card);
+        const res = await deps.playToCenter(code, target.space, card);
         if (get().code !== code) return; // session changed mid-flight (leave/rejoin) - drop the stale continuation
-        if (!committed) {
+        if (!res.committed) {
           set({ tableau, lastRejected: { card, at: Date.now(), space: target.space } }); // rollback
-          void deps.reportRace(code, target.space, uid).catch(() => {});
+          void deps.reportRace(code, target.space, uid, res.winner).catch(() => {});
           return;
         }
         void persist(taken.next);

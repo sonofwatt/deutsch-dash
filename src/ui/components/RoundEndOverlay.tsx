@@ -1,5 +1,7 @@
 import { useGameStore, isHost } from '../../state/store';
 import { ScoreList } from './ScoreList';
+import { Commentary } from './Commentary';
+import { remarksForRoom } from '../commentary';
 
 export function RoundEndOverlay() {
   const room = useGameStore(s => s.room)!;
@@ -16,6 +18,7 @@ export function RoundEndOverlay() {
       <div className="sheet">
         <h2 style={{ margin: 0 }}>{blitzer ? `${blitzer} blitzed!` : 'Round over (all stuck)'}</h2>
         <ScoreList players={room.players} scores={scores} />
+        <Commentary remarks={remarksForRoom(room)} />
         {actionError && <p className="error" style={{ margin: 0 }}>{actionError}</p>}
         {host
           ? <button className="btn btn-primary" onClick={next}>Next round</button>

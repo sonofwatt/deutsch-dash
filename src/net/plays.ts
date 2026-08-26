@@ -1,9 +1,9 @@
-import { ref, runTransaction, serverTimestamp, set, update } from 'firebase/database';
+import { increment, ref, runTransaction, serverTimestamp, set, update } from 'firebase/database';
 import { db } from './firebase';
-import type { Card, PlayerInfo, Room, Tableau } from '../game/types';
+import type { Card, CenterSpace, PlayerInfo, Room, Tableau } from '../game/types';
 import { buildDeck, deal, shuffle, type Rng } from '../game/deck';
 import { postCountForPlayers } from '../game/rules';
-import { centerPlayTxn, reconcileTableau } from '../game/center';
+import { centerPlayTxn, reconcileTableau, spaceOwner } from '../game/center';
 import { scoreRound, winnerIds } from '../game/scoring';
 
 const r = (code: string, path = '') => ref(db, `rooms/${code}${path ? '/' + path : ''}`);
@@ -28,7 +28,9 @@ export async function startRound(code: string, room: Room, rng?: Rng): Promise<v
   const tableaus: Record<string, Tableau> = {};
   for (const uid of uids) tableaus[uid] = deal(shuffle(buildDeck(uid), rng), postCount);
   const patch: Record<string, unknown> = {
-    round: { tableaus, stuckRounds: 0, blitzedBy: null, scores: null, startedAt: serverTimestamp() },
+    round: {
+      tableaus, stuckRounds: 0, blitzedBy: null, scores: null, startedAt: serverTimestamp(),
+    },
     'meta/phase': 'playing',
     'meta/roundNumber': room.meta.roundNumber + 1,
   };
@@ -36,12 +38,24 @@ export async function startRound(code: string, room: Room, rng?: Rng): Promise<v
   await update(r(code), patch);
 }
 
-export async function playToCenter(code: string, spaceIndex: number, card: Card): Promise<boolean> {
+/**
+ * `winner` is only set on a loss, and it is the whole reason this returns an
+ * object rather than a boolean: an aborted transaction's snapshot holds the
+ * server's value for that space, so the loser learns who beat it from the same
+ * round trip that told it it lost. Guessing from the client's own room snapshot
+ * would be a race against the very update that caused the loss.
+ */
+export interface PlayResult { committed: boolean; winner: string | null }
+
+export async function playToCenter(code: string, spaceIndex: number, card: Card): Promise<PlayResult> {
   const result = await runTransaction(
     r(code, `round/spaces/${spaceIndex}`), centerPlayTxn(card), { applyLocally: false },
   );
-  if (result.committed) set(r(code, 'round/stuckRounds'), 0).catch(() => {}); // best-effort reset; a lost reset only delays the stall counter
-  return result.committed;
+  if (result.committed) {
+    set(r(code, 'round/stuckRounds'), 0).catch(() => {}); // best-effort reset; a lost reset only delays the stall counter
+    return { committed: true, winner: null };
+  }
+  return { committed: false, winner: spaceOwner(result.snapshot.val() as CenterSpace | null) };
 }
 
 /**
@@ -50,8 +64,16 @@ export async function playToCenter(code: string, spaceIndex: number, card: Card)
  * a winning transaction looks exactly like an uncontested play. Best-effort: a
  * failure costs a halo, nothing more.
  */
-export function reportRace(code: string, space: number, uid: string): Promise<void> {
-  return set(r(code, `round/races/${space}`), { by: uid, at: serverTimestamp() });
+export function reportRace(
+  code: string, space: number, loser: string, winner: string | null,
+): Promise<void> {
+  const patch: Record<string, unknown> = {
+    [`round/races/${space}`]: { by: loser, at: serverTimestamp() },
+  };
+  // The running tally the commentary reads. Same write, so a rivalry can never
+  // count a race the flash did not show, or the other way round.
+  if (winner && winner !== loser) patch[`round/duels/${loser}/${winner}`] = increment(1);
+  return update(r(code), patch);
 }
 
 export function persistTableau(code: string, uid: string, t: Tableau): Promise<void> {
@@ -90,7 +112,8 @@ export async function commitScores(code: string, room: Room): Promise<void> {
     Object.entries(round.tableaus).map(([uid, t]) => [uid, reconcileTableau(t, round.spaces)]),
   );
   const scores = scoreRound(round.spaces, tableaus);
-  const patch: Record<string, unknown> = { 'round/scores': scores };
+  // Stamped here so the round has a length for the commentary to talk about.
+  const patch: Record<string, unknown> = { 'round/scores': scores, 'round/endedAt': serverTimestamp() };
   const totals: Record<string, number> = {};
   for (const [uid, p] of Object.entries(room.players)) {
     totals[uid] = p.score + (scores[uid]?.delta ?? 0);

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createGameStore, legalTargets, HOST_AWAY_MS, type Deps } from './store';
+import type { PlayResult } from '../net/plays';
 import { deal, buildDeck } from '../game/deck';
 import type { Card, CenterSpace, PlayerInfo, RoomMeta, Suit, Room, Tableau } from '../game/types';
 
@@ -13,7 +14,7 @@ function fakeDeps(over: Partial<Deps> = {}): Deps {
     createRoom: vi.fn(async () => 'ABCDEF'),
     setTargetScore: vi.fn(async () => {}),
     startRound: vi.fn(async () => {}),
-    playToCenter: vi.fn(async () => true),
+    playToCenter: vi.fn(async () => ({ committed: true, winner: null })),
     reportRace: vi.fn(async () => {}),
     persistTableau: vi.fn(async () => {}),
     declareStuck: vi.fn(async () => {}),
@@ -39,7 +40,7 @@ function playingRoom(tableau: Tableau): Room {
     meta: { createdAt: 1, hostId: 'me', creatorId: 'me', targetScore: 75, phase: 'playing', roundNumber: 1 },
     players: { me: { name: 'D', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, score: 0 } },
     round: { spaces: Array.from({ length: 16 }, () => ({ stack: [], history: [] })),
-             tableaus: { me: tableau }, blitzedBy: null, scores: null, races: null, stuckRounds: 0, startedAt: 1 },
+             tableaus: { me: tableau }, blitzedBy: null, scores: null, races: null, duels: null, endedAt: null, stuckRounds: 0, startedAt: 1 },
   };
 }
 
@@ -95,7 +96,7 @@ describe('optimistic play', () => {
   });
 
   it('restores the tableau when the transaction loses the race', async () => {
-    const deps = fakeDeps({ playToCenter: vi.fn(async () => false) });
+    const deps = fakeDeps({ playToCenter: vi.fn(async () => ({ committed: false, winner: 'ann' })) });
     const store = createGameStore(deps);
     const t = seededTableau();
     const rigged: Tableau = { ...t, blitz: [...t.blitz.slice(0, -1), c(1, 'red')] };
@@ -109,7 +110,8 @@ describe('optimistic play', () => {
     expect(store.getState().lastRejected?.space).toBe(0);   // which space to scowl at
     // The loser is the only client that knows a race happened - a winning
     // transaction looks exactly like an uncontested play - so it announces it.
-    expect(deps.reportRace).toHaveBeenCalledWith('ABCDEF', 0, 'me');
+    // ...and passes on who beat it, which only the aborted transaction knew.
+    expect(deps.reportRace).toHaveBeenCalledWith('ABCDEF', 0, 'me', 'ann');
   });
 
   it('announces blitz when the last blitz card is played', async () => {
@@ -230,9 +232,9 @@ describe('stale-session guards', () => {
   });
 
   it('drops in-flight play continuations after leave()', async () => {
-    let resolvePlay!: (v: boolean) => void;
+    let resolvePlay!: (v: PlayResult) => void;
     const deps = fakeDeps({
-      playToCenter: vi.fn(() => new Promise<boolean>(res => { resolvePlay = res; })),
+      playToCenter: vi.fn(() => new Promise<PlayResult>(res => { resolvePlay = res; })),
     });
     const store = createGameStore(deps);
     const t = seededTableau();
@@ -241,7 +243,7 @@ describe('stale-session guards', () => {
     store.getState().select({ kind: 'blitz' });
     const inFlight = store.getState().playTo({ space: 0 });
     store.getState().leave();
-    resolvePlay(true);
+    resolvePlay({ committed: true, winner: null });
     await inFlight;
     expect(deps.announceBlitz).not.toHaveBeenCalled();
     expect(deps.persistTableau).not.toHaveBeenCalled();
@@ -395,7 +397,7 @@ describe('AI players', () => {
       round: {
         spaces: Array.from({ length: 16 }, () => ({ stack: [], history: [] })),
         tableaus: { me: deal(buildDeck('me'), 3), bot_star: deal(buildDeck('bot_star'), 3) },
-        blitzedBy: null, scores: null, races: null, stuckRounds: 0, startedAt: 1,
+        blitzedBy: null, scores: null, races: null, duels: null, endedAt: null, stuckRounds: 0, startedAt: 1,
       },
     };
   }
@@ -447,7 +449,7 @@ describe('automatic stuck detection', () => {
     return {
       meta: { createdAt: 1, hostId: 'me', creatorId: 'me', targetScore: 75, phase: 'playing', roundNumber: 1 },
       players: { me: { name: 'D', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt, score: 0 } },
-      round: { spaces: blocked(), tableaus: { me: t }, blitzedBy: null, scores: null, races: null,
+      round: { spaces: blocked(), tableaus: { me: t }, blitzedBy: null, scores: null, races: null, duels: null, endedAt: null,
                stuckRounds: 0, startedAt: 1 },
     };
   }
