@@ -385,9 +385,22 @@ sudo npx playwright install-deps chromium && npx playwright install chromium
 npx playwright screenshot --viewport-size "360,620" --color-scheme dark URL out.png
 ```
 
-That covers layout and legibility at a known width in both themes. It does not
-cover touch, timing, or how a real phone actually lays out — the list below still
-stands.
+`--device "Pixel 5"` gives a real phone profile at DPR 2.75, which is what to use
+for judging legibility. (Device profiles that default to WebKit — the iPhone ones
+— need `npx playwright install webkit` first.)
+
+**One artifact to know about:** a static render has no JS, so framer-motion's
+`initial` state never animates away. `CardView` sets `initial={{ rotateY: 90 }}`
+whenever `flipKey` is passed, which leaves the turned-over wood card frozen
+edge-on and invisible. Neutralise it in the harness page, not the component:
+
+```css
+.card[style*="rotateY"] { transform: none !important; opacity: 1 !important; }
+```
+
+This covers layout, colour and legibility at a known width in both themes. It does
+not cover touch, timing, or how a real phone actually lays out — the list below
+still stands.
 
 ### Check the URL first if something looks broken
 
@@ -399,22 +412,45 @@ assuming a code fault.
 
 ### Never rendered
 
-- Container-query grid sizing (`container-type: inline-size` + `100cqw`), Chrome
-  105+ / Safari 16+. Where unsupported the slot falls back to a fixed `--card-w`,
-  which can overflow at six columns.
-- `aspect-ratio: 2.5 / 3.5` card proportions, and that the old `--card-h` bug is
-  genuinely gone on a wide window (it was invisible at 360px because both values
-  clamped to the same number).
-- `color-mix()` in rail chips, card backs and finished-pile tints — Chrome 111+ /
-  Safari 16.2+.
-- Pile-depth peek layers now that the step scales with the card.
-- The washroom plates: legibility at 44px, and whether boy and girl are told apart
-  at a glance.
-- Dark mode across every new surface: rails, snap band, stuck note, AI tag,
-  recycle button.
-- **The 44px card floor at 24 spaces / six columns on a 360px phone.** The
-  arithmetic says it fits with about 3px to spare. Not a margin worth trusting.
-- Drag ghost tracking the cursor exactly, after the `left: 0; top: 0` fix.
+The board itself now has been, headlessly, at 360×800 and on a Pixel 5 profile,
+4-player and 8-player, light and dark (2026-08-26). That closed most of this list:
+
+- ~~Container-query grid sizing~~ — correct at four and at six columns.
+- ~~`color-mix()` in rail chips, card backs and finished-pile tints~~ — all render.
+- ~~Pile-depth peek layers~~ — visible under blitz, posts and wood.
+- ~~The washroom plates~~ — the plate reads at ~47px and the skirt silhouette is
+  unmistakable against the boy's. At a *zoom* of a 2.75x shot, note; on glass at
+  8mm it is still an open question.
+- ~~Dark mode across every new surface~~ — rails, snap band, AI tag, selection
+  ring and every card face all hold up. This is also where the `--danger` fix
+  came from.
+- ~~**The 44px card floor at 24 spaces / six columns**~~ — **it fits, and not
+  narrowly.** 24 spaces at six columns lands the slot on `--card-w` (~43px at
+  360px wide), never on the 34px floor, with roughly 30px of width to spare. The
+  "about 3px of slack" arithmetic was pessimistic.
+
+Still unrendered:
+
+- `aspect-ratio: 2.5 / 3.5` on a **wide window** specifically — the phone shots
+  cannot show the old `--card-h` bug, which was invisible at 360px because both
+  values clamped to the same number.
+- Drag ghost tracking the cursor exactly, after the `left: 0; top: 0` fix. Needs a
+  pointer, so headless static rendering will never reach it.
+
+### The board wastes its vertical space — new, from those renders
+
+At 393×851 the centre grid occupies roughly the middle third of the screen with
+about 90px of dead space above it and 80px below, while cards sit at 47px.
+`--card-w: clamp(34px, min(12vw, 7vh), 96px)` is what holds them there: 12vw is
+47px on that phone, and the 12vw cap exists for the **six-column** 8-player board,
+where six of them plus gaps do have to fit across. A four-column board pays that
+cap for nothing — it uses about 200px of a 377px-wide area.
+
+Nothing is broken and nothing overflows, so this is a design call, not a bug: give
+the slot more room when the column count is low (the container query already knows
+`--cols`), or leave the board small and deliberate. **Decide before touching it** —
+bigger cards eat the slack the snap band and the tableau currently sit in, and the
+snap band is already the largest single element on the board.
 - ~~The seven-column score row at 360px~~ — done headlessly, both themes, with a
   14-character name. Never on real glass.
 
