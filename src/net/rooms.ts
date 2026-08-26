@@ -16,7 +16,7 @@ export const MAX_PLAYERS = 8;
 
 export type JoinResult =
   | { ok: true; code: string }
-  | { ok: false; reason: 'not-found' | 'expired' | 'full' | 'badge-taken' | 'started' | 'race' };
+  | { ok: false; reason: 'not-found' | 'expired' | 'full' | 'badge-taken' | 'started' | 'race' | 'offline' };
 
 const roomRef = (code: string) => ref(db, `rooms/${code}`);
 

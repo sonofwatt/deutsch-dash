@@ -467,3 +467,36 @@ describe('automatic stuck detection', () => {
     expect(deps.declareStuck).not.toHaveBeenCalled();
   });
 });
+
+describe('a dead socket must not wedge the join buttons', () => {
+  // Firebase's get()/update() reject outright when the socket is gone - which is
+  // what coming back to a tab after the phone slept looks like. joinPhase used to
+  // stay on 'joining' through that, disabling every join and create button for good.
+  it('enterRoom reports offline instead of leaving joinPhase on joining', async () => {
+    const store = createGameStore(fakeDeps({
+      joinRoom: vi.fn(async () => { throw new Error('client is offline'); }),
+    }));
+    const res = await store.getState().enterRoom('ABCDEF', 'D', 'tulip');
+    expect(res).toEqual({ ok: false, reason: 'offline' });
+    expect(store.getState().joinPhase).toBe('idle');
+    expect(store.getState().joinError).toBe('offline');
+  });
+
+  it('hostRoom clears joinPhase before it rethrows', async () => {
+    const store = createGameStore(fakeDeps({
+      createRoom: vi.fn(async () => { throw new Error('client is offline'); }),
+    }));
+    await expect(store.getState().hostRoom('D', 'tulip')).rejects.toThrow();
+    expect(store.getState().joinPhase).toBe('idle');
+    expect(store.getState().joinError).toBe('offline');
+  });
+
+  it('a refused join still reports its own reason, not offline', async () => {
+    const store = createGameStore(fakeDeps({
+      joinRoom: vi.fn(async () => ({ ok: false as const, reason: 'full' as const })),
+    }));
+    expect(await store.getState().enterRoom('ABCDEF', 'D', 'tulip'))
+      .toEqual({ ok: false, reason: 'full' });
+    expect(store.getState().joinError).toBe('full');
+  });
+});

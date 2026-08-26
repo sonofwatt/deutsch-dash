@@ -4,29 +4,35 @@ import { faceGroup } from '../../game/rules';
 import type { Card, FaceGroup } from '../../game/types';
 
 /**
- * Boy/girl marker, drawn as the North-American washroom pictograms. Post building
- * is gated on this pair (red/blue are boys, green/yellow girls), so it has to be
- * readable at a glance at card size - the old ◆/○ dingbats were not.
- * Painted in currentColor, which .card-group sets to the card's suit colour.
+ * Boy/girl marker, drawn as an actual washroom-door sign: the figure knocked out
+ * of a solid suit-coloured plate. Post building is gated on this pair (red/blue
+ * are boys, green/yellow girls), so the two have to be told apart instantly at
+ * card size - the first cut used matching outline figures whose only difference
+ * was a slightly tapered torso, which was not enough. The silhouettes are now
+ * deliberately exaggerated: the skirt flares to nearly the full plate width
+ * against a torso barely half that, so the shapes differ in outline, not detail.
  */
 export function FaceGlyph({ group }: { group: FaceGroup }) {
   return (
-    <svg className="card-group" viewBox="4.6 0 14.8 24" fill="currentColor" aria-hidden="true"
+    <svg className="card-group" viewBox="0 0 20 28" aria-hidden="true"
       preserveAspectRatio="xMidYMid meet">
-      <circle cx="12" cy="3.9" r="3.5" />
-      {group === 'boy' ? (
-        <>
-          <rect x="6.4" y="8.4" width="11.2" height="9" rx="1.6" />
-          <rect x="7.9" y="14.8" width="3.4" height="8.6" rx="1.1" />
-          <rect x="12.7" y="14.8" width="3.4" height="8.6" rx="1.1" />
-        </>
-      ) : (
-        <>
-          <path d="M12 8.2c2.7 0 4.3 1.5 4.9 3.6l1.7 6H5.4l1.7-6C7.7 9.7 9.3 8.2 12 8.2z" />
-          <rect x="8.3" y="17" width="3" height="6.4" rx="1" />
-          <rect x="12.7" y="17" width="3" height="6.4" rx="1" />
-        </>
-      )}
+      <rect className="plate" x="0" y="0" width="20" height="28" rx="4.5" />
+      <g className="figure">
+        <circle cx="10" cy="6.6" r="3.2" />
+        {group === 'boy' ? (
+          <>
+            <rect x="6.1" y="10.9" width="7.8" height="7.7" rx="1.3" />
+            <rect x="6.8" y="16.6" width="2.7" height="7.8" rx="1" />
+            <rect x="10.5" y="16.6" width="2.7" height="7.8" rx="1" />
+          </>
+        ) : (
+          <>
+            <path d="M10 10.5c2.3 0 3.5 1.2 4.1 3.2l2.4 7.4H3.5l2.4-7.4c.6-2 1.8-3.2 4.1-3.2z" />
+            <rect x="7.3" y="20" width="2.3" height="4.4" rx=".9" />
+            <rect x="10.4" y="20" width="2.3" height="4.4" rx=".9" />
+          </>
+        )}
+      </g>
     </svg>
   );
 }

@@ -9,7 +9,7 @@ import { botDelay, chooseBotAction, type BotLevel } from '../game/bot';
 import * as netRooms from '../net/rooms';
 import * as netPlays from '../net/plays';
 import { pickNextHost, allConnectedStuck } from '../net/plays';
-import { watchConnected } from '../net/firebase';
+import { reconnect, watchConnected } from '../net/firebase';
 import type { JoinResult } from '../net/rooms';
 
 // How long the host may stay disconnected in the watchdog below before a stand-in claims
@@ -356,21 +356,36 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         if (room) syncBots(room); // bots idle while we are offline, resume when back
       },
 
+      // Both of these used to let a rejection escape with joinPhase still set to
+      // 'joining', which disables every join/create button on screen for good.
+      // A dead socket - coming back to the tab after the phone slept, say - makes
+      // Firebase's get()/update() reject exactly like that, so the wedge was
+      // reachable from the most ordinary thing a phone does.
       async hostRoom(name, badgeId) {
         set({ joinPhase: 'joining', joinError: null });
-        const uid = await deps.ensureSignedIn();
-        const code = await deps.createRoom(name, badgeId);
-        watch(code, uid);
-        return code;
+        try {
+          const uid = await deps.ensureSignedIn();
+          const code = await deps.createRoom(name, badgeId);
+          watch(code, uid);
+          return code;
+        } catch (e) {
+          set({ joinPhase: 'idle', joinError: 'offline' });
+          throw e; // the caller still needs to know not to navigate
+        }
       },
 
       async enterRoom(code, name, badgeId) {
         set({ joinPhase: 'joining', joinError: null });
-        const uid = await deps.ensureSignedIn();
-        const res = await deps.joinRoom(code, name, badgeId);
-        if (res.ok) watch(code, uid);
-        else set({ joinPhase: 'idle', joinError: res.reason });
-        return res;
+        try {
+          const uid = await deps.ensureSignedIn();
+          const res = await deps.joinRoom(code, name, badgeId);
+          if (res.ok) watch(code, uid);
+          else set({ joinPhase: 'idle', joinError: res.reason });
+          return res;
+        } catch {
+          set({ joinPhase: 'idle', joinError: 'offline' });
+          return { ok: false, reason: 'offline' };
+        }
       },
 
       leave() {
@@ -497,6 +512,18 @@ const realDeps: Deps = {
 export const gameStore = createGameStore(realDeps);
 try {
   watchConnected(ok => gameStore.getState().setOnline(ok));
+  // Coming back from another app is exactly when the socket is most likely to be
+  // dead. Nudge it on return, then again shortly after: .info/connected can still
+  // read true for a moment because the frozen tab has not yet processed the drop,
+  // and we must not flap presence for everyone else by reconnecting when fine.
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible') return;
+      const nudgeIfDown = () => { if (!gameStore.getState().online) reconnect(); };
+      nudgeIfDown();
+      setTimeout(nudgeIfDown, 2500);
+    });
+  }
 } catch {
   // module side effect: fine to skip when no Firebase backend is reachable (tests)
 }

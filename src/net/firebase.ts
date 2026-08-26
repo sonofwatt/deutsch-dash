@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import { initializeApp } from 'firebase/app';
 import { connectAuthEmulator, getAuth, signInAnonymously, type Auth } from 'firebase/auth';
-import { connectDatabaseEmulator, getDatabase, onValue, ref, type Database } from 'firebase/database';
+import { connectDatabaseEmulator, getDatabase, goOffline, goOnline, onValue, ref, type Database } from 'firebase/database';
 import { firebaseConfig, isConfigured } from './firebaseConfig';
 
 // Local work (dev server, unit tests, test:emu) uses the emulator; a production
@@ -41,4 +41,21 @@ export function ensureSignedIn(): Promise<string> {
 
 export function watchConnected(cb: (ok: boolean) => void): () => void {
   return onValue(ref(db, '.info/connected'), snap => cb(snap.val() === true));
+}
+
+/**
+ * Force the SDK to rebuild its connection. Switching to another app on a phone
+ * freezes the tab, and it can come back holding a WebSocket the OS killed while
+ * it was asleep - the SDK's own retry does not always fire from that state.
+ * goOffline/goOnline drops whatever is there and dials again immediately.
+ * Only call this when already believed offline: it would otherwise flap presence
+ * for everyone else in the room.
+ */
+export function reconnect(): void {
+  try {
+    goOffline(db);
+    goOnline(db);
+  } catch {
+    // no backend wired up (unit tests) - nothing to reconnect
+  }
 }

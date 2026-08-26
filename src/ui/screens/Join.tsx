@@ -1,16 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useGameStore } from '../../state/store';
 import { peekRoom } from '../../net/rooms';
 import { ensureSignedIn } from '../../net/firebase';
 import { BadgePicker } from '../components/BadgePicker';
+import { JOIN_REASONS } from '../joinReasons';
 import type { BadgeId } from '../../game/badges';
-
-const REASONS: Record<string, string> = {
-  'not-found': 'No room with that code.', expired: 'This room has expired.',
-  full: 'Room is full (8 players).', 'badge-taken': 'That badge is taken - pick another.',
-  started: 'This game already started without you.',
-  race: 'Someone just took that spot — try again.',
-};
 
 export function Join({ code }: { code: string }) {
   const enterRoom = useGameStore(s => s.enterRoom);
@@ -20,6 +14,22 @@ export function Join({ code }: { code: string }) {
   const [badge, setBadge] = useState<BadgeId | null>(localStorage.getItem('bz.badge') as BadgeId | null);
   const [taken, setTaken] = useState<BadgeId[]>([]);
   const [resuming, setResuming] = useState(false);
+  const [resumeFailed, setResumeFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const online = useGameStore(s => s.online);
+  const wasOffline = useRef(false);
+
+  // Retry the resume by itself once the connection comes back, but only on an
+  // offline -> online edge: retrying on every render would spin if the failure
+  // is something a retry cannot fix.
+  useEffect(() => {
+    if (!online) { wasOffline.current = true; return; }
+    if (wasOffline.current && resumeFailed) {
+      wasOffline.current = false;
+      setResumeFailed(false);
+      setAttempt(a => a + 1);
+    }
+  }, [online, resumeFailed]);
 
   useEffect(() => {
     // sign in FIRST so peekRoom reuses the same uid (concurrent sign-ins can diverge),
@@ -45,11 +55,14 @@ export function Join({ code }: { code: string }) {
         // this form while still being a member, and must not grey out my own badge
         setTaken(Object.entries(room.players).filter(([id]) => id !== uid).map(([, p]) => p.badgeId));
       } catch {
-        // peek is best-effort; join itself will surface real errors
+        // A throw in here - most likely a dead socket after the phone slept - used
+        // to be swallowed with `resuming` still true, leaving the screen stuck on
+        // "Rejoining…" for good with no retry and no way out. Surface it instead.
+        if (!cancelled) { setResuming(false); setResumeFailed(true); }
       }
     })();
     return () => { cancelled = true; };
-  }, [code, enterRoom]);
+  }, [code, enterRoom, attempt]);
 
   const effBadge = badge && !taken.includes(badge) ? badge : null;
   const ready = name.trim().length > 0 && effBadge != null;
@@ -58,6 +71,11 @@ export function Join({ code }: { code: string }) {
     localStorage.setItem('bz.name', name.trim());
     localStorage.setItem('bz.badge', effBadge!);
     await enterRoom(code, name.trim(), effBadge!);
+  }
+
+  function retry() {
+    setResumeFailed(false);
+    setAttempt(a => a + 1);
   }
 
   if (resuming) {
@@ -70,6 +88,21 @@ export function Join({ code }: { code: string }) {
     );
   }
 
+  if (resumeFailed) {
+    return (
+      <div className="screen stack">
+        <h1 className="title">Reconnecting…</h1>
+        <div className="code-pill">{code}</div>
+        <p className="muted">
+          {online
+            ? 'Could not reach the game.'
+            : 'Waiting for your connection to come back — this will retry by itself.'}
+        </p>
+        <button className="btn btn-primary" onClick={retry}>Try again</button>
+      </div>
+    );
+  }
+
   return (
     <div className="screen stack">
       <h1 className="title">Join room</h1>
@@ -77,7 +110,7 @@ export function Join({ code }: { code: string }) {
       <input className="field" placeholder="Your name" maxLength={14}
         value={name} onChange={e => setName(e.target.value)} />
       <BadgePicker value={effBadge} onChange={setBadge} taken={taken} />
-      {joinError && <p className="error">{REASONS[joinError] ?? joinError}</p>}
+      {joinError && <p className="error">{JOIN_REASONS[joinError] ?? joinError}</p>}
       <button className="btn btn-primary" disabled={!ready || joinPhase === 'joining'} onClick={join}>
         {joinPhase === 'joining' ? 'Joining…' : 'Join game'}
       </button>

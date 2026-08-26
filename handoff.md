@@ -230,7 +230,11 @@ hard-refresh before assuming a code fault.
   proves it.
 - The snap band at its new height (`clamp(44px, 9vh, 72px)`) - big enough to hit
   mid-drag with a thumb, without squeezing the grid on a short screen.
-- Washroom pictogram legibility at 44px, which is the whole point of the change.
+- Washroom pictograms: legibility at 44px, and more importantly whether boy and
+  girl are now told apart at a glance. The first cut used matching outline figures
+  differing only by a tapered torso and was reported as not distinct enough; they
+  are now a figure knocked out of a solid suit-coloured plate, with the skirt
+  flaring to nearly the plate width against a torso barely half that.
 - Dark mode across every new surface: rails, snap band, stuck note, AI tag,
   recycle button.
 - **The 44px card floor at 24 spaces / six columns on a 360px phone.** The
@@ -260,6 +264,27 @@ hard-refresh before assuming a code fault.
 - Five to eight players, and the 24-space cap in practice.
 - Several bots at once with a low-end phone as host — every bot turn runs on the
   host's device.
+
+### Reconnecting after the app is backgrounded
+
+Reported 2026-08-25 and fixed blind — needs the same test that found it, which is
+switching apps mid-game and coming back. Three separate faults were in that path:
+
+- `Join`'s auto-resume set `resuming` true and then swallowed any throw, so a
+  rejoin that failed left the screen on "Rejoining…" for good. It now surfaces a
+  "Reconnecting…" state with a Try again button, and retries by itself on the
+  offline → online edge.
+- `enterRoom` / `hostRoom` let a rejection escape with `joinPhase` still
+  `'joining'`, which disables every join and create button permanently. Both now
+  land on `joinError: 'offline'`. Covered by tests.
+- Nothing ever nudged the SDK. A frozen tab can come back holding a socket the OS
+  killed, and Firebase's own retry does not always fire from that state; a
+  `visibilitychange` handler now calls `goOffline`/`goOnline` on return, and again
+  2.5s later, but **only while `online` is false** so it cannot flap presence for
+  everyone else.
+
+The nudge in particular is unverifiable from here — it depends on how a real
+mobile browser freezes and thaws a tab.
 
 ### Carried over from the previous session, still true
 
