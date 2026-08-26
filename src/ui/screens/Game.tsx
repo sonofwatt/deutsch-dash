@@ -49,12 +49,19 @@ export function Game() {
     void playTo(target);                       // playTo consumes the selection
   });
 
-  if (!round || !tableau) return <div className="screen"><p className="muted">dealing…</p></div>;
+  // The store drops our hand the moment the phase leaves 'playing' (store.ts, the
+  // clear that makes the next round adopt a fresh one). The round is still on
+  // screen underneath the blitz splash and the score sheet though, so fall back
+  // to the hand RTDB last recorded: the board the round ended on, rather than the
+  // word "dealing…" flashing up behind the moment someone won. Nothing can be
+  // played from it - playTo refuses outside 'playing'.
+  const hand = tableau ?? round?.tableaus[uid] ?? null;
+  if (!round || !hand) return <div className="screen"><p className="muted">dealing…</p></div>;
 
   const races = raceFlashes({ races: round.races, spaces: round.spaces, uid, lastRejected });
   const active = drag ? drag.source : selection;
-  const targets = active ? legalTargets(tableau, active, round.spaces) : { spaces: [], posts: [] };
-  const stuckAvailable = !hasLegalMove(tableau, round.spaces);
+  const targets = active ? legalTargets(hand, active, round.spaces) : { spaces: [], posts: [] };
+  const stuckAvailable = !hasLegalMove(hand, round.spaces);
 
   return (
     <div className="game" style={{ opacity: online ? 1 : 0.6 }}>
@@ -72,7 +79,7 @@ export function Game() {
         <motion.div key={lastRejected?.at ?? 0}
           animate={lastRejected ? { x: [0, -8, 8, -5, 5, 0] } : { x: 0 }}
           transition={{ duration: 0.35 }}>
-          <TableauView t={tableau} badgeId={me.badgeId} selection={selection}
+          <TableauView t={hand} badgeId={me.badgeId} selection={selection}
             postHighlight={targets.posts} onSelect={select} onFlip={flip}
             onTapPost={i => void playTo({ post: i })} startDrag={startDrag} />
         </motion.div>

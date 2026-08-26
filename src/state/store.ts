@@ -409,6 +409,9 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
 
       async playTo(target) {
         if (!get().online) return; // spec §8: no plays while disconnected
+        // The board stays on screen under the blitz splash for over a second after
+        // the round ends, and the splash does not take pointer events.
+        if (get().room?.meta.phase !== 'playing') return;
         const { tableau, selection, code, uid, room } = get();
         if (!tableau || !selection || !code || !uid) return;
         set({ selection: null });

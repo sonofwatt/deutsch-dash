@@ -78,6 +78,22 @@ describe('optimistic play', () => {
     expect(top).toBeDefined(); // silence unused warning
   });
 
+  it('refuses a play once the round is over', async () => {
+    // The board is still on screen under the blitz splash, which takes no pointer
+    // events, so a tap in that window would otherwise land on a scored round.
+    const deps = fakeDeps();
+    const store = createGameStore(deps);
+    const t = seededTableau();
+    const room = playingRoom(t);
+    store.setState({
+      uid: 'me', code: 'ABCDEF', tableau: t,
+      room: { ...room, meta: { ...room.meta, phase: 'roundEnd' } },
+    });
+    store.getState().select({ kind: 'blitz' });
+    await store.getState().playTo({ space: 0 });
+    expect(deps.playToCenter).not.toHaveBeenCalled();
+  });
+
   it('restores the tableau when the transaction loses the race', async () => {
     const deps = fakeDeps({ playToCenter: vi.fn(async () => false) });
     const store = createGameStore(deps);
