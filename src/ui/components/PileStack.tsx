@@ -23,7 +23,8 @@ export function PileStack(props: {
     <div className={`pile-depth${props.className ? ` ${props.className}` : ''}`}
       data-drop={props['data-drop']} onClick={props.onClick}>
       {Array.from({ length: n }, (_, i) => (
-        <div key={i} className="pile-layer" style={{ top: (n - i) * 3 }} />
+        <div key={i} className="pile-layer"
+          style={{ top: `calc(${n - i} * var(--pile-step))` }} />
       ))}
       <div className="pile-top">{props.children}</div>
     </div>

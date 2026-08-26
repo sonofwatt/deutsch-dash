@@ -1,7 +1,9 @@
 # Project Handoff — Deutsch Dash (Dutch Blitz web app)
 
-_Last updated: 2026-08-24 — merged to `main`, 77/77 tests green including full
-emulator coverage against real security rules._
+_Last updated: 2026-08-25 — 124/124 tests green including full emulator coverage
+against real security rules. Two playtest-driven passes have landed since the
+last real-device session; **none of that work has been seen in a browser yet** —
+see "What still needs testing" at the end._
 
 ## What this is
 
@@ -110,16 +112,9 @@ rules enforce (authenticated room read returns data, unauthenticated returns 401
 and the deployed bundle carries the current code. Copy-link confirmed on a real
 phone.
 
-Still outstanding:
-
-1. **A full multi-round game with real players.** Production testing covered
-   setup, joining, dealing and a single card play — not a round played to
-   completion (blitz call, scoring overlay, next round, rematch) or the
-   stuck-rotation path. This is the last untested behaviour of any size.
-2. **Real-device acceptance pass (spec §7)** beyond copy-link: a full round on
-   iPhone Safari and Android Chrome, checking no pull-to-refresh, no rubber-band
-   scroll, no double-tap zoom, and no text selection while dragging cards.
-3. The ledgered pointer-capture re-select check on mouse drags.
+Still outstanding: see **What still needs testing** at the end of this document.
+It is now the long pole — two passes of work have landed on top of the last
+real-device session and none of it has been rendered in a browser.
 
 ~~iOS home-screen icon~~ — fixed 2026-08-25: `public/icon-180.png` (apple-touch-icon)
 and `public/icon-512.png` are generated from the same design as `icon.svg` by
@@ -193,3 +188,80 @@ First real two-player game. Everything in this pass came out of that session:
   `useDrag.ts`). Tap works too, for the tap-to-play path.
 - **Cards are poker-standard 2.5 x 3.5** via `aspect-ratio`, which also makes the
   `--card-h` class of bug structurally impossible to reintroduce.
+
+## What still needs testing (2026-08-25)
+
+**Nothing in either 2026-08-25 pass has been seen in a browser.** Verification so
+far is 108 unit tests, 16 emulator integration tests against the real security
+rules, and static render assertions through `react-dom/server`. That combination
+catches structure, logic and wiring; it cannot catch layout, legibility, timing
+or feel. Treat everything below as unverified.
+
+### Deploy and URL — check this first if the site looks broken
+
+**GitHub does not redirect Pages for a renamed repo.** Verified 2026-08-25:
+`https://sonofwatt.github.io/flemish-fury/` returns a bare 404 with no redirect,
+while `https://sonofwatt.github.io/deutsch-dash/` and every asset under it return
+200 and the bundle carries the current code. A browser still holding the *old*
+cached `index.html` renders a **blank page**, because that shell points at
+`/flemish-fury/assets/*`, which no longer exists. Blank page ⇒ check the URL and
+hard-refresh before assuming a code fault.
+
+### Browser-dependent, never rendered
+
+- Container-query grid sizing (`container-type: inline-size` + `100cqw` in
+  `.game-grid`). Needs Chrome 105+ / Safari 16+. Where unsupported the slot falls
+  back to a fixed `--card-w`, which can overflow at six columns.
+- `aspect-ratio: 2.5 / 3.5` card proportions, including that the previous
+  `--card-h` bug is genuinely gone on a wide window (it was invisible at 360px
+  because both values clamped to the same number).
+- `color-mix()` in the rail chips, card backs and finished-pile tints — Chrome
+  111+ / Safari 16.2+.
+- Pile-depth peek layers. The step was a flat 3px, which with a 2px border on each
+  layer antialiased into a single line - a flipped group of three read as two
+  cards. It now scales with the card (`--pile-step`); needs a look to confirm
+  three layers are three lines.
+- **Drag ghost tracking the cursor.** `.drag-ghost` is `position: fixed` with
+  `left`/`top` auto, so it started from its STATIC position - the last implicit
+  row of the `.game` grid - and the transform moved it from there. Adding
+  `max-width` + `margin-inline: auto` to `.game` pushed that origin right by half
+  the leftover window width, which is why the card appeared offset to the right on
+  a wide Windows window. Pinned to `left: 0; top: 0` now, but only a real drag
+  proves it.
+- The snap band at its new height (`clamp(44px, 9vh, 72px)`) - big enough to hit
+  mid-drag with a thumb, without squeezing the grid on a short screen.
+- Washroom pictogram legibility at 44px, which is the whole point of the change.
+- Dark mode across every new surface: rails, snap band, stuck note, AI tag,
+  recycle button.
+- **The 44px card floor at 24 spaces / six columns on a 360px phone.** The
+  arithmetic says it fits with about 3px to spare. That is not a margin worth
+  trusting without looking.
+
+### Gameplay never actually played
+
+- A full round to completion on the new board — blitz call, scoring overlay, next
+  round, rematch. Carried over from the previous session and still true.
+- **AI players end to end.** The bot loop has only ever run against fake deps and
+  fake timers: whether Easy/Medium/Hard feel distinct, whether a bot's blitz
+  announces correctly, and whether host transfer hands the bots over cleanly are
+  all unknown.
+- Automatic stuck detection firing in a real game, and the all-stuck rotation
+  with bots in the room.
+- The snap band by touch drag, and by tap.
+- Wood recycle: both the ↻ button on the turned-over pile and the ↻ empty draw slot.
+- One-tap join from the home page, including the badge-taken fallback path.
+- Opponent strip mini-cards updating live as an opponent plays.
+
+### Scale
+
+- Three or more players. Only two have ever played.
+- Five to eight players, and the 24-space cap in practice.
+- Several bots at once with a low-end phone as host — every bot turn runs on the
+  host's device.
+
+### Carried over from the previous session, still true
+
+- iPhone Safari has never been opened.
+- Spec §7 touch acceptance: no pull-to-refresh, no rubber-band scroll, no
+  double-tap zoom, no text selection while dragging.
+- The ledgered pointer-capture re-select check on mouse drags.
