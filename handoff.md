@@ -1,8 +1,12 @@
 # Project Handoff — Deutsch Dash
 
-_Last updated: 2026-08-26. **134 tests green** (118 unit + 16 emulator). This is
-the only place in the repo that quotes a count — it drifted three separate ways
-when it lived in four places, so keep it here and nowhere else._
+_Last updated: 2026-08-26 at `6abe8bd`. Working tree clean, `main` ==
+`origin/main`, CI green including the emulator suite, and the live site matches
+`HEAD`._
+
+_**134 tests green** (118 unit + 16 emulator). This is the only place in the repo
+that quotes a count — it drifted three separate ways when it lived in four
+places, so keep it here and nowhere else._
 
 A mobile-first multiplayer Dutch Blitz game for 2–8 players, plus AI opponents.
 Host creates a room, texts the invite link, everyone plays in their phone
@@ -72,10 +76,19 @@ something deliberately turns them on.
 So CI runs `npm run test:emu`, not `npm test`. It is a strict superset, and
 running the plain suite alongside it would just execute everything twice.
 
-`src/net/emulatorCoverage.test.ts` guards this. It reads the workflow rather than
-checking env vars, so it fails in **any** run the moment the two drift apart,
-rather than only in the environment that already broke. Delete the CI step and
-`npm test` goes red locally. (Verified by doing exactly that.)
+Running the emulator on a runner needs a JVM (`actions/setup-java`), and the
+~30MB database-emulator jar is cached so a slow CDN cannot turn the rules tests
+into a red build. Both are in the workflow. This has run green on a real runner —
+the `npm run test:emu` step is in the job's step list with a `success`
+conclusion, not merely an overall green tick.
+
+`src/net/emulatorCoverage.test.ts` guards it. It reads the workflow rather than
+checking env vars, deliberately: an env check only fails in the environment that
+already broke, whereas this goes red in **any** run — local, CI, a contributor's
+laptop — the moment the two drift apart. Verified by deleting the CI step and
+watching `npm test` fail on it, then restoring it. It also pins that the emu
+suites still gate on `EMULATOR`, so if that changes, the reasoning behind the CI
+step gets revisited rather than quietly rotting.
 
 Locally, `npm test` skipping the rules tests is still fine and intended — but run
 `test:emu` before pushing anything touching `src/net/` or the rules.
@@ -445,6 +458,8 @@ game is frozen, including the bot. That is inherent to a serverless design.
 | `3f030ea` | Reconnect-after-backgrounding fixes; washroom-sign redraw |
 | `6a0836f` | Larger figures on the gender plates; bot-cannot-be-host test |
 | `d1c85b4` | Swapped wood and Blitz — wood to the right thumb |
+| `26ff306` | This handoff, rewritten around pending work and the landmines |
+| `6abe8bd` | CI runs the rules tests; guard so that cannot silently regress |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`. The README carries setup, the security model
