@@ -23,6 +23,44 @@ export function TableauView(props: {
 
   return (
     <div className={`tableau-zone${t.post.length >= 5 ? ' tight' : ''}`}>
+      {/* Blitz left, wood right. Wood is the pile a player touches most - every
+         flip of three is another tap - so it sits under the right thumb, where
+         most players reach fastest. Posts stay in the middle between them. */}
+      <div>
+        <PileStack layers={depthLayers(t.blitz.length)}>
+          {blitzTop ? (
+            <div style={{ position: 'relative' }}
+              onClick={() => props.onSelect({ kind: 'blitz' })}
+              onPointerDown={e => props.startDrag(e, blitzTop, { kind: 'blitz' })}>
+              <CardView key={cardId(blitzTop)} card={blitzTop} badgeId={badgeId} selected={isSel({ kind: 'blitz' })} layoutId={cardId(blitzTop)} />
+              <span className="count-bubble">{t.blitz.length}</span>
+            </div>
+          ) : <div className="pile-space" />}
+        </PileStack>
+        <div className="pile-label">blitz</div>
+      </div>
+
+      {t.post.map((stack, i) => {
+        const top = stack[stack.length - 1] ?? null;
+        const source: PlaySource = { kind: 'post', index: i };
+        return (
+          <div key={i}>
+            <PileStack layers={depthLayers(stack.length)} data-drop={`post:${i}`}
+              onClick={() => props.onTapPost(i)}>
+              <div className={`pile-space${props.postHighlight.includes(i) ? ' glow' : ''}`}>
+                {top && (
+                  <div onClick={e => { e.stopPropagation(); props.onSelect(source); }}
+                    onPointerDown={e => props.startDrag(e, top, source)}>
+                    <CardView key={cardId(top)} card={top} badgeId={badgeId} selected={isSel(source)} layoutId={cardId(top)} />
+                  </div>
+                )}
+              </div>
+            </PileStack>
+            <div className="pile-label">{stack.length > 1 ? `+${stack.length - 1}` : ' '}</div>
+          </div>
+        );
+      })}
+
       <div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <PileStack layers={depthLayers(faceDown)}>
@@ -50,41 +88,6 @@ export function TableauView(props: {
           </PileStack>
         </div>
         <div className="pile-label">wood {t.wood.length}</div>
-      </div>
-
-      {t.post.map((stack, i) => {
-        const top = stack[stack.length - 1] ?? null;
-        const source: PlaySource = { kind: 'post', index: i };
-        return (
-          <div key={i}>
-            <PileStack layers={depthLayers(stack.length)} data-drop={`post:${i}`}
-              onClick={() => props.onTapPost(i)}>
-              <div className={`pile-space${props.postHighlight.includes(i) ? ' glow' : ''}`}>
-                {top && (
-                  <div onClick={e => { e.stopPropagation(); props.onSelect(source); }}
-                    onPointerDown={e => props.startDrag(e, top, source)}>
-                    <CardView key={cardId(top)} card={top} badgeId={badgeId} selected={isSel(source)} layoutId={cardId(top)} />
-                  </div>
-                )}
-              </div>
-            </PileStack>
-            <div className="pile-label">{stack.length > 1 ? `+${stack.length - 1}` : ' '}</div>
-          </div>
-        );
-      })}
-
-      <div>
-        <PileStack layers={depthLayers(t.blitz.length)}>
-          {blitzTop ? (
-            <div style={{ position: 'relative' }}
-              onClick={() => props.onSelect({ kind: 'blitz' })}
-              onPointerDown={e => props.startDrag(e, blitzTop, { kind: 'blitz' })}>
-              <CardView key={cardId(blitzTop)} card={blitzTop} badgeId={badgeId} selected={isSel({ kind: 'blitz' })} layoutId={cardId(blitzTop)} />
-              <span className="count-bubble">{t.blitz.length}</span>
-            </div>
-          ) : <div className="pile-space" />}
-        </PileStack>
-        <div className="pile-label">blitz</div>
       </div>
     </div>
   );

@@ -34,6 +34,14 @@ describe('TableauView', () => {
     const one = renderTableau(tableau({ post: [[c(8, 'red')]] }));
     expect(two.split('pile-layer').length).toBeGreaterThan(one.split('pile-layer').length);
   });
+  it('lays out Blitz on the left and wood on the right', () => {
+    // Wood is the pile touched most - every flip of three is another tap - so it
+    // sits under the right thumb. Order is a deliberate choice, so pin it.
+    const html = renderTableau(tableau());
+    expect(html.indexOf('>blitz<')).toBeGreaterThan(-1);
+    expect(html.indexOf('>wood ')).toBeGreaterThan(-1);
+    expect(html.indexOf('>blitz<')).toBeLessThan(html.indexOf('>wood '));
+  });
   it('offers the recycle control only once the face-down wood runs out', () => {
     expect(renderTableau(tableau({ woodIndex: 3 }))).not.toContain('class="recycle"');
     const spent = renderTableau(tableau({ woodIndex: 12 }));
@@ -85,7 +93,11 @@ describe('OpponentStrip', () => {
     }));
     expect(html).not.toContain('>Me<');
     expect(html).toContain('>You<');
-    // wood top + 3 post slots + blitz top = 5 visible slots
+    // blitz top + 3 post slots + wood top = 5 visible slots
     expect(html.split('opp-slot').length - 1).toBe(5);
+    // and in the same order as your own tableau: the Blitz slot, the one carrying
+    // the count bubble, is the first of them
+    const slotsBeforeCount = html.slice(0, html.indexOf('opp-count')).split('opp-slot').length - 1;
+    expect(slotsBeforeCount).toBe(1);
   });
 });

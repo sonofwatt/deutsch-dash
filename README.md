@@ -155,5 +155,10 @@ rotation.
 the nearest space it can legally reach — for an Ace, simply the closest free one,
 so you never have to aim at a particular slot mid-race.
 
+**Tableau layout** is Blitz on the left, post piles in the middle, wood on the
+right. Wood is the pile a player touches most — every flip of three is another
+tap — so it sits under the right thumb. The opponent strip mirrors the same order
+so a glance across the table reads the same way.
+
 Tied at the target? The round simply continues to another round until someone
 stands alone on top.

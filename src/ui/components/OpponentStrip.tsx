@@ -39,11 +39,13 @@ export function OpponentStrip(props: {
               <span className="opp-blitz">{t ? t.blitz.length : '-'}</span>
               {p.stuckAt != null && <span title="stuck">⏳</span>}
             </div>
+            {/* Same left-to-right order as your own tableau, so a glance across
+                the table reads the same way: Blitz, posts, wood. */}
             {t && (
               <div className="opp-cards">
-                <Slot card={woodTop} badgeId={p.badgeId} />
-                {t.post.map((s, i) => <Slot key={i} card={s[s.length - 1] ?? null} badgeId={p.badgeId} />)}
                 <Slot card={blitzTop} badgeId={p.badgeId} count={t.blitz.length} />
+                {t.post.map((s, i) => <Slot key={i} card={s[s.length - 1] ?? null} badgeId={p.badgeId} />)}
+                <Slot card={woodTop} badgeId={p.badgeId} />
               </div>
             )}
           </div>
