@@ -6,6 +6,8 @@ import { CenterGrid, gridColumns } from './CenterGrid';
 import { OpponentStrip } from './OpponentStrip';
 import { ScoreRow } from './ScoreRow';
 import { BlitzSplash } from './BlitzSplash';
+import { ScoreList } from './ScoreList';
+import { rankRows } from '../scoreRanks';
 import { splashVariant } from '../splashVariant';
 import type { Card, CenterSpace, PlayerInfo, RoundScore, Suit, Tableau } from '../../game/types';
 
@@ -180,5 +182,56 @@ describe('BlitzSplash', () => {
     expect(render('poo')).toContain('💩');
     expect(render('poo')).not.toContain('✨');
     expect(render('crying')).toContain('😢');
+  });
+});
+
+describe('rankRows', () => {
+  const p = (score: number): PlayerInfo => ({
+    name: 'P', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, score,
+  });
+  const sc = (delta: number): RoundScore => ({ centerCount: 0, blitzLeft: 0, delta });
+
+  it('derives the old standing by undoing this round', () => {
+    // ann 30 (+12 this round), bo 25 (-2): ann was 18 and last, and is now first.
+    const { previous, current, move } = rankRows(
+      { ann: p(30), bo: p(25) }, { ann: sc(12), bo: sc(-2) },
+    );
+    expect(previous).toEqual(['bo', 'ann']);
+    expect(current).toEqual(['ann', 'bo']);
+    expect(move).toEqual({ ann: 'up', bo: 'down' });
+  });
+  it('moves nobody when there is no breakdown to undo', () => {
+    const { previous, current, move } = rankRows({ ann: p(20), bo: p(25) }, null);
+    expect(previous).toEqual(current);
+    expect(move).toEqual({ ann: null, bo: null });
+  });
+  it('leaves players level on points where they are', () => {
+    // Equal scores must not trade places just because the sort is called twice.
+    const { move } = rankRows({ ann: p(10), bo: p(10), cy: p(10) }, { ann: sc(1), bo: sc(1), cy: sc(1) });
+    expect(move).toEqual({ ann: null, bo: null, cy: null });
+  });
+  it('scores a three-way shuffle from every seat', () => {
+    // was: cy 30, ann 18, bo 5 -> now: ann 34, cy 31, bo 25. Bo gained the most
+    // points of anyone and still moved nowhere: the tint is about places, not points.
+    const { move } = rankRows({ ann: p(34), bo: p(25), cy: p(31) },
+      { ann: sc(16), bo: sc(20), cy: sc(1) });
+    expect(move).toEqual({ ann: 'up', bo: null, cy: 'down' });
+  });
+});
+
+describe('ScoreList', () => {
+  const p = (name: string, score: number): PlayerInfo => ({
+    name, badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, score,
+  });
+  it('is the still frame of the animation: old order, no tint', () => {
+    // No effects run in a static render, so this is the sheet as it lands - the
+    // previous standing, before the swap it is about to play out.
+    const html = renderToStaticMarkup(createElement(ScoreList, {
+      players: { ann: p('Ann', 20), bo: p('Bo', 25) },
+      scores: { ann: { centerCount: 0, blitzLeft: 0, delta: 12 },
+                bo: { centerCount: 0, blitzLeft: 0, delta: -2 } },
+    }));
+    expect(html.indexOf('Bo')).toBeLessThan(html.indexOf('Ann'));
+    expect(html).not.toContain('moved-');
   });
 });

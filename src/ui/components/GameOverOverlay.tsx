@@ -1,6 +1,6 @@
 import { useGameStore, isHost } from '../../state/store';
 import { winnerIds } from '../../game/scoring';
-import { ScoreRow } from './ScoreRow';
+import { ScoreList } from './ScoreList';
 
 export function GameOverOverlay() {
   const room = useGameStore(s => s.room)!;
@@ -11,7 +11,6 @@ export function GameOverOverlay() {
   const totals = Object.fromEntries(Object.entries(room.players).map(([id, p]) => [id, p.score]));
   // gameOver is only entered with a unique winner (ties play another round); the join below is defensive
   const winners = winnerIds(totals, room.meta.targetScore);
-  const rows = Object.entries(room.players).sort(([, a], [, b]) => b.score - a.score);
   // The final round's breakdown, which the round-end overlay never gets to show
   // when the round that ends the game is the same snapshot that ends the round.
   const scores = room.round?.scores;
@@ -25,7 +24,7 @@ export function GameOverOverlay() {
         <p className="muted" style={{ margin: 0, fontSize: 13 }}>
           Final round · played to {room.meta.targetScore} points
         </p>
-        {rows.map(([id, p]) => <ScoreRow key={id} player={p} score={scores?.[id]} />)}
+        <ScoreList players={room.players} scores={scores} />
         {actionError && <p className="error" style={{ margin: 0 }}>{actionError}</p>}
         {host
           ? <button className="btn btn-primary" onClick={again}>Rematch</button>

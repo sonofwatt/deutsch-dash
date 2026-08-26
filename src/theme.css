@@ -5,6 +5,8 @@
      the same idea as text. They part company in dark mode, where the fill has to
      stay dark enough for white text while the text has to lift off the surface. */
   --danger-ink: var(--danger);
+  /* Scoreboard movement: a row's background while it climbs or falls a place. */
+  --rise: #dcf5e3; --fall: #fbe0dd;
   /* Empty-slot outlines on the play surface. Deliberately far darker than --line:
      at playing-card size a hairline border reads as nothing at all on a phone in
      daylight, and the 16 center slots are the thing players aim at. */
@@ -21,6 +23,7 @@
 @media (prefers-color-scheme: dark) {
   :root { --bg: #171613; --surface: #23211c; --ink: #f2f0ea; --ink-soft: #a29d92;
           --line: #37342d; --accent: #f2f0ea; --danger-ink: #ff8a7d;
+          --rise: #1d3527; --fall: #3d2420;
           --pile-line: #8b8577; --pile-fill: #1f1e19; }
 }
 * { box-sizing: border-box; }

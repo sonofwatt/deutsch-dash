@@ -47,6 +47,18 @@
 /* The running total, set apart from the round's arithmetic to its left. */
 .score-total { font-weight: 800; padding-left: 6px; border-left: 1px solid var(--line); }
 .error { color: var(--danger-ink); }
+/* A row that changed place holds its colour through the slide, then lets go. The
+   animation carries the fade so no second timer has to clear the class. */
+.score-row.moved-up { animation: score-rise 1.8s ease-out both; }
+.score-row.moved-down { animation: score-fall 1.8s ease-out both; }
+@keyframes score-rise {
+  0%, 55% { background: var(--rise); border-color: var(--rise); }
+  100% { background: var(--surface); border-color: var(--line); }
+}
+@keyframes score-fall {
+  0%, 55% { background: var(--fall); border-color: var(--fall); }
+  100% { background: var(--surface); border-color: var(--line); }
+}
 .blitz-splash { position: fixed; inset: 0; display: grid; place-items: center; z-index: 110;
   pointer-events: none; }
 .blitz-word { font-size: clamp(48px, 18vw, 120px); font-weight: 800; letter-spacing: .02em;
