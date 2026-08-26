@@ -4,6 +4,8 @@ import type { PlayerInfo } from '../game/types';
 
 const p = (joinedAt: number, connected: boolean, stuckAt: number | null = null): PlayerInfo =>
   ({ name: 'x', badgeId: 'tulip', joinedAt, connected, stuckAt, score: 0 });
+const bot = (joinedAt: number, stuckAt: number | null = null): PlayerInfo =>
+  ({ ...p(joinedAt, true, stuckAt), isBot: true, botLevel: 'medium' });
 
 describe('pickNextHost', () => {
   it('picks the connected player with the earliest join', () => {
@@ -12,6 +14,14 @@ describe('pickNextHost', () => {
   it('breaks joinedAt ties by uid, returns null when nobody is connected', () => {
     expect(pickNextHost({ b: p(100, true), a: p(100, true) })).toBe('a');
     expect(pickNextHost({ a: p(100, false) })).toBeNull();
+  });
+  it('never hands the room to a bot, however early it joined', () => {
+    // A bot's connected flag is written once and never cleared, so without the
+    // isBot filter it would always look like the longest-present live player -
+    // and it has no client to actually run the room with.
+    expect(pickNextHost({ bot_star: bot(1), human: p(500, true) })).toBe('human');
+    // the only "connected" player being a bot means there is nobody to promote
+    expect(pickNextHost({ bot_star: bot(1), human: p(500, false) })).toBeNull();
   });
 });
 
