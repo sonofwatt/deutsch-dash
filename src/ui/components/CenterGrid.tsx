@@ -1,4 +1,5 @@
 import { CardView } from './CardView';
+import { depthLayers } from './PileStack';
 import { cardId, type Card, type CenterSpace } from '../../game/types';
 import type { BadgeId } from '../../game/badges';
 
@@ -53,9 +54,15 @@ export function CenterGrid(props: {
           style={{ ['--cols' as string]: String(gridColumns(props.spaces.length)) }}>
           {props.spaces.map((s, i) => {
             const top = s.stack[s.stack.length - 1];
+            // Capped at two: the peek only has the grid gap to grow into, and the
+            // card's own number already says how deep a centre pile is.
+            const layers = depthLayers(s.stack.length, 2);
             return (
               <div key={i} data-drop={`space:${i}`} onClick={() => props.onTap(i)}
                 className={`pile-space${props.highlight.includes(i) ? ' glow' : ''}`}>
+                {Array.from({ length: layers }, (_, k) => (
+                  <div key={k} className="slot-layer" style={{ ['--k' as string]: String(layers - k) }} />
+                ))}
                 {top && (
                   <CardView key={cardId(top)} card={top} badgeId={props.badgeOf(top.owner)} layoutId={cardId(top)} />
                 )}

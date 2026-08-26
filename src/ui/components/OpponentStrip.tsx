@@ -7,10 +7,10 @@ import type { Card, PlayerInfo, Tableau } from '../../game/types';
  * the physical game too - post tops, the turned-over wood card and the top of the
  * Blitz pile all sit face up on the table.
  */
-function Slot({ card, badgeId, count }: { card: Card | null; badgeId: BadgeId; count?: number }) {
+function Slot({ card, badgeId, count }: { card: Card; badgeId: BadgeId; count?: number }) {
   return (
     <div className="opp-slot">
-      {card ? <CardView card={card} badgeId={badgeId} /> : <div className="pile-space" />}
+      <CardView card={card} badgeId={badgeId} />
       {count != null && count > 0 && <span className="opp-count">{count}</span>}
     </div>
   );
@@ -41,11 +41,17 @@ export function OpponentStrip(props: {
             </div>
             {/* Same left-to-right order as your own tableau, so a glance across
                 the table reads the same way: Blitz, posts, wood. */}
+            {/* Only the slots holding something. An empty slot said "this player
+                has no wood turned over" at the cost of a whole card of width in a
+                strip that has to fit seven other players. */}
             {t && (
               <div className="opp-cards">
-                <Slot card={blitzTop} badgeId={p.badgeId} count={t.blitz.length} />
-                {t.post.map((s, i) => <Slot key={i} card={s[s.length - 1] ?? null} badgeId={p.badgeId} />)}
-                <Slot card={woodTop} badgeId={p.badgeId} />
+                {blitzTop && <Slot card={blitzTop} badgeId={p.badgeId} count={t.blitz.length} />}
+                {t.post.map((s, i) => {
+                  const top = s[s.length - 1];
+                  return top ? <Slot key={i} card={top} badgeId={p.badgeId} /> : null;
+                })}
+                {woodTop && <Slot card={woodTop} badgeId={p.badgeId} />}
               </div>
             )}
           </div>

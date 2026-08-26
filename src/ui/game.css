@@ -53,9 +53,24 @@
    a custom property containing var() is substituted where it is DECLARED and
    inherited already-resolved, so a --card-h on :root would stay pinned to the root
    --card-w and ignore every local override (tight tableau, opponent strip, slots). */
-.pile-space { width: var(--card-w); aspect-ratio: 2.5 / 3.5; border-radius: var(--radius);
-  border: 2px dashed var(--pile-line); display: grid; place-items: center; position: relative; }
-.pile-space .card { position: absolute; inset: 0; }
+.pile-space { --slot-border: 2px;
+  width: var(--card-w); aspect-ratio: 2.5 / 3.5; border-radius: var(--radius);
+  border: var(--slot-border) dashed var(--pile-line);
+  display: grid; place-items: center; position: relative; }
+/* Negative inset, not 0: an absolutely positioned child is laid out against the
+   PADDING box, so inset:0 left the card sitting inside the dashed border - a card
+   visibly smaller than its slot, with the dashes showing round two of its edges.
+   Pulling out by the border width makes the card's box cover the slot's exactly.
+   width/height must go to auto or .card's own width wins and the offset returns. */
+.pile-space .card { position: absolute; inset: calc(-1 * var(--slot-border));
+  width: auto; height: auto; z-index: 1; }
+/* Depth under a centre pile: outlines behind the card, stepping down into the
+   grid gap. Deliberately NOT .pile-depth, which reserves peek height in the flow
+   and would grow every row of a board already fighting for vertical space. */
+.slot-layer { position: absolute; inset: calc(-1 * var(--slot-border)); z-index: 0;
+  border-radius: var(--radius); background: var(--pile-fill);
+  border: 2px solid var(--pile-line);
+  transform: translateY(calc(var(--k) * max(3px, var(--card-w) * .07))); }
 
 /* Stack-depth cue: underlying card outlines peeking out below the top card. The
    step has to clear its own 2px border twice over or adjacent layers antialias
@@ -94,9 +109,6 @@
   padding-bottom: 4px; }
 .tableau-zone.tight { gap: 6px; --card-w: clamp(34px, min(11.5vw, 6vh), 72px); }
 .pile-label { font-size: 10px; text-align: center; color: var(--ink-soft); margin-top: 3px; }
-.count-bubble { position: absolute; top: -6px; right: -6px; background: var(--accent);
-  color: var(--bg); font-size: 11px; font-weight: 800; border-radius: 999px;
-  min-width: 20px; height: 20px; display: grid; place-items: center; padding: 0 4px; }
 
 /* Recycle affordance: the empty draw slot, once the face-down wood is exhausted.
    Tapping it flips. There is deliberately no button on the face-up card - see
@@ -117,7 +129,7 @@
   --card-w: clamp(22px, min(7vw, 3.4vh), 32px); }
 .opp-cards .card { box-shadow: none; }
 .opp-cards .card-badge { display: none; } /* every card in a tableau is that player's own */
-.opp-cards .pile-space { border-width: 1.5px; }
+.opp-cards .pile-space { --slot-border: 1.5px; }
 .opp-slot { position: relative; }
 .opp-count { position: absolute; bottom: -2px; right: -2px; background: var(--accent);
   color: var(--bg); font-size: 9px; font-weight: 800; border-radius: 999px;

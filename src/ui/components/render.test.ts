@@ -34,6 +34,14 @@ describe('TableauView', () => {
     expect(html).toContain('data-drop="post:0"');
     expect(html).toContain('data-drop="post:2"'); // empty posts still take drops
   });
+  it('labels every pile with the cards it holds, the whole pile not the remainder', () => {
+    const html = renderTableau(tableau());
+    expect(html).toContain('>blitz 2<');   // 2 in the Blitz pile
+    expect(html).toContain('>2<');         // a 2-card post says 2, not "+1"
+    expect(html).toContain('>1<');         // and a single card says so rather than nothing
+    expect(html).toContain('>wood 12<');
+    expect(html).not.toContain('count-bubble'); // the count is on the label, not over the card
+  });
   it('peeks outlines under a stacked pile but not under a single card', () => {
     const two = renderTableau(tableau({ post: [[c(8, 'red'), c(7, 'green')]] }));
     const one = renderTableau(tableau({ post: [[c(8, 'red')]] }));
@@ -43,9 +51,9 @@ describe('TableauView', () => {
     // Wood is the pile touched most - every flip of three is another tap - so it
     // sits under the right thumb. Order is a deliberate choice, so pin it.
     const html = renderTableau(tableau());
-    expect(html.indexOf('>blitz<')).toBeGreaterThan(-1);
+    expect(html.indexOf('>blitz ')).toBeGreaterThan(-1);
     expect(html.indexOf('>wood ')).toBeGreaterThan(-1);
-    expect(html.indexOf('>blitz<')).toBeLessThan(html.indexOf('>wood '));
+    expect(html.indexOf('>blitz ')).toBeLessThan(html.indexOf('>wood '));
   });
   it('offers the recycle control only once the face-down wood runs out', () => {
     expect(renderTableau(tableau({ woodIndex: 3 }))).not.toContain('recycle-slot');
@@ -98,8 +106,10 @@ describe('OpponentStrip', () => {
     }));
     expect(html).not.toContain('>Me<');
     expect(html).toContain('>You<');
-    // blitz top + 3 post slots + wood top = 5 visible slots
-    expect(html.split('opp-slot').length - 1).toBe(5);
+    // Only slots holding a card: blitz top + 2 non-empty posts + wood top. The
+    // third post is empty and takes no width at all - see OpponentStrip.
+    expect(html.split('opp-slot').length - 1).toBe(4);
+    expect(html).not.toContain('pile-space');
     // and in the same order as your own tableau: the Blitz slot, the one carrying
     // the count bubble, is the first of them
     const slotsBeforeCount = html.slice(0, html.indexOf('opp-count')).split('opp-slot').length - 1;

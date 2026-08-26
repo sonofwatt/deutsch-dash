@@ -30,15 +30,16 @@ export function TableauView(props: {
       <div>
         <PileStack layers={depthLayers(t.blitz.length)}>
           {blitzTop ? (
-            <div style={{ position: 'relative' }}
-              onClick={() => props.onSelect({ kind: 'blitz' })}
+            <div onClick={() => props.onSelect({ kind: 'blitz' })}
               onPointerDown={e => props.startDrag(e, blitzTop, { kind: 'blitz' })}>
               <CardView key={cardId(blitzTop)} card={blitzTop} badgeId={badgeId} selected={isSel({ kind: 'blitz' })} layoutId={cardId(blitzTop)} />
-              <span className="count-bubble">{t.blitz.length}</span>
             </div>
           ) : <div className="pile-space" />}
         </PileStack>
-        <div className="pile-label">blitz</div>
+        {/* The count used to be a bubble pinned to the card's corner, over the
+            card art. Every pile now says how many cards it holds in the same
+            place, in the same way: on the label underneath. */}
+        <div className="pile-label">blitz {t.blitz.length}</div>
       </div>
 
       {t.post.map((stack, i) => {
@@ -57,7 +58,9 @@ export function TableauView(props: {
                 )}
               </div>
             </PileStack>
-            <div className="pile-label">{stack.length > 1 ? `+${stack.length - 1}` : ' '}</div>
+            {/* The whole pile, not the hidden remainder: "+1" under a 2-card post
+                was asking the player to add. An empty post has nothing to count. */}
+            <div className="pile-label">{stack.length > 0 ? String(stack.length) : ' '}</div>
           </div>
         );
       })}
