@@ -1,10 +1,10 @@
 # Project Handoff — Deutsch Dash
 
-_Last updated: 2026-08-26 at `b38da9b`. Working tree clean, `main` ==
+_Last updated: 2026-08-26 at `676e946`. Working tree clean, `main` ==
 `origin/main`, CI green including the emulator suite, and the live site matches
 `HEAD`._
 
-_**138 tests green** (122 unit + 16 emulator). This is the only place in the repo
+_**160 tests green** (143 unit + 17 emulator). This is the only place in the repo
 that quotes a count — it drifted three separate ways when it lived in four
 places, so keep it here and nowhere else._
 
@@ -188,7 +188,12 @@ the open questions are decisions only the product owner can make, and several
 genuinely change the game rather than the interface. Numbering is kept as-is so
 earlier notes still point at the right item.
 
-### 1. Move the recycle button to the bottom right — _small_
+### 1. Move the recycle button to the bottom right — _retired 2026-08-26_
+
+**Removed instead of moved** (`8f66869`). It covered `.card-badge` at every card
+size and took about two thirds of a small phone's card width, and the empty draw
+slot beside it already shows the ↻ and flips on tap. The note below is kept for
+why the move was never the right answer.
 
 The `↻` on the turned-over wood card is `.recycle` in `game.css` (`left: 3px` →
 `right: 3px`). One declaration.
@@ -399,8 +404,44 @@ edge-on and invisible. Neutralise it in the harness page, not the component:
 ```
 
 This covers layout, colour and legibility at a known width in both themes. It does
-not cover touch, timing, or how a real phone actually lays out — the list below
-still stands.
+not cover touch or timing — for those, drive the real app.
+
+### Driving the real app (this is how the untestable things got tested)
+
+The static harness renders a component with state you hand it. It cannot show a
+transition, a pointer, or an animation that only fires when data changes. Running
+the actual app can, and it is not much harder: the dev server already points at
+the emulator, so a scripted browser can create a room, add bots and play.
+
+```
+npm run emu &            # terminal 1
+npm run dev &            # terminal 2
+npm install --prefix /tmp/pw playwright   # outside the repo: not a dependency of it
+```
+
+Then a script under `/tmp/pw` (so node can resolve `playwright`) drives
+`http://localhost:5173`: fill "Your name", click a badge by its label, "Create
+room", "Add AI player", "Start game", wait for `.game-grid`. `page.mouse.down()`
+on a pile and a `move` gives a genuine drag with the ghost attached.
+
+**The other half is rigging state directly**, which is what makes end states
+reachable in seconds instead of by playing a round out. The emulator's REST API
+takes an admin bypass — `Authorization: Bearer owner`, NOT `?auth=owner`, which
+is refused:
+
+```
+curl -X PUT -H 'authorization: Bearer owner' -d '"roundEnd"' \
+  'http://127.0.0.1:9000/rooms/<CODE>/meta/phase.json?ns=demo-blitz-default-rtdb'
+```
+
+Write `round/scores` and `players/$uid/score` yourself and the score sheet shows
+exactly the movement you want to look at; set `round/blitzedBy` and flip the phase
+and the splash fires; write `round/races/$i` and the halo appears. The client
+takes it as real data, because it is.
+
+**Watch:** the host client commits scores automatically when the phase turns to
+`roundEnd` and `scores` is absent, so write the scores you want FIRST or it will
+compute its own from the live round.
 
 ### Check the URL first if something looks broken
 
@@ -434,8 +475,24 @@ Still unrendered:
 - `aspect-ratio: 2.5 / 3.5` on a **wide window** specifically — the phone shots
   cannot show the old `--card-h` bug, which was invisible at 360px because both
   values clamped to the same number.
-- Drag ghost tracking the cursor exactly, after the `left: 0; top: 0` fix. Needs a
-  pointer, so headless static rendering will never reach it.
+- ~~Drag ghost tracking the cursor~~ — **verified in the real app.** Ghost centre
+  landed 4px above the pointer at a 393px viewport, which is exactly the intended
+  `translate(-50%, -55%)` lift that keeps the card out from under the thumb. The
+  `left: 0; top: 0` fix holds.
+
+### Verified in the real app on 2026-08-26
+
+Driven end to end through the emulator, in a room with two bots:
+
+- The blitz splash, all three variants: glitter for the blitzer, falling 😢, and
+  falling 💩 for the worst score at three or more players.
+- The score sheet's reorder: rows land in the old standing, swap after 400ms,
+  green up and red down.
+- The race halo over a contested space.
+- Creating a room, adding bots, starting a round, and a real pointer drag.
+
+None of it had been seen before. It also turned up a bug no test could: the board
+vanished behind "dealing…" the instant a round ended (fixed in `676e946`).
 
 ### The board wastes its vertical space — new, from those renders
 
@@ -494,9 +551,26 @@ the join form means the anonymous identity was lost, which is a different bug.
 In a 1-human + 1-bot game you are the only client, so while you are away the whole
 game is frozen, including the bot. That is inherent to a serverless design.
 
+### Open, and worth a decision
+
+- **The black ring on a selected card.** Asked to be removed after it showed up in
+  a screenshot, but it is `.card.selected` — the only thing that says which card
+  you have tapped, and tap-then-tap-a-target is a whole input path. Left in place
+  deliberately. If it is genuinely unwanted, it needs a replacement cue, not a
+  deletion.
+- **Bots report their lost races too**, so a human beating a bot gets a halo. Bots
+  race often; if it turns out too frequent to feel special, gate `reportRace` on
+  the loser being human in `driveBot`.
+- **The board's dead space** (see above) is unchanged: cards stay at 12vw even
+  when a four-column board has room for far more.
+- An opponent's empty slots are gone, but **your own wood still shows an empty
+  slot** under the face-down pile before the first flip. That one is arguably a
+  target rather than a gap - it is where the turned-over card lands.
+
 ### Scale
 
-- Three or more players — only two have ever played.
+- Three or more players — only two have ever played, and the bots have now been
+  driven for real but only briefly.
 - Five to eight players, and the 24-space cap in practice.
 - Several bots at once with a low-end phone as host — every bot turn runs there.
 
