@@ -5,6 +5,8 @@ import { TableauView } from './TableauView';
 import { CenterGrid, gridColumns } from './CenterGrid';
 import { OpponentStrip } from './OpponentStrip';
 import { ScoreRow } from './ScoreRow';
+import { BlitzSplash } from './BlitzSplash';
+import { splashVariant } from '../splashVariant';
 import type { Card, CenterSpace, PlayerInfo, RoundScore, Suit, Tableau } from '../../game/types';
 
 const c = (v: number, suit: Suit, owner = 'me'): Card => ({ v, suit, owner });
@@ -135,3 +137,48 @@ describe('ScoreRow', () => {
   });
 });
 
+describe('BlitzSplash', () => {
+  const player = (score: number): PlayerInfo => ({
+    name: 'P', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, score,
+  });
+  const table = (...scores: number[]) =>
+    Object.fromEntries(scores.map((s, i) => [`p${i}`, player(s)]));
+
+  it('gives the blitzer glitter', () => {
+    expect(splashVariant(table(10, 20, 30), 'p1', 'p1')).toBe('glitter');
+  });
+  it('never poos on a two-player game', () => {
+    // Heads-up, the loser is always last. Rubbing it in is a group activity.
+    expect(splashVariant(table(30, 2), 'p0', 'p1')).toBe('crying');
+  });
+  it('poos on the worst score at three or more, and everyone else cries', () => {
+    const t = table(30, 2, 20);
+    expect(splashVariant(t, 'p0', 'p1')).toBe('poo');
+    expect(splashVariant(t, 'p0', 'p2')).toBe('crying');
+  });
+  it('poos on everyone tied for worst', () => {
+    const t = table(30, 2, 2);
+    expect(splashVariant(t, 'p0', 'p1')).toBe('poo');
+    expect(splashVariant(t, 'p0', 'p2')).toBe('poo');
+  });
+  it('spares the table when the blitzer is the one propping it up', () => {
+    // The winner gets glitter, so nobody gets the poo that round.
+    const t = table(2, 30, 20);
+    expect(splashVariant(t, 'p0', 'p0')).toBe('glitter');
+    expect(splashVariant(t, 'p0', 'p1')).toBe('crying');
+    expect(splashVariant(t, 'p0', 'p2')).toBe('crying');
+  });
+  it('is unreadable to a spectator with no uid, and does not crash', () => {
+    expect(splashVariant(table(30, 2, 20), 'p0', null)).toBe('crying');
+  });
+
+  const render = (variant: 'glitter' | 'poo' | 'crying') =>
+    renderToStaticMarkup(createElement(BlitzSplash, { name: 'Dave', variant }));
+  it('throws exactly one kind of thing at a viewer', () => {
+    expect(render('glitter')).toContain('✨');
+    expect(render('glitter')).not.toContain('😢');
+    expect(render('poo')).toContain('💩');
+    expect(render('poo')).not.toContain('✨');
+    expect(render('crying')).toContain('😢');
+  });
+});

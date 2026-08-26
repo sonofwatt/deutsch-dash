@@ -3,7 +3,8 @@ import { useGameStore } from '../../state/store';
 import { Join } from './Join';
 import { Lobby } from './Lobby';
 import { Game } from './Game';
-import { BlitzSplash, splashVariant } from '../components/BlitzSplash';
+import { BlitzSplash } from '../components/BlitzSplash';
+import { splashVariant } from '../splashVariant';
 import { RoundEndOverlay } from '../components/RoundEndOverlay';
 import { GameOverOverlay } from '../components/GameOverOverlay';
 
