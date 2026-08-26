@@ -1,294 +1,441 @@
-# Project Handoff — Deutsch Dash (Dutch Blitz web app)
+# Project Handoff — Deutsch Dash
 
-_Last updated: 2026-08-25 — 124/124 tests green including full emulator coverage
-against real security rules. Two playtest-driven passes have landed since the
-last real-device session; **none of that work has been seen in a browser yet** —
-see "What still needs testing" at the end._
+_Last updated: 2026-08-26. **131 tests green** (115 unit + 16 emulator). Working
+tree clean, `main` == `origin/main` at `d1c85b4`, and the live site is
+byte-identical to that commit._
 
-## What this is
+A mobile-first multiplayer Dutch Blitz game for 2–8 players, plus AI opponents.
+Host creates a room, texts the invite link, everyone plays in their phone
+browser. React + Firebase Realtime Database, static hosting on GitHub Pages,
+anonymous auth. No server of our own.
 
-A mobile-first multiplayer Dutch Blitz card game for 2–8 players. Host creates a
-room, texts the invite link, everyone plays in their phone browser. Frontend on
-GitHub Pages (static), Firebase Realtime Database as the only backend, anonymous
-auth. Verified against the official Dutch Blitz rules (post building, wood
-flip-3 cycle, stuck rotation, +1/−2 scoring to a 75-point target).
-
-## Status
-
-**Complete and merged to `main`.** 15 planned tasks, each gated by an independent
-review; a whole-branch review plus two fix waves; then server-side join limits
-and an emulator-verification pass.
-
-- **77 tests pass** — 65 pure-logic unit tests plus 12 emulator integration tests
-  covering the live transaction race, the 8-player cap, badge uniqueness, and
-  rejoin. Build and lint clean.
-- Reviews caught and fixed three critical cross-layer bugs unit tests could not
-  see (all-stuck snapshot recursion, Blitz missed when emptied via a post build,
-  wood pile un-flippable after the first flip), plus presence teardown, score
-  reconciliation, spec-correct tie handling, offline play blocking, and a
-  compact 2-player tableau that fits 360px phones.
-- **Server-side enforcement is real now.** The 8-player cap and badge uniqueness
-  are enforced by Firebase rules, not just the client. The cap uses a
-  `meta/playerCount` counter written with Firebase's `increment(1)` sentinel so
-  the server resolves it atomically — `numChildren()` is unsupported by the RTDB
-  emulator's rules engine, so counting children was not an option.
-- **Emulator now tests the real rules.** The app previously connected to database
-  namespace `demo-blitz`, where the emulator serves wide-open rules, while
-  `database.rules.json` loads into `demo-blitz-default-rtdb`. Every emulator test
-  before this fix ran with rules disabled. Corrected in `src/net/firebase.ts`;
-  a regression canary test now fails loudly if it ever regresses.
-
-## Key documents
-
-| Doc | Purpose |
-|---|---|
-| [Design spec](docs/superpowers/specs/2026-08-23-dutch-blitz-design.md) | Approved requirements |
-| [Implementation plan](docs/superpowers/plans/2026-08-23-dutch-blitz.md) | The 15 tasks as executed |
-| [README](README.md) | Setup, local dev, deploy, house rules |
-| `.superpowers/sdd/progress.md` | Execution ledger: per-task commits, every finding + disposition |
+- **Live:** https://sonofwatt.github.io/deutsch-dash/
+- **Repo:** `sonofwatt/deutsch-dash`, deploys from `main` via GitHub Actions
+- **Firebase project:** `holland-hustle` (id is immutable, never shown to players)
 
 ## How to run
 
 ```
 npm install
-npm test         # 65 unit tests, no emulator needed
-npm run dev      # local dev server
-npm run emu      # Firebase emulator (portable JRE at .tools/, gitignored)
-npm run test:emu # all 77 tests, emulator included
+npm test         # 115 unit tests. The 16 emulator tests report as SKIPPED.
+npm run test:emu # all 131, emulator included. Run this before pushing.
+npm run dev      # local dev server, always against the emulator
+npm run emu      # Firebase emulator on its own
+npm run build    # tsc -b then vite build
+npm run lint     # oxlint — 7 warnings, 0 errors is the current clean state
 ```
 
-Java is not installed system-wide; a portable Temurin JRE 21 lives in `.tools/`
-(gitignored) and `scripts/with-java.mjs` puts it on PATH for the emulator
-scripts automatically. On another machine, either install Java 11+ or re-download
-that JRE.
+Java is required for the emulator. A portable Temurin JRE lives in `.tools/`
+(gitignored) and `scripts/with-java.mjs` puts it on PATH automatically, falling
+back to system Java.
 
-## Verified against production (2026-08-25)
+**Pushing:** the remote is SSH (`git@github.com:sonofwatt/deutsch-dash.git`) via
+a repo deploy key at `~/.ssh/id_ed25519_deutsch_dash`. There are no HTTPS
+credentials on this machine — switching the remote back to HTTPS breaks pushing
+entirely. Confirm auth with `ssh -T git@github.com`.
 
-Firebase project `holland-hustle` is wired and its rules are deployed. A live
-two-client test through the production build confirmed the whole path works:
-anonymous auth issuing two distinct identities, room creation, a second client
-joining (with the host's badge correctly greyed out), real-time lobby sync, the
-host deal (5 post piles for a 2-player game, 25-card wood, 10-card blitz), and a
-card played to the centre landing on the opponent's screen with the correct owner
-badge. No console errors at any point.
+---
 
-Two test rooms (`WMTGGM`, `DX44BC`) are left in the database; they are harmless
-and ignored after the 24h expiry check.
+## Before you change anything
 
-## Host continuity (fixed 2026-08-25, verified in production)
+These are the things that will cost you an afternoon if you don't know them.
+Most are load-bearing decisions with a reason behind them, not accidents.
 
-**Rule: the room's creator is host whenever they are present; while they are away,
-the longest-present connected player stands in.**
+### Two traps that will bite almost any UI change
 
-- `meta.creatorId` is immutable and set at room creation. The creator reclaims host
-  automatically the moment they are back — no button, no timer.
-- If the host goes quiet, a stand-in takes over after `HOST_AWAY_MS` (30s, exported
-  from `src/state/store.ts`). Transfer now works in the lobby too, so a host who
-  closes their tab before starting no longer kills the room.
-- The 30s grace exists because tapping "Invite friends" opens the mobile share
-  sheet, which backgrounds the tab and drops the socket. Most invite round-trips
-  finish inside it; if one doesn't, reclaim puts things right anyway.
-- Non-hosts see "Host is away — someone else can start shortly…" instead of an
-  unexplained wait.
-- **Auto-resume:** anyone already in a room who reopens its link goes straight back
-  in (brief "Rejoining…" state) instead of re-picking a name and badge. Players who
-  are not members still get the normal join form, with taken badges greyed out.
+**`tsc -b` typechecks the test files.** `tsconfig.app.json` has
+`"include": ["src"]`, and `npm run build` runs `tsc -b` first. `render.test.ts`
+constructs `TableauView` / `CenterGrid` prop objects as complete literals, so
+**adding a _required_ prop to either breaks the build**, not just the tests — and
+`npm test` stays green while it does, because vitest does not typecheck. Make new
+props optional, or update that file in the same commit. Four of the seven pending
+features below hit this.
 
-Verified live against production, two clients on separate origins: host away →
-grace held → stand-in took over and could start → original host returned and
-reclaimed instantly. Auto-resume verified separately: closing and reopening the
-host's tab lands directly in the lobby, still host, while a different identity
-opening the same link still sees the join form.
+**There is no DOM anywhere in the test suite.** `vite.config.ts` sets
+`environment: 'node'`, so `localStorage` is undefined. **Any `localStorage` read
+at module scope throws at import time**, and because `src/state/store.ts` builds
+the `gameStore` singleton at module scope, that failure takes out every store
+test at once. Hydrate preferences inside a component (as `Home.tsx` and
+`Join.tsx` already do) or guard with `typeof localStorage !== 'undefined'`.
+Also: `include` is `src/**/*.test.ts`, so a test file named `.test.tsx` is
+silently never collected.
 
-## Remaining work
+### CI does not run the emulator suite
 
-~~Anonymous auth, Realtime Database, config paste, rules deploy, GitHub repo,
-Pages deploy~~ — all done.
+`.github/workflows` runs `npm ci`, `npm test`, `npm run build`. It never runs
+`npm run test:emu`. Because the emulator files open with
+`describe.runIf(process.env.EMULATOR === '1')`, their 16 tests **skip silently**
+rather than fail — so **a change that breaks `database.rules.json` passes CI
+green**. Run `test:emu` locally before pushing anything touching `src/net/` or
+the rules. Adding the emulator suite to CI is unclaimed work.
 
-**Live at https://sonofwatt.github.io/deutsch-dash/** — repo `sonofwatt/deutsch-dash`,
-deployed by GitHub Actions on every push to `main` (CI runs the tests first).
-Verified on the live origin: anonymous auth works from `sonofwatt.github.io`,
-rules enforce (authenticated room read returns data, unauthenticated returns 401),
-and the deployed bundle carries the current code. Copy-link confirmed on a real
-phone.
+### Firebase and the emulator
 
-Still outstanding: see **What still needs testing** at the end of this document.
-It is now the long pole — two passes of work have landed on top of the last
-real-device session and none of it has been rendered in a browser.
+- The emulator database URL in `src/net/firebase.ts` must stay
+  `?ns=demo-blitz-default-rtdb`. The emulator only auto-loads
+  `database.rules.json` into the `<project>-default-rtdb` namespace; any other
+  namespace serves fully-open rules. **This bug already happened once** and
+  silently ran every emulator test with rules disabled.
+- The CANARY test in `rooms.emu.test.ts` ("a non-host cannot write another
+  player's round/tableaus — proves rules are ON in this namespace") exists purely
+  to fail loudly if that regresses. Do not weaken or delete it.
+- `usingEmulator` is `forceEmu || (import.meta.env.DEV && !forceProd)`, so
+  `npm run dev` and every test point at the emulator and can never write the live
+  database. Only a production build reaches the real project. Opt in deliberately
+  with `VITE_USE_PROD=1 npm run dev`.
+- `createRoom` performs **two sequential writes, not one atomic `set()`**. The
+  `players/$uid` validate rule cross-references `meta/phase`, and that only
+  resolves reliably when meta is already committed. Collapsing them breaks room
+  creation.
+- `joinRoom` must write `meta/playerCount` with the `increment(1)` sentinel and
+  never `snapshotCount + 1` — two racers reading 7 would both send the literal 8
+  and both satisfy the validate. That's a confirmed race that admitted a 9th
+  player while wedging the counter at 8.
+- `MAX_PLAYERS = 8` in `src/net/rooms.ts` is mirrored as a bare literal `8` in
+  `database.rules.json`. Change both or client and server disagree.
 
-~~iOS home-screen icon~~ — fixed 2026-08-25: `public/icon-180.png` (apple-touch-icon)
-and `public/icon-512.png` are generated from the same design as `icon.svg` by
-`scripts/make-icons.py`; re-run it if the artwork changes.
+### Trust model
 
-Note on PowerShell: `npx` is blocked by the execution policy on this machine; use
-`npx.cmd` (or Git Bash) for `firebase` commands.
+**Knowing the room code is the credential.** Room `.read` and the writes to
+`round/spaces`, `blitzedBy`, `scores` and `stuckRounds` are gated only on
+`auth != null`, and anonymous tokens can be minted straight from the Firebase
+REST API. Only `players/$uid` and `round/tableaus/$uid` are genuinely bound to a
+uid. `endRoundStalled` and `incrementStuckRounds` are host-by-convention and
+explicitly not enforced. See the README's security section for why this is
+deliberate.
 
-**Triaged fix-later list (non-blocking, in the ledger):** ShareInvite clipboard
-try/catch; rejection-shake remounts the tableau; room-code collision check on
-create; bundle code-split; ~~combined roundEnd→gameOver snapshot skips the final
-score breakdown~~ (fixed 2026-08-25: the game-over sheet now carries the final
-round's +center/-blitz breakdown and the target); kite/bell badge hues sit near
-suit blue/red; host transfer disabled in lobby (deliberate).
+### State and host continuity
 
-## Playtest pass — 2026-08-25 (2 players, Android + Windows Chrome)
+- **Firebase raises local `onValue` events synchronously from inside
+  `set()`/`update()`**, so `onSnapshot` can re-enter itself. The `inSnapshot`
+  flag lets re-entrant snapshots update `room` but skips all side effects. That's
+  what stops the all-stuck rotation firing twice.
+- Host continuity is two independent mechanisms: an immutable `meta.creatorId`
+  that reclaims host instantly on any snapshot where `hostId !== me`, and a
+  `HOST_AWAY_MS` (30s) stand-in watchdog handing host to the longest-present
+  connected non-bot. `claimHost` is a transaction returning `undefined` when
+  already host, so reclaim cannot loop.
+- Tests must build a store with `createGameStore(fakeDeps)` and never touch the
+  exported `gameStore` singleton — importing it executes Firebase module side
+  effects.
 
-First real two-player game. Everything in this pass came out of that session:
+### AI players
 
-- **Darker slot outlines** — `--pile-line`/`--pile-fill` in `theme.css`, a
-  deliberately heavy token separate from `--line`, because a hairline at card
-  size reads as nothing on a phone.
-- **Completed piles stay put**, turned face down, retiring their space. Enforced
-  in both directions: `canPlayToSpace` on the client, and `centerPlayTxn`
-  rejecting a finished space server-side so a stale client cannot revive one.
-- **Washroom pictograms** replace the ◆/○ boy/girl dingbats (`FaceGlyph` in
-  `CardView.tsx`) — post building turns on that distinction, so it has to read
+- **A bot can never be host.** `pickNextHost` filters `isBot`, which matters
+  precisely because a bot's `connected` flag is written once and never cleared —
+  without the filter it would always look like the longest-present live player,
+  while having no client to run the room with. Asserted in `plays.test.ts`.
+- **Only the host runs the bot loop.** `driveBot` bails on `isHost`. Bot hands
+  live in client-only `botTableaus` state, and a new host re-adopts them from
+  `room.round.tableaus[id]` via `reconcileTableau`.
+- **Bots are excluded from `meta/playerCount`** because that validate rule
+  forbids the value ever decreasing — counting a bot would permanently consume a
+  seat when it was removed. The 8-seat total is enforced client-side in `Lobby`.
+- A bot's badge is claimed **under the host's uid**, because
+  `badges/$badgeId`'s validate requires `newData.val() === auth.uid` and bots have
+  no auth identity. This still blocks a human taking that badge, with no rules
+  change.
+- The practical player ceiling is the 8 entries in `BADGE_IDS`.
+
+### Game rules as implemented
+
+- `centerPlayTxn` archives a pile into `space.history` and clears `stack` at
+  exactly 10, freeing the space server-side, so a stale client cannot revive a
+  finished pile. Finished piles show on the rails flanking the board.
+- Board size is `min(24, 4 × players)` — `spaceCountForPlayers`. Four per player
+  is one space per Ace in the game; the cap is a legibility choice.
+- **`ENABLE_STUCK_BUTTON` is `false`** and the whole stuck path still runs
+  underneath. Being stuck is *detected* by `isStuck` + `syncStuck`, not declared.
+  `isStuck` needs more than "no legal move": either zero wood, or
+  `flipsSinceProgress >= ceil(wood.length / 3)`.
+- That flip counter is a closure-scoped `Map` in `createGameStore`, never
+  persisted — **it resets to zero on any page reload**.
+- Tableau order is Blitz | posts | wood. Wood sits under the right thumb because
+  it's the pile touched most. `render.test.ts` pins this order in both the
+  tableau and the opponent strip.
+
+---
+
+## Pending work
+
+Seven requests from the 2026-08-25/26 playtests, none started. Each was specced
+against the real code; the open questions are decisions only the product owner
+can make, and several genuinely change the game rather than the interface.
+
+### 1. Move the recycle button to the bottom right — _small_
+
+The `↻` on the turned-over wood card is `.recycle` in `game.css` (`left: 3px` →
+`right: 3px`). One declaration.
+
+**Decide first:** the 22×22px button **completely covers `.card-badge`** at every
+card size, so one of them has to give. Options: accept the occlusion (the badge
+is decorative on your own tableau), suppress the badge on that one card, or
+shrink the button. Related: `.recycle` is a fixed 22px while `--card-w` floors at
+34px, so on a small phone it covers about two-thirds of the card's width — and
+moving it right puts that dead-to-drag zone on the side the thumb arrives from.
+
+**Watch:** `render.test.ts` asserts `toContain('class="recycle"')` as an exact
+substring including the closing quote, so adding any second class to that button
+breaks it. Nothing pins the button's position, so the move itself is unguarded.
+
+### 2. Choose which side wood and Blitz sit on — _small_
+
+New `src/ui/prefs.ts` + a `SidePicker` on Home and Join, storing `bz.woodSide`
+alongside `bz.name` / `bz.badge`. Thread a `woodSide` prop into `TableauView` and
+`OpponentStrip` and swap the two end groups.
+
+**Decide first:**
+- Pre-join only, or changeable mid-game? A player resumed by auto-rejoin never
+  sees the Join form again, so pre-join only means they cannot change it without
+  clearing storage.
+- When wood moves left, does the **whole tableau mirror** (posts reversed too), or
+  do only the two end piles swap? A true mirror is what a left-handed player
+  probably pictures; swapping only the ends keeps each post where they last saw it.
+- Label it ergonomically ("Right-handed" / "Left-handed") or literally ("Wood on
+  the right")? That decides whether it reads as an accessibility setting.
+
+**Watch:** invalidates the two order-pinning tests in `render.test.ts` — they must
+become parameterised rather than deleted. Required prop ⇒ build break (see traps).
+
+### 3. Move the "no moves" alert into the drop band — _small_
+
+Delete the `.stuck-note` `<p>` under the tableau, pass `stuck={me.stuckAt != null}`
+into `CenterGrid`, and render the text inside `.snap-band` — brighter and bolder
+than the band's existing hint. Fixes the board shifting when the alert appears.
+
+**Decide first:** does the stuck band take an alert colour (`--danger`, amber) or
+stay neutral? Is the copy fixed, or can it shorten to guarantee one line in a
+~260px band on a 360px phone? And while the note shows, is the faint "drop here"
+hint hidden or still visible alongside it?
+
+**Watch:** pinning `.snap-band` to a fixed height removes its growth escape hatch
+— longer copy clips rather than reflows. That's the intended trade, but it
+constrains future wording.
+
+### 4. Move a run of cards between post piles — _medium, and it changes the rules_
+
+Today only the top card of a post pile can move (`placeOnPost`). The request:
+tap-and-hold a pile, see its cards in a row, tap which to move, tap a destination.
+
+**This is the one that needs the most thought before any code.**
+
+- **The wording says "wood piles" but the example describes post piles.** In this
+  codebase `wood` is a single face-down draw pile flipped three at a time, with
+  only `wood[woodIndex-1]` playable — it cannot hold a run and there is only one
+  of it. The descending alternating runs in the example (9,8 and 10,9,8,7,6,5) are
+  post piles. **Confirm this reading before starting.**
+- **It departs from official Dutch Blitz**, which the design spec pins at one card
+  at a time. House rule for every game, or a lobby toggle so a purist table can
+  play by the book? It cannot be per-player — it's a shared rule.
+- **What does "tap which cards to move" mean?** Taking the card at depth k plus
+  everything above it (a contiguous suffix) is the only reading that leaves both
+  piles legal runs, and it is the reading under which the given example works.
+  Arbitrary multi-select does not.
+- **May the whole pile move**, emptying the post so the Blitz top drops into it via
+  `refillPosts`? That is the strongest move in the game — emptying the Blitz pile
+  is the only way to win a round.
+- Trigger at 3+ cards as proposed, or 2+? A 2-card pile is equally movable.
+
+**Watch:** `hasLegalMove` / `isStuck` become *wrong* if not updated with the rule —
+`syncStuck` writes stuck claims automatically and three fruitless rotations end
+the round, so a player with a legal run move could be declared stuck. The hold
+gesture also collides with `useDrag`, which takes pointer capture and shows a
+ghost card on pointerdown. And `movePostRun` must not assume a post stack is a
+clean run: `reconcileTableau` filters post stacks by centre membership and
+`normalizeTableau` returns whatever RTDB holds.
+
+### 5. Host option: orderly grid, one colour per column — _medium_
+
+`CenterSpace` gains a `suit` constraint, `RoomMeta` gains `orderlyGrid`, and
+`centerPlayTxn` enforces it server-side. Lobby toggle next to "Play to".
+
+**Decide first:**
+- At 5+ players an orderly board needs **8 columns** to stay within 4 rows, which
+  drops the slot to ~34px on a 360px phone — at or below the card floor that is
+  already flagged as having about 3px of slack. Accept smaller cards in orderly
+  mode, cap orderly boards at 16 spaces, or allow more rows?
+- A 5-player board is 20 spaces = 5 per suit, which does not split evenly into two
+  columns — four visible holes in the bottom row. Accept, or bump orderly
+  5-player boards to 24?
+- Orderly mode **strictly narrows where an Ace can go**, so a suit whose columns
+  are full starves while others sit empty: more stuck declarations, more
+  rotations, a more reachable "three fruitless rotations ends the round". Is that
+  the intended texture?
+
+**Watch:** `store.test.ts` asserts `playToCenter` was called with exactly three
+arguments, and `toHaveBeenCalledWith` is arity-exact — adding a fourth breaks two
+tests. Adding to `Deps` breaks `fakeDeps()` at typecheck time, so it's a build
+break.
+
+### 6. Helper hint that flashes a playable card — _small_
+
+New `src/game/hint.ts` reusing the bot's own `botMoves` / `rankMove`, a `hint`
+prop through `TableauView`, and a CSS pulse. No Firebase write needed if it's a
+local preference.
+
+**Decide first:**
+- Local per-player, or host-controlled for the room (fairness in a competitive
+  game)? Local is far cheaper.
+- Flash **only the single best move**, or every playable source? Flashing
+  everything is often three or four cards at once and comes close to playing the
+  round for them.
+- Immediate, or only after a few seconds of no input? A delay needs an idle timer
+  and a decision on what resets it.
+- When nothing is playable, should it point at the wood pile to suggest a flip?
+  That overlaps with the automatic stuck detection.
+
+**Watch:** the hint hands a human the exact move a Hard bot would pick — it is
+literally the branch `chooseBotAction` takes when not being sloppy. Bot difficulty
+was tuned against a human *without* hints, so "is Easy beatable" reopens for
+players with hints on. Also: `.glow` green currently means exactly one thing
+("the held card can land here") — a second green would erode it, so use a
+different colour. Reduced motion is unhandled today; `MotionConfig
+reducedMotion="user"` does not cover CSS keyframes.
+
+### 7. Score screen: add a round-total column and reorder — _small_
+
+Requested order: negative, positive, sum, `=`, running total. The round sum
+should come from `RoundScore.delta` — the exact number `commitScores` added — not
+be recomputed, so the displayed sum and total can never disagree. Worth extracting
+the duplicated row from `RoundEndOverlay` and `GameOverOverlay` into a shared
+`ScoreRow` first.
+
+**Decide first — the equals sign as requested reads false.** A row renders
+`-4 +6 2 = 47`, which asserts "2 = 47" — wrong for anyone with a prior score,
+because the total already includes this round's delta. The equals that genuinely
+belongs is between `+6` and `2`, and it's missing. Options: (a) add a muted header
+row labelling the columns and keep `=` as written; (b) put `=` before the sum and
+`→` before the total; (c) ship it literally and accept the ambiguity.
+
+Also: seven columns on a 360px phone leave ~70–80px for the name, and the name
+input allows 14 characters. Truncate with an ellipsis, or wrap to a second line?
+
+**Watch:** nothing in the suite pins the current column order, so nothing will
+fail — which also means nothing would have caught a regression. The name track
+must be `minmax(0, 1fr)`, not `1fr`, or the row overflows and the sheet grows a
+horizontal scrollbar. The design spec pins the opposite order and goes stale.
+
+---
+
+## What still needs testing
+
+**Most of the last three passes has never been rendered in a browser.**
+Verification is unit tests, emulator tests against the real security rules, and
+static render assertions via `react-dom/server` — which catch structure, logic and
+wiring, but not layout, legibility, timing or feel.
+
+### Check the URL first if something looks broken
+
+**GitHub does not redirect Pages for a renamed repo.** Verified: the old
+`/flemish-fury/` path returns a bare 404 with no redirect. A browser holding the
+*old* cached `index.html` renders a **blank page**, because that shell points at
+`/flemish-fury/assets/*`. Blank page ⇒ check the URL and hard-refresh before
+assuming a code fault.
+
+### Never rendered
+
+- Container-query grid sizing (`container-type: inline-size` + `100cqw`), Chrome
+  105+ / Safari 16+. Where unsupported the slot falls back to a fixed `--card-w`,
+  which can overflow at six columns.
+- `aspect-ratio: 2.5 / 3.5` card proportions, and that the old `--card-h` bug is
+  genuinely gone on a wide window (it was invisible at 360px because both values
+  clamped to the same number).
+- `color-mix()` in rail chips, card backs and finished-pile tints — Chrome 111+ /
+  Safari 16.2+.
+- Pile-depth peek layers now that the step scales with the card.
+- The washroom plates: legibility at 44px, and whether boy and girl are told apart
   at a glance.
-- **Pile depth cues** (`PileStack`) under the wood draw pile, the turned-over
-  wood group (max 2, matching a flip of 3), the Blitz pile and post stacks.
-- **Wood recycle** is now reachable from the turned-over pile itself (a ↻ button
-  that does not steal the tap-to-play target) as well as from the empty draw
-  slot, which now shows ↻ rather than looking like dead space.
-- **Board sizing is height-aware** — `min(12vw, 8vh)`. The board is a fixed
-  four-row layout in 100dvh, and the new opponent row plus the peek reserve
-  would otherwise push the bottom row under `overflow: hidden` on a short
-  window. Grid columns are fixed card widths and centre, instead of `1fr`
-  columns scattering the piles across a desktop window.
-- **Opponents' face-up cards** are mirrored in the opponent strip (wood top,
-  post tops, Blitz top + count) — all public information in the physical game.
-- **"I'm stuck" hidden** behind `ENABLE_STUCK_BUTTON`. See the caveat in the
-  README: with it off, a genuine stalemate has no way out.
-- **One-tap join** — Home joins outright with the name and badge already on
-  screen; the Join form is now only the fallback for an invite link (or a
-  rejected join, whose reason it still shows).
-- **Game-over threshold pinned by test** (`plays.emu.test.ts`): target-1 keeps
-  playing, target ends it, asserted through the real write path. The playtest
-  report of "the game ended at 24" turned out to be the ROUND-end sheet (it
-  carries a "Next round" button); the emulator test now replays that exact board
-  — Dave +24/-0, sonofwatt +8/-20, target 25 — and asserts both that the game
-  does not end and that "Next round" deals round 2.
-- **Host actions no longer fail silently.** `start` / `next` / `again` / bot
-  management were `void`-ed promises, so a rejected or dropped write left the
-  button looking dead with nothing on screen. They now land in `actionError`,
-  rendered by the lobby and both overlays.
-- **AI players** (`src/game/bot.ts`, driver in `store.ts`, lobby UI). See the
-  README section for the design and why bots are host-driven.
-
-## Second pass — 2026-08-25
-
-- **Finished piles clear again** and show on rails flanking the board. The
-  dead-space rule lasted one iteration; clearing removes the starvation question
-  entirely and the rails keep the information the vanishing cards used to lose.
-- **Board is 4 x players spaces, capped at 24** (`spaceCountForPlayers`). 32 at
-  eight players was too cluttered to be worth the theoretical guarantee, and with
-  clearing restored the guarantee is no longer needed - a full board is transient.
-- **Automatic stuck detection** (`isStuck` in `rules.ts`, `syncStuck` in
-  `store.ts`) replaces the button, covers bots, and rotates bot wood piles on the
-  all-stuck path (nobody else can - the host owns their hands).
-- **Snap-to-nearest drop band** under the board (`nearestOf` / `nearestSpace` in
-  `useDrag.ts`). Tap works too, for the tap-to-play path.
-- **Cards are poker-standard 2.5 x 3.5** via `aspect-ratio`, which also makes the
-  `--card-h` class of bug structurally impossible to reintroduce.
-
-## What still needs testing (2026-08-25)
-
-**Nothing in either 2026-08-25 pass has been seen in a browser.** Verification so
-far is 108 unit tests, 16 emulator integration tests against the real security
-rules, and static render assertions through `react-dom/server`. That combination
-catches structure, logic and wiring; it cannot catch layout, legibility, timing
-or feel. Treat everything below as unverified.
-
-### Deploy and URL — check this first if the site looks broken
-
-**GitHub does not redirect Pages for a renamed repo.** Verified 2026-08-25:
-`https://sonofwatt.github.io/flemish-fury/` returns a bare 404 with no redirect,
-while `https://sonofwatt.github.io/deutsch-dash/` and every asset under it return
-200 and the bundle carries the current code. A browser still holding the *old*
-cached `index.html` renders a **blank page**, because that shell points at
-`/flemish-fury/assets/*`, which no longer exists. Blank page ⇒ check the URL and
-hard-refresh before assuming a code fault.
-
-### Browser-dependent, never rendered
-
-- Container-query grid sizing (`container-type: inline-size` + `100cqw` in
-  `.game-grid`). Needs Chrome 105+ / Safari 16+. Where unsupported the slot falls
-  back to a fixed `--card-w`, which can overflow at six columns.
-- `aspect-ratio: 2.5 / 3.5` card proportions, including that the previous
-  `--card-h` bug is genuinely gone on a wide window (it was invisible at 360px
-  because both values clamped to the same number).
-- `color-mix()` in the rail chips, card backs and finished-pile tints — Chrome
-  111+ / Safari 16.2+.
-- Pile-depth peek layers. The step was a flat 3px, which with a 2px border on each
-  layer antialiased into a single line - a flipped group of three read as two
-  cards. It now scales with the card (`--pile-step`); needs a look to confirm
-  three layers are three lines.
-- **Drag ghost tracking the cursor.** `.drag-ghost` is `position: fixed` with
-  `left`/`top` auto, so it started from its STATIC position - the last implicit
-  row of the `.game` grid - and the transform moved it from there. Adding
-  `max-width` + `margin-inline: auto` to `.game` pushed that origin right by half
-  the leftover window width, which is why the card appeared offset to the right on
-  a wide Windows window. Pinned to `left: 0; top: 0` now, but only a real drag
-  proves it.
-- The snap band at its new height (`clamp(44px, 9vh, 72px)`) - big enough to hit
-  mid-drag with a thumb, without squeezing the grid on a short screen.
-- Washroom pictograms: legibility at 44px, and more importantly whether boy and
-  girl are now told apart at a glance. The first cut used matching outline figures
-  differing only by a tapered torso and was reported as not distinct enough; they
-  are now a figure knocked out of a solid suit-coloured plate, with the skirt
-  flaring to nearly the plate width against a torso barely half that.
 - Dark mode across every new surface: rails, snap band, stuck note, AI tag,
   recycle button.
 - **The 44px card floor at 24 spaces / six columns on a 360px phone.** The
-  arithmetic says it fits with about 3px to spare. That is not a margin worth
-  trusting without looking.
+  arithmetic says it fits with about 3px to spare. Not a margin worth trusting.
+- Drag ghost tracking the cursor exactly, after the `left: 0; top: 0` fix.
 
-### Gameplay never actually played
+### Never actually played
 
 - A full round to completion on the new board — blitz call, scoring overlay, next
-  round, rematch. Carried over from the previous session and still true.
-- **AI players end to end.** The bot loop has only ever run against fake deps and
-  fake timers: whether a bot's blitz announces correctly, and whether host transfer
-  hands the bots over cleanly, are both unknown. Difficulty has had one real game
-  against it — Easy beat a casual human, so all three levels were slowed
-  (2026-08-25) and now need re-checking for whether they feel distinct and whether
-  Easy is now beatable without being inert.
-- Automatic stuck detection firing in a real game, and the all-stuck rotation
-  with bots in the room.
+  round, rematch.
+- **AI players end to end.** The bot loop has only run against fake deps and fake
+  timers. Whether a bot's blitz announces correctly and whether host transfer
+  hands bots over cleanly are both unknown. Difficulty was retuned on 2026-08-25
+  after Easy beat a casual human; whether Easy is now beatable *without being
+  inert* is unverified.
+- Automatic stuck detection firing in a real game, and the all-stuck rotation with
+  bots in the room.
 - The snap band by touch drag, and by tap.
-- Wood recycle: both the ↻ button on the turned-over pile and the ↻ empty draw slot.
-- One-tap join from the home page, including the badge-taken fallback path.
-- Opponent strip mini-cards updating live as an opponent plays.
+- Wood recycle: both the `↻` button and the `↻` empty draw slot.
+- One-tap join from the home page, including the badge-taken fallback.
+- Opponent strip mini-cards updating live.
+
+### Reconnecting after backgrounding
+
+Reported and fixed blind on 2026-08-25; needs the test that found it — switching
+apps mid-game and coming back. Three separate faults were on that path:
+
+- `Join`'s auto-resume swallowed any throw with `resuming` still true, leaving the
+  screen on "Rejoining…" for good. Now surfaces a Try again button and retries on
+  the offline → online edge.
+- `enterRoom` / `hostRoom` let rejections escape with `joinPhase` still
+  `'joining'`, disabling every join button permanently. Both now land on
+  `joinError: 'offline'`. Covered by tests.
+- Nothing nudged the SDK. A `visibilitychange` handler now calls
+  `goOffline`/`goOnline` on return and again 2.5s later, **only while `online` is
+  false** so it cannot flap presence for others.
+
+The nudge in particular is unverifiable from here — it depends on how a real
+mobile browser freezes and thaws a tab. **If it still fails, the diagnostic is
+which screen you land on:** "Reconnecting…" means the resume path failed;
+the dimmed board with the "reconnecting…" pill means the socket is still down;
+the join form means the anonymous identity was lost, which is a different bug.
+
+In a 1-human + 1-bot game you are the only client, so while you are away the whole
+game is frozen, including the bot. That is inherent to a serverless design.
 
 ### Scale
 
-- Three or more players. Only two have ever played.
+- Three or more players — only two have ever played.
 - Five to eight players, and the 24-space cap in practice.
-- Several bots at once with a low-end phone as host — every bot turn runs on the
-  host's device.
+- Several bots at once with a low-end phone as host — every bot turn runs there.
 
-### Reconnecting after the app is backgrounded
-
-Reported 2026-08-25 and fixed blind — needs the same test that found it, which is
-switching apps mid-game and coming back. Three separate faults were in that path:
-
-- `Join`'s auto-resume set `resuming` true and then swallowed any throw, so a
-  rejoin that failed left the screen on "Rejoining…" for good. It now surfaces a
-  "Reconnecting…" state with a Try again button, and retries by itself on the
-  offline → online edge.
-- `enterRoom` / `hostRoom` let a rejection escape with `joinPhase` still
-  `'joining'`, which disables every join and create button permanently. Both now
-  land on `joinError: 'offline'`. Covered by tests.
-- Nothing ever nudged the SDK. A frozen tab can come back holding a socket the OS
-  killed, and Firebase's own retry does not always fire from that state; a
-  `visibilitychange` handler now calls `goOffline`/`goOnline` on return, and again
-  2.5s later, but **only while `online` is false** so it cannot flap presence for
-  everyone else.
-
-The nudge in particular is unverifiable from here — it depends on how a real
-mobile browser freezes and thaws a tab.
-
-### Carried over from the previous session, still true
+### Carried over, still true
 
 - iPhone Safari has never been opened.
 - Spec §7 touch acceptance: no pull-to-refresh, no rubber-band scroll, no
   double-tap zoom, no text selection while dragging.
 - The ledgered pointer-capture re-select check on mouse drags.
+
+---
+
+## Known gaps, not blocking
+
+- **The emulator suite is invisible to CI** (see above). Highest-value unclaimed
+  chore.
+- `handoff.md`'s test counts drifted three times before this rewrite — the numbers
+  live in `npm test` output, not in prose. Re-check when you edit.
+- Bundle is one 586 kB chunk, over Vite's 500 kB warning threshold. No code-split.
+- `oxlint` reports 7 warnings, all `react(only-export-components)` fast-refresh
+  hints plus two pre-existing `RoomScreen` warnings. Zero errors.
+- ShareInvite clipboard try/catch; rejection-shake remounts the tableau;
+  room-code collision check on create; kite/bell badge hues sit near suit
+  blue/red; host transfer disabled in lobby (deliberate).
+- A bot's `connected` flag is never cleared. Harmless today because
+  `pickNextHost` filters bots, but worth knowing.
+
+---
+
+## History
+
+`1529330` was the rename to Deutsch Dash. Everything since is playtest-driven:
+
+| | |
+|---|---|
+| `1f01070` | AI players, board rework, automatic stuck detection, one-tap join |
+| `a1eb202` | Drag-ghost offset fix, deeper pile peek, taller drop band |
+| `17d766a` | All three bot levels slowed; fixed a 16%-flaky test |
+| `3f030ea` | Reconnect-after-backgrounding fixes; washroom-sign redraw |
+| `6a0836f` | Larger figures on the gender plates; bot-cannot-be-host test |
+| `d1c85b4` | Swapped wood and Blitz — wood to the right thumb |
+
+Earlier history, the approved design spec and the original 15-task execution
+ledger are in `docs/superpowers/`. The README carries setup, the security model
+and the house rules.
