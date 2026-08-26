@@ -146,7 +146,7 @@ describe('ScoreRow', () => {
   });
   it('degrades to a name and a total when there is no round breakdown', () => {
     // Game over can render from a snapshot with no round/scores.
-    expect(renderRow(player())).toBe('🌷 Dave 47');
+    expect(renderRow(player())).toBe('🌷\uFE0F Dave 47');   // the badge carries its emoji selector
   });
 });
 
@@ -258,6 +258,16 @@ describe('raceFlashes', () => {
     });
     expect(flashes).toEqual({ 1: { kind: 'angel', at: 99 } });
   });
+  it('haloes the player whose card FINISHED the pile, which clears the space', () => {
+    // A 10 is the most contested card in a pile and the one that leaves nothing on
+    // top: centerPlayTxn archives the run and empties the stack the moment it lands.
+    // Caught by racing two real clients for a blue 10 and watching the halo not appear.
+    const finished: CenterSpace = {
+      stack: [], history: [Array.from({ length: 10 }, (_, i) => c(i + 1, 'blue', i === 9 ? 'me' : 'ann'))],
+    };
+    expect(raceFlashes({ races: { 0: { by: 'bo', at: 5 } }, spaces: [finished], uid: 'me' }))
+      .toEqual({ 0: { kind: 'angel', at: 5 } });
+  });
   it('haloes nobody when the winner was somebody else', () => {
     // ann won that race. From my seat it never happened.
     expect(raceFlashes({
@@ -295,6 +305,8 @@ describe('raceFlashes', () => {
     }));
     expect(html).toContain('😇');
     expect(html).toContain('😠');
+    expect(html).toContain('race-angel');  // the two faces move differently
+    expect(html).toContain('race-angry');
     expect(html.indexOf('😇')).toBeLessThan(html.indexOf('😠')); // space 0 before space 1
   });
 });

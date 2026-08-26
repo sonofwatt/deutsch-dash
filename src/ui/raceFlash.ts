@@ -17,6 +17,21 @@ export interface RaceFlash { kind: RaceKind; at: number }
  * `at` is a nonce for the view, not a clock: it keys the element so a fresh race
  * remounts and replays the animation. Nothing here compares it to the time.
  */
+/**
+ * Whose card is on this space now - which is who won any race for it.
+ *
+ * The stack is normally the answer, but a 10 completes the pile and
+ * `centerPlayTxn` archives it into `history` and clears the stack on the spot. So
+ * the single most contested card in a pile is exactly the one that leaves nothing
+ * on top to credit, and the winner is the last card of the run that just went.
+ */
+function winnerOf(space: CenterSpace | undefined): string | undefined {
+  if (!space) return undefined;
+  if (space.stack.length) return space.stack[space.stack.length - 1].owner;
+  const done = space.history[space.history.length - 1];
+  return done?.[done.length - 1]?.owner;
+}
+
 export function raceFlashes(args: {
   races?: Record<string, RaceRecord> | null;
   spaces: CenterSpace[];
@@ -28,8 +43,7 @@ export function raceFlashes(args: {
     for (const [key, rec] of Object.entries(args.races ?? {})) {
       const i = Number(key);
       if (!Number.isInteger(i) || !rec || rec.by === args.uid) continue;
-      const stack = args.spaces[i]?.stack;
-      if (stack?.[stack.length - 1]?.owner === args.uid) out[i] = { kind: 'angel', at: rec.at };
+      if (winnerOf(args.spaces[i]) === args.uid) out[i] = { kind: 'angel', at: rec.at };
     }
   }
   // Last, so that losing a space I earlier won shows the scowl, not the halo.

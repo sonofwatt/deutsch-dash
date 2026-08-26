@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import { EMOJI } from '../../game/badges';
 import type { SplashVariant } from '../splashVariant';
 
 const SPARKS = 14;
@@ -13,7 +14,7 @@ function Glitter() {
           ['--a' as string]: `${(i * 360) / SPARKS}deg`,
           ['--d' as string]: `${[42, 30, 36][i % 3]}vmin`,
           ['--delay' as string]: `${(i % 5) * 70}ms`,
-        }}>✨</span>
+        }}>{'✨' + EMOJI}</span>
       ))}
     </div>
   );
@@ -29,7 +30,7 @@ function Rain({ glyph }: { glyph: string }) {
           ['--delay' as string]: `${(i % 5) * 80}ms`,
           ['--dur' as string]: `${1150 + (i % 4) * 150}ms`,
           ['--spin' as string]: `${i % 2 ? 24 : -24}deg`,
-        }}>{glyph}</span>
+        }}>{glyph + EMOJI}</span>
       ))}
     </div>
   );

@@ -1,7 +1,7 @@
 import { CardView } from './CardView';
 import { depthLayers } from './PileStack';
 import { cardId, type Card, type CenterSpace } from '../../game/types';
-import type { BadgeId } from '../../game/badges';
+import { EMOJI, type BadgeId } from '../../game/badges';
 import type { RaceFlash } from '../raceFlash';
 
 /**
@@ -73,8 +73,8 @@ export function CenterGrid(props: {
                     the animation. The element then simply sits at opacity 0 - no
                     timer clears it, which is why nothing here needs a clock. */}
                 {props.races?.[i] && (
-                  <span key={props.races[i].at} className="race-flash">
-                    {props.races[i].kind === 'angry' ? '😠' : '😇'}
+                  <span key={props.races[i].at} className={`race-flash race-${props.races[i].kind}`}>
+                    {(props.races[i].kind === 'angry' ? '😠' : '😇') + EMOJI}
                   </span>
                 )}
               </div>

@@ -64,6 +64,20 @@ test at once. Hydrate preferences inside a component (as `Home.tsx` and
 Also: `include` is `src/**/*.test.ts`, so a test file named `.test.tsx` is
 silently never collected.
 
+### Any emoji the app prints needs `EMOJI` after it
+
+`badges.ts` exports `EMOJI` (U+FE0F, VARIATION SELECTOR-16) and every glyph the
+app renders is built with it. Without it the glyph is at the mercy of font
+fallback: a monochrome outline from an earlier font in the chain wins for any
+codepoint that also has a text form, so ⚓ and 😇 came out as **black line
+drawings** while 💩 and ⭐ next to them were in full colour. It is redundant for
+codepoints that already default to emoji presentation and harmless there, which
+is why it goes on all of them rather than on a list somebody has to maintain.
+
+Reproduced and fixed on 2026-08-26 after it showed up in a screenshot. It is not
+a headless-rendering artifact — it is what any device does whose font chain
+offers a text glyph first.
+
 ### CI runs the emulator suite — keep it that way
 
 The emulator files gate every describe on

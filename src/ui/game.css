@@ -136,18 +136,37 @@
   min-width: 14px; height: 14px; display: grid; place-items: center; padding: 0 3px; }
 
 /* Who won the race for this space. One second, then it is simply gone: the
-   animation's own end state is the timer, so no effect has to clear anything. */
+   animation's own end state is the timer, so no effect has to clear anything.
+   The two faces move differently on purpose - you should know which one you got
+   from the corner of your eye, without reading it. */
 .race-flash { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center;
-  font-size: calc(var(--card-w) * .62); pointer-events: none; opacity: 0;
-  animation: race-flash 1s ease-out forwards; }
-@keyframes race-flash {
-  0%   { opacity: 0; transform: scale(.5); }
-  15%  { opacity: 1; transform: scale(1.15); }
-  70%  { opacity: 1; transform: scale(1); }
-  100% { opacity: 0; transform: scale(1); }
+  font-size: calc(var(--card-w) * .62); pointer-events: none; opacity: 0; }
+/* Winner: floats off the top of the card. Rise scales with the card so it clears
+   the same amount of it on a phone as on a desktop. */
+.race-angel { animation: race-angel 1s ease-out forwards; }
+@keyframes race-angel {
+  0%   { opacity: 0; transform: translateY(15%) scale(.7); }
+  18%  { opacity: 1; transform: translateY(0) scale(1.05); }
+  30%  { transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-55%) scale(1); }
 }
+/* Loser: a short sideways shake, then gone. Percentages are of the slot, so the
+   shake stays proportional at every card size. */
+.race-angry { animation: race-angry 1s ease-out forwards; }
+@keyframes race-angry {
+  0%   { opacity: 0; transform: translateX(0) scale(.7); }
+  12%  { opacity: 1; transform: translateX(0) scale(1.05); }
+  24%  { transform: translateX(-13%) scale(1); }
+  38%  { transform: translateX(13%) scale(1); }
+  52%  { transform: translateX(-9%) scale(1); }
+  66%  { transform: translateX(9%) scale(1); }
+  80%  { opacity: 1; transform: translateX(0) scale(1); }
+  100% { opacity: 0; transform: translateX(0) scale(1); }
+}
+/* Reduced motion keeps both faces and drops the movement - which one you got is
+   the information here, the moving is only how it carries. */
 @media (prefers-reduced-motion: reduce) {
-  .race-flash { animation: race-flash-still 1s ease-out forwards; }
+  .race-angel, .race-angry { animation: race-flash-still 1s ease-out forwards; }
   @keyframes race-flash-still { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
 }
 
