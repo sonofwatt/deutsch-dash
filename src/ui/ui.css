@@ -10,7 +10,6 @@
 .spacer { flex: 1; }
 .title { font-weight: 800; font-size: 28px; margin: 0; }
 .muted { color: var(--ink-soft); }
-.error { color: var(--danger); }
 .player-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
 .tag { font-size: 11px; font-weight: 600; color: var(--ink-soft); border: 1px solid var(--line);
@@ -31,15 +30,23 @@
    minmax(0, 1fr), not 1fr: a 14-character name against six other columns on a
    360px phone otherwise overflows the sheet into a horizontal scrollbar instead
    of ellipsing. */
-.score-row { display: grid; grid-template-columns: 28px minmax(0, 1fr) repeat(5, auto);
-  gap: 6px; align-items: center; padding: 8px 10px; border-radius: var(--radius);
+.score-row { display: grid; gap: 6px; align-items: center;
+  grid-template-columns: 28px minmax(0, 1fr) repeat(2, minmax(3ch, auto)) auto
+                         repeat(2, minmax(3ch, auto));
+  padding: 8px 10px; border-radius: var(--radius);
   background: var(--surface); border: 1px solid var(--line); font-size: 14px; }
 .score-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.score-math { font-variant-numeric: tabular-nums; }
-.score-neg { color: var(--danger); }
+/* Every row is its own grid - it has to be, the row IS the card - so without a
+   floor on the value columns each row sizes them to its own digits and the =
+   signs stagger down the sheet. In tabular figures 3ch is exactly three digits,
+   which holds every value the game can produce ("-20", "+40", a 3-digit total);
+   minmax lets anything wider grow rather than clip. */
+.score-math, .score-total { text-align: right; font-variant-numeric: tabular-nums; }
+.score-neg { color: var(--danger-ink); }
 .score-delta { font-weight: 600; }
 /* The running total, set apart from the round's arithmetic to its left. */
 .score-total { font-weight: 800; padding-left: 6px; border-left: 1px solid var(--line); }
+.error { color: var(--danger-ink); }
 .blitz-splash { position: fixed; inset: 0; display: grid; place-items: center; z-index: 110;
   pointer-events: none; }
 .blitz-word { font-size: clamp(48px, 18vw, 120px); font-weight: 800; letter-spacing: .02em;

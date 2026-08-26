@@ -1,6 +1,10 @@
 :root {
   --bg: #f4f2ec; --surface: #ffffff; --ink: #23211c; --ink-soft: #7a766c;
   --line: #e3e0d7; --accent: #23211c; --danger: #b3261e;
+  /* --danger is a fill (the disconnected pill, white text on it); --danger-ink is
+     the same idea as text. They part company in dark mode, where the fill has to
+     stay dark enough for white text while the text has to lift off the surface. */
+  --danger-ink: var(--danger);
   /* Empty-slot outlines on the play surface. Deliberately far darker than --line:
      at playing-card size a hairline border reads as nothing at all on a phone in
      daylight, and the 16 center slots are the thing players aim at. */
@@ -16,7 +20,7 @@
 }
 @media (prefers-color-scheme: dark) {
   :root { --bg: #171613; --surface: #23211c; --ink: #f2f0ea; --ink-soft: #a29d92;
-          --line: #37342d; --accent: #f2f0ea;
+          --line: #37342d; --accent: #f2f0ea; --danger-ink: #ff8a7d;
           --pile-line: #8b8577; --pile-fill: #1f1e19; }
 }
 * { box-sizing: border-box; }

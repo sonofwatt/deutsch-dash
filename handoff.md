@@ -346,10 +346,23 @@ Decisions taken, so they don't get re-litigated:
   `score` as optional: game over can render from a snapshot with no
   `round/scores`, and degrades to a name and a total.
 
-**Still unrendered**, like most of the last three passes: seven columns on a real
-phone. The name track is `minmax(0, 1fr)` with `text-overflow: ellipsis`, which is
-what keeps a 14-character name from overflowing the sheet into a horizontal
-scrollbar — if a long name still forces one, that track is the thing to look at.
+Rendered headlessly at 360px in both themes (see "What still needs testing" for
+the recipe), which caught two things worth keeping:
+
+- **Every row is its own grid**, because the row is the card that carries the
+  background and border. `auto` columns therefore size to each row's own digits
+  and the `=` signs stagger down the sheet, so the value columns are floored at
+  `3ch` — exactly three tabular digits, which is every value the game can produce
+  — and right-aligned. `minmax` lets anything wider grow rather than clip.
+- **`--danger` at 1.9:1 on the dark surface** was barely readable as text. It is
+  now two tokens: `--danger` stays the fill (the disconnected pill needs white
+  text on it), `--danger-ink` is the text colour and lifts to `#ff8a7d` in dark
+  mode. `.error` uses it too, so every error message in the app got legible.
+
+That leaves the name track: `minmax(0, 1fr)` with `text-overflow: ellipsis`, which
+is what keeps a 14-character name from overflowing the sheet into a horizontal
+scrollbar. At 360px a name gets about 90px — "Annalisa-Marie" ellipses to
+"Annalisa-…". Widening it means taking width from the arithmetic.
 
 ---
 
@@ -359,6 +372,22 @@ scrollbar — if a long name still forces one, that track is the thing to look a
 Verification is unit tests, emulator tests against the real security rules, and
 static render assertions via `react-dom/server` — which catch structure, logic and
 wiring, but not layout, legibility, timing or feel.
+
+**A component can be rendered headlessly, though**, which is how the score row's
+column alignment and its dark-mode red were caught. Write a throwaway
+`*.test.ts` that `renderToStaticMarkup`s the component into an HTML file beside
+copies of `theme.css` / `ui.css` plus the Outfit `<link>` from `index.html` (the
+fallback font is much wider — omit it and the layout reads far tighter than it
+is), serve the folder, and shoot it:
+
+```
+sudo npx playwright install-deps chromium && npx playwright install chromium
+npx playwright screenshot --viewport-size "360,620" --color-scheme dark URL out.png
+```
+
+That covers layout and legibility at a known width in both themes. It does not
+cover touch, timing, or how a real phone actually lays out — the list below still
+stands.
 
 ### Check the URL first if something looks broken
 
@@ -386,7 +415,8 @@ assuming a code fault.
 - **The 44px card floor at 24 spaces / six columns on a 360px phone.** The
   arithmetic says it fits with about 3px to spare. Not a margin worth trusting.
 - Drag ghost tracking the cursor exactly, after the `left: 0; top: 0` fix.
-- The seven-column score row at 360px, with the longest name a player can enter.
+- ~~The seven-column score row at 360px~~ — done headlessly, both themes, with a
+  14-character name. Never on real glass.
 
 ### Never actually played
 

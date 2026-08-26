@@ -21,11 +21,14 @@ export function ScoreRow({ player, score }: { player: PlayerInfo; score?: RoundS
     <div className="score-row">
       <span className="chip" style={{ ['--badge' as string]: badge.color }}>{badge.glyph}</span>
       <span className="score-name">{player.name}</span>
-      {/* Red is for an actual penalty: a blitzer's "0" in red reads as a loss. */}
+      {/* A zero is quiet in both columns: red is for an actual penalty, and a
+          blitzer's "0" in danger red reads as a loss rather than a clean sweep. */}
       <span className={`score-math ${score?.blitzLeft ? 'score-neg' : 'muted'}`}>
         {score ? signed(-2 * score.blitzLeft) : ''}
       </span>
-      <span className="score-math">{score ? signed(score.centerCount) : ''}</span>
+      <span className={`score-math ${score?.centerCount ? '' : 'muted'}`}>
+        {score ? signed(score.centerCount) : ''}
+      </span>
       <span className="score-math muted">{score ? '=' : ''}</span>
       <span className="score-math score-delta">{score ? signed(score.delta) : ''}</span>
       <span className="score-total">{player.score}</span>
