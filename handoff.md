@@ -1,10 +1,10 @@
 # Project Handoff — Deutsch Dash
 
-_Last updated: 2026-08-26 at `6abe8bd`. Working tree clean, `main` ==
+_Last updated: 2026-08-26 at `b38da9b`. Working tree clean, `main` ==
 `origin/main`, CI green including the emulator suite, and the live site matches
 `HEAD`._
 
-_**134 tests green** (118 unit + 16 emulator). This is the only place in the repo
+_**138 tests green** (122 unit + 16 emulator). This is the only place in the repo
 that quotes a count — it drifted three separate ways when it lived in four
 places, so keep it here and nowhere else._
 
@@ -182,9 +182,11 @@ deliberate.
 
 ## Pending work
 
-Seven requests from the 2026-08-25/26 playtests, none started. Each was specced
-against the real code; the open questions are decisions only the product owner
-can make, and several genuinely change the game rather than the interface.
+Seven requests from the 2026-08-25/26 playtests. **#7 landed** and **#4 is
+deferred**; the other five are unstarted. Each was specced against the real code;
+the open questions are decisions only the product owner can make, and several
+genuinely change the game rather than the interface. Numbering is kept as-is so
+earlier notes still point at the right item.
 
 ### 1. Move the recycle button to the bottom right — _small_
 
@@ -236,7 +238,15 @@ hint hidden or still visible alongside it?
 — longer copy clips rather than reflows. That's the intended trade, but it
 constrains future wording.
 
-### 4. Move a run of cards between post piles — _medium, and it changes the rules_
+### 4. Move a run of cards between post piles — _deferred 2026-08-26_
+
+Not being built for now. The spec below stands if it comes back.
+
+**It is a house rule, confirmed at the source.** Dutch Blitz's own FAQ says of the
+post piles: "You can move one card at a time - you cannot shift entire piles."
+(https://dutchblitz.com/pages/policies-faq). The design spec's one-card-at-a-time
+wording is therefore correct as written, and shipping this would need the lobby
+toggle below rather than being a silent change to everyone's game.
 
 Today only the top card of a post pile can move (`placeOnPost`). The request:
 tap-and-hold a pile, see its cards in a row, tap which to move, tap a destination.
@@ -248,9 +258,8 @@ tap-and-hold a pile, see its cards in a row, tap which to move, tap a destinatio
   only `wood[woodIndex-1]` playable — it cannot hold a run and there is only one
   of it. The descending alternating runs in the example (9,8 and 10,9,8,7,6,5) are
   post piles. **Confirm this reading before starting.**
-- **It departs from official Dutch Blitz**, which the design spec pins at one card
-  at a time. House rule for every game, or a lobby toggle so a purist table can
-  play by the book? It cannot be per-player — it's a shared rule.
+- **Everyone or nobody.** House rule for every game, or a lobby toggle so a purist
+  table can play by the book? It cannot be per-player — it's a shared rule.
 - **What does "tap which cards to move" mean?** Taking the card at depth k plus
   everything above it (a contiguous suffix) is the only reading that leaves both
   piles legal runs, and it is the reading under which the given example works.
@@ -316,28 +325,31 @@ players with hints on. Also: `.glow` green currently means exactly one thing
 different colour. Reduced motion is unhandled today; `MotionConfig
 reducedMotion="user"` does not cover CSS keyframes.
 
-### 7. Score screen: add a round-total column and reorder — _small_
+### 7. Score screen: round arithmetic — _landed in `b38da9b`_
 
-Requested order: negative, positive, sum, `=`, running total. The round sum
-should come from `RoundScore.delta` — the exact number `commitScores` added — not
-be recomputed, so the displayed sum and total can never disagree. Worth extracting
-the duplicated row from `RoundEndOverlay` and `GameOverOverlay` into a shared
-`ScoreRow` first.
+Rows on both sheets now read `🌷 Dave -4 +6 = +2 │ 47`: penalty, cards played,
+`=`, the round's delta, then the running total set off by a rule.
 
-**Decide first — the equals sign as requested reads false.** A row renders
-`-4 +6 2 = 47`, which asserts "2 = 47" — wrong for anyone with a prior score,
-because the total already includes this round's delta. The equals that genuinely
-belongs is between `+6` and `2`, and it's missing. Options: (a) add a muted header
-row labelling the columns and keep `=` as written; (b) put `=` before the sum and
-`→` before the total; (c) ship it literally and accept the ambiguity.
+Decisions taken, so they don't get re-litigated:
 
-Also: seven columns on a 360px phone leave ~70–80px for the name, and the name
-input allows 14 characters. Truncate with an ellipsis, or wrap to a second line?
+- **The `=` sits between the components and the sum, not before the total.** The
+  originally requested `-4 +6 2 = 47` asserts "2 = 47", which is false for anyone
+  with a prior score. No header row: labels wide enough to read ("Played",
+  "Round") cost more width than the numbers they label and squeeze the name below
+  an ellipsis on a 360px phone.
+- **The sum is `RoundScore.delta` verbatim**, never recomputed from
+  `centerCount`/`blitzLeft`, so it cannot disagree with the total beside it.
+  `render.test.ts` feeds a contradicting fixture to pin exactly that.
+- **Zero is unsigned and muted** — a blitzer reads `0 +9 = +9`, not `-0`, and the
+  danger red is reserved for a real penalty.
+- The duplicated row moved out of both overlays into `ScoreRow`, which takes
+  `score` as optional: game over can render from a snapshot with no
+  `round/scores`, and degrades to a name and a total.
 
-**Watch:** nothing in the suite pins the current column order, so nothing will
-fail — which also means nothing would have caught a regression. The name track
-must be `minmax(0, 1fr)`, not `1fr`, or the row overflows and the sheet grows a
-horizontal scrollbar. The design spec pins the opposite order and goes stale.
+**Still unrendered**, like most of the last three passes: seven columns on a real
+phone. The name track is `minmax(0, 1fr)` with `text-overflow: ellipsis`, which is
+what keeps a 14-character name from overflowing the sheet into a horizontal
+scrollbar — if a long name still forces one, that track is the thing to look at.
 
 ---
 
@@ -374,6 +386,7 @@ assuming a code fault.
 - **The 44px card floor at 24 spaces / six columns on a 360px phone.** The
   arithmetic says it fits with about 3px to spare. Not a margin worth trusting.
 - Drag ghost tracking the cursor exactly, after the `left: 0; top: 0` fix.
+- The seven-column score row at 360px, with the longest name a player can enter.
 
 ### Never actually played
 
