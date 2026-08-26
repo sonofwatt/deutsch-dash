@@ -1,10 +1,10 @@
 # Project Handoff — Deutsch Dash
 
-_Last updated: 2026-08-26 at `4619481`. Working tree clean, `main` ==
+_Last updated: 2026-08-26 at `05516a8`. Working tree clean, `main` ==
 `origin/main`, CI green including the emulator suite, and the live site matches
 `HEAD`._
 
-_**175 tests green** (158 unit + 17 emulator). This is the only place in the repo
+_**195 tests green** (177 unit + 18 emulator). This is the only place in the repo
 that quotes a count — it drifted three separate ways when it lived in four
 places, so keep it here and nowhere else._
 
@@ -87,11 +87,25 @@ Three things about it that are not obvious:
   round a length. `duels` needs its own rules clause - the loser is usually not
   the host - and `endedAt` does not, because only the host writes it.
 
-Candidates written but not built, in rough order of how much they would add:
-last-place streaks, biggest single-round swing in the game so far, a player who
-never once lost a race, longest gap between two players' blitz times, and "you
-have all been stuck at the same time N times this game". Each needs history the
-round does not currently keep.
+**`rooms/$code/stats` is the game-long half of it** (`src/game/stats.ts`).
+`nextStats` is pure and the host calls it inside `commitScores`, in the same
+idempotent write as the scores, so no round can be counted into it twice. It
+carries blitz counts, last-place tallies and streaks, race wins and losses, the
+fastest blitz and the best and worst round of the game, and the number of full
+standstills. `rematch` clears it, because it describes one game.
+
+Two traps that were caught only by playing it:
+
+- **A level table has no bottom.** A round nobody scores in moves everyone by the
+  same -20, and awarding the whole room a last place each had all three players on
+  a "3 rounds running" losing streak by round three. `nextStats` now skips
+  last-place accounting when the lowest total equals the highest, and `basement`
+  in the commentary needs a player to be *strictly* lowest before it names them.
+- **The round's length is the host's own clock** against a server timestamp: at
+  commit time `round/endedAt` is still a sentinel, so the host cannot read it back.
+  It is thrown away unless it lands between 3 seconds and 20 minutes, and only the
+  game-record lines use it. The per-round "blitzed in Ns" reads
+  `endedAt - startedAt`, which is server time at both ends.
 
 ### Any emoji the app prints needs `EMOJI` after it
 

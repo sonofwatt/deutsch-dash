@@ -172,6 +172,15 @@ emu('server-side player cap and badge uniqueness (database.rules.json)', () => {
     await assertFails(db.ref(`rooms/${code}/round`).set({ races: { 3: { by: RACER, at: 1 } } }));
   });
 
+  it('lets only the host write the game-long stats', async () => {
+    const code = 'GAMESTATS';
+    await seedRoom(code, 0);
+    // One writer by design: the host derives them inside commitScores, so anybody
+    // else writing here could only be rewriting history.
+    await assertSucceeds(hostCtx.database().ref(`rooms/${code}/stats`).set({ rounds: 1, races: 0 }));
+    await assertFails(racerCtx.database().ref(`rooms/${code}/stats/rounds`).set(99));
+  });
+
   it('rejects claiming a badge already held by another uid, but allows claiming a free one', async () => {
     const code = 'BADGERACE';
     await seedRoom(code, 0); // just the host, who holds 'tulip'

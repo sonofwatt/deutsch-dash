@@ -61,4 +61,12 @@ export interface RoundState {
   endedAt: number | null;
 }
 
-export interface Room { meta: RoomMeta; players: Record<string, PlayerInfo>; round: RoundState | null }
+import type { GameStats } from './stats';
+export interface Room {
+  meta: RoomMeta; players: Record<string, PlayerInfo>; round: RoundState | null;
+  // Accumulated across the game by the host and cleared on a rematch. Optional
+  // for the same reason as meta.playerCount: rooms created before this field
+  // existed (and ad-hoc test fixtures) simply do not have it. normalizeRoom
+  // always sets it, so nothing downstream sees it absent.
+  stats?: GameStats | null;
+}

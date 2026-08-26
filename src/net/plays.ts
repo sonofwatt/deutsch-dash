@@ -5,6 +5,7 @@ import { buildDeck, deal, shuffle, type Rng } from '../game/deck';
 import { postCountForPlayers } from '../game/rules';
 import { centerPlayTxn, reconcileTableau, spaceOwner } from '../game/center';
 import { scoreRound, winnerIds } from '../game/scoring';
+import { nextStats } from '../game/stats';
 
 const r = (code: string, path = '') => ref(db, `rooms/${code}${path ? '/' + path : ''}`);
 
@@ -119,6 +120,20 @@ export async function commitScores(code: string, room: Room): Promise<void> {
     totals[uid] = p.score + (scores[uid]?.delta ?? 0);
     patch[`players/${uid}/score`] = totals[uid];
   }
+  // The game-long tally, in the same idempotent write as the scores, so no round
+  // can ever be counted into it twice.
+  //
+  // The duration is the host's own clock against a server timestamp, because
+  // round/endedAt is a sentinel until this write lands - so it is thrown away
+  // unless it is plausible. Only the game-record lines use it; the per-round
+  // "blitzed in Ns" reads endedAt - startedAt, which is server time on both ends.
+  const elapsed = round.startedAt > 0 ? Date.now() - round.startedAt : 0;
+  const durationMs = elapsed >= 3_000 && elapsed <= 20 * 60_000 ? elapsed : null;
+  patch.stats = nextStats(room.stats ?? null, {
+    roundNumber: room.meta.roundNumber,
+    scores, duels: round.duels, blitzedBy: round.blitzedBy,
+    durationMs, stuckRounds: round.stuckRounds, totals,
+  });
   // Ties at/above target play another round (spec: game ends only when someone stands alone on top)
   if (winnerIds(totals, room.meta.targetScore).length === 1) patch['meta/phase'] = 'gameOver';
   await update(r(code), patch);
@@ -130,7 +145,8 @@ export function nextRound(code: string, room: Room): Promise<void> {
 
 export async function rematch(code: string, room: Room): Promise<void> {
   const patch: Record<string, unknown> = {
-    'meta/phase': 'lobby', 'meta/roundNumber': 0, round: null,
+    // stats describe one game, and a rematch is a new one.
+    'meta/phase': 'lobby', 'meta/roundNumber': 0, round: null, stats: null,
   };
   for (const uid of Object.keys(room.players)) patch[`players/${uid}/score`] = 0;
   await update(r(code), patch);

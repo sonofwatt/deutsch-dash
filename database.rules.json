@@ -26,6 +26,9 @@
             ".validate": "newData.isString() && newData.val() === auth.uid && (!data.exists() || data.val() === auth.uid)"
           }
         },
+        "stats": {
+          ".write": "auth != null && root.child('rooms').child($code).child('meta').child('hostId').val() === auth.uid"
+        },
         "round": {
           "spaces": { ".write": "auth != null" },
           "blitzedBy": { ".write": "auth != null" },

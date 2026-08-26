@@ -8,6 +8,7 @@ import { botId, type BotLevel } from '../game/bot';
 import type { PlayerInfo, Room, RoomMeta, RoundState } from '../game/types';
 import { normalizeSpaces, normalizeTableau } from '../game/center';
 import { postCountForPlayers, spaceCountForPlayers } from '../game/rules';
+import { normalizeStats } from '../game/stats';
 
 export const ROOM_TTL_MS = 24 * 60 * 60 * 1000;
 // Mirrored in database.rules.json's rooms/$code/meta/playerCount .validate
@@ -22,7 +23,9 @@ const roomRef = (code: string) => ref(db, `rooms/${code}`);
 
 export function normalizeRoom(raw: unknown): Room | null {
   if (!raw || typeof raw !== 'object') return null;
-  const r = raw as { meta?: RoomMeta; players?: Record<string, PlayerInfo>; round?: unknown };
+  const r = raw as {
+    meta?: RoomMeta; players?: Record<string, PlayerInfo>; round?: unknown; stats?: unknown;
+  };
   if (!r.meta || !r.players) return null;
   const players: Record<string, PlayerInfo> = {};
   for (const [uid, p] of Object.entries(r.players)) {
@@ -48,7 +51,7 @@ export function normalizeRoom(raw: unknown): Room | null {
       endedAt: rr.endedAt ?? null,
     };
   }
-  return { meta, players, round };
+  return { meta, players, round, stats: normalizeStats(r.stats) };
 }
 
 function playerRecord(name: string, badgeId: BadgeId): Omit<PlayerInfo, 'joinedAt'> & { joinedAt: object } {

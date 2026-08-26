@@ -1,4 +1,5 @@
 import { rankRows } from './scoreRanks';
+import { statsFor, type GameStats } from '../game/stats';
 import type { CenterSpace, PlayerInfo, Room, RoundScore } from '../game/types';
 
 export interface Remark {
@@ -18,6 +19,8 @@ export interface CommentaryInput {
   /** endedAt - startedAt, when both are known. */
   durationMs: number | null;
   stuckRounds: number;
+  /** Everything one round cannot know: streaks, records, who has never lost a race. */
+  stats: GameStats | null;
   /** The game-over sheet, which gets to be ruder. */
   final?: boolean;
 }
@@ -34,6 +37,9 @@ function hash(s: string): number {
   return Math.abs(h);
 }
 const pick = (variants: string[], seed: string) => variants[hash(seed) % variants.length];
+
+/** "1 second", "2 seconds". Snark does not survive a grammar mistake. */
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 const MAX_REMARKS = 6;
 /** Nobody wants five jokes about the same person. */
@@ -98,8 +104,8 @@ export function commentary(input: CommentaryInput): Remark[] {
   }
   if (blitzedBy && input.durationMs != null && seconds > 0 && seconds <= 60) {
     add('speed-blitz', 95, [
-      `${nameOf(blitzedBy)} blitzed in ${seconds} seconds. Everyone else was still reading their cards.`,
-      `${seconds} seconds. ${nameOf(blitzedBy)} came to play; the rest came to watch.`,
+      `${nameOf(blitzedBy)} blitzed in ${plural(seconds, 'second')}. Everyone else was still reading their cards.`,
+      `${plural(seconds, 'second')}. ${nameOf(blitzedBy)} came to play; the rest came to watch.`,
     ], [blitzedBy]);
   }
   if (input.durationMs != null && input.durationMs >= 240_000) {
@@ -157,9 +163,13 @@ export function commentary(input: CommentaryInput): Remark[] {
   }
 
   // === the table ===========================================================
-  if (current.length > 1 && Math.abs(total(leader) - total(current[1])) <= 2) {
-    add('photo-finish', 76, [
-      `${nameOf(leader)} and ${nameOf(current[1])} are ${Math.abs(total(leader) - total(current[1]))} apart. Somebody blink.`,
+  const gap = current.length > 1 ? Math.abs(total(leader) - total(current[1])) : 0;
+  if (current.length > 1 && gap <= 2) {
+    add('photo-finish', 76, gap === 0 ? [
+      `${nameOf(leader)} and ${nameOf(current[1])} are dead level. Somebody do something.`,
+      `Not a point between ${nameOf(leader)} and ${nameOf(current[1])}. This is going to get personal.`,
+    ] : [
+      `${nameOf(leader)} and ${nameOf(current[1])} are ${plural(gap, 'point')} apart. Somebody blink.`,
       `Nothing between ${nameOf(leader)} and ${nameOf(current[1])}. This is going to get personal.`,
     ], [leader, current[1]]);
   } else if (lead >= Math.max(15, targetScore / 4)) {
@@ -174,7 +184,10 @@ export function commentary(input: CommentaryInput): Remark[] {
       `One decent round and ${nameOf(leader)} takes the whole thing.`,
     ], [leader]);
   }
-  if (total(last) < 0) {
+  // Strictly lowest, not merely sorted last: on a table where everyone is level on
+  // the same negative score, naming one of them is just picking on whoever RTDB
+  // happened to key first.
+  if (total(last) < 0 && total(last) < total(leader)) {
     add('basement', 52, [
       `${nameOf(last)} is on ${total(last)}. That is a negative number, on purpose, in a game.`,
       `${nameOf(last)} has fewer points than they started with. Impressive, in a way.`,
@@ -195,15 +208,15 @@ export function commentary(input: CommentaryInput): Remark[] {
       ], [climber]);
     } else {
       add('climb', 58, [
-        `${nameOf(climber)} climbed ${places} places. Ladder acquired.`,
-        `${places} places up for ${nameOf(climber)}. Somebody found a gear.`,
+        `${nameOf(climber)} climbed ${plural(places, 'place')}. Ladder acquired.`,
+        `${plural(places, 'place')} up for ${nameOf(climber)}. Somebody found a gear.`,
       ], [climber]);
     }
   }
   const faller = ids.find(id => move[id] === 'down' && current.indexOf(id) - previous.indexOf(id) >= 2);
   if (faller) {
     add('freefall', 56, [
-      `${nameOf(faller)} dropped ${current.indexOf(faller) - previous.indexOf(faller)} places. Gravity is undefeated.`,
+      `${nameOf(faller)} dropped ${plural(current.indexOf(faller) - previous.indexOf(faller), 'place')}. Gravity is undefeated.`,
       `A bad round for ${nameOf(faller)}, and the table noticed.`,
     ], [faller]);
   }
@@ -219,21 +232,21 @@ export function commentary(input: CommentaryInput): Remark[] {
   if (topPair && topPair[1] >= 3) {
     const [a, b] = topPair[0].split('|');
     add('rivalry', 78, [
-      `${nameOf(a)} and ${nameOf(b)} went for the same pile ${topPair[1]} times. Get a room.`,
+      `${nameOf(a)} and ${nameOf(b)} went for the same pile ${plural(topPair[1], 'time')}. Get a room.`,
       `${topPair[1]} photo-finishes between ${nameOf(a)} and ${nameOf(b)}. This is no longer about cards.`,
     ], [a, b]);
   }
   const bully = Object.entries(won).sort(([, a], [, b]) => b - a)[0];
   if (bully && bully[1] >= 3) {
     add('bully', 62, [
-      `${nameOf(bully[0])} won ${bully[1]} races to the same space. Fast hands.`,
+      `${nameOf(bully[0])} won ${plural(bully[1], 'race')} to the same space. Fast hands.`,
       `${bully[1]} cards snatched out from under people by ${nameOf(bully[0])}.`,
     ], [bully[0]]);
   }
   const unlucky = Object.entries(lost).sort(([, a], [, b]) => b - a)[0];
   if (unlucky && unlucky[1] >= 3) {
     add('unlucky', 60, [
-      `${nameOf(unlucky[0])} lost ${unlucky[1]} races. Fractionally too slow, ${unlucky[1]} separate times.`,
+      `${nameOf(unlucky[0])} lost ${plural(unlucky[1], 'race')}. Fractionally too slow, ${plural(unlucky[1], 'separate time')}.`,
       `${nameOf(unlucky[0])} has been second to the same pile ${unlucky[1]} times. Painful.`,
     ], [unlucky[0]]);
   }
@@ -242,14 +255,14 @@ export function commentary(input: CommentaryInput): Remark[] {
   const closer = Object.entries(finished).sort(([, a], [, b]) => b - a)[0];
   if (closer && closer[1] >= 2) {
     add('pile-closer', 54, [
-      `${nameOf(closer[0])} closed ${closer[1]} piles. Somebody has to do the washing up.`,
+      `${nameOf(closer[0])} closed ${plural(closer[1], 'pile')}. Somebody has to do the washing up.`,
       `${closer[1]} tens from ${nameOf(closer[0])}. Finishing what others start.`,
     ], [closer[0]]);
   }
   const opener = Object.entries(opened).sort(([, a], [, b]) => b - a)[0];
   if (opener && opener[1] >= 3) {
     add('opener', 42, [
-      `${nameOf(opener[0])} opened ${opener[1]} piles. Generous. Everyone else said thanks.`,
+      `${nameOf(opener[0])} opened ${plural(opener[1], 'pile')}. Generous. Everyone else said thanks.`,
       `${opener[1]} Aces down from ${nameOf(opener[0])}, mostly for other people to build on.`,
     ], [opener[0]]);
   }
@@ -292,6 +305,70 @@ export function commentary(input: CommentaryInput): Remark[] {
     ], [blitzedBy]);
   }
 
+  // === the game so far, not just this round ================================
+  const stats = input.stats;
+  const games = stats?.rounds ?? 0;
+  if (stats && games >= 2) {
+    const streaker = ids.find(id => statsFor(stats, id).lastStreak >= 2);
+    if (streaker) {
+      const k = statsFor(stats, streaker).lastStreak;
+      add('last-streak', 68, [
+        `${nameOf(streaker)} has been bottom of the table ${plural(k, 'round')} running. A tradition, at this point.`,
+        `${plural(k, 'straight round')} propping up the scoreboard for ${nameOf(streaker)}. Consistency of a kind.`,
+      ], [streaker]);
+    }
+    if (stats.best && stats.best.round === roundNumber && stats.best.delta > 0 && players[stats.best.uid]) {
+      add('record-round', 74, [
+        `${nameOf(stats.best.uid)}'s +${stats.best.delta} is the best round anyone has managed all game.`,
+        `Nobody has had a round like ${nameOf(stats.best.uid)}'s +${stats.best.delta} tonight.`,
+      ], [stats.best.uid]);
+    }
+    if (stats.worst && stats.worst.round === roundNumber && stats.worst.delta < 0 && players[stats.worst.uid]) {
+      add('record-low', 63, [
+        `${nameOf(stats.worst.uid)}'s ${stats.worst.delta} is the worst round of the night so far.`,
+        `${stats.worst.delta} is a new low for this table, and it belongs to ${nameOf(stats.worst.uid)}.`,
+      ], [stats.worst.uid]);
+    }
+    const unbeaten = ids.find(id => {
+      const p = statsFor(stats, id);
+      return p.racesLost === 0 && p.racesWon >= 2;
+    });
+    if (unbeaten && stats.races >= 4) {
+      add('unbeaten', 66, [
+        `${nameOf(unbeaten)} has not lost a single race all game. Suspicious reflexes.`,
+        `Every race ${nameOf(unbeaten)} has been in, ${nameOf(unbeaten)} has won. Nobody likes that.`,
+      ], [unbeaten]);
+    }
+    if (stats.fastest && stats.fastest.round !== roundNumber && players[stats.fastest.uid]) {
+      add('standing-record', 48, [
+        `${nameOf(stats.fastest.uid)}'s ${Math.round(stats.fastest.ms / 1000)}-second blitz is still the one to beat.`,
+        `Nobody has got near ${nameOf(stats.fastest.uid)}'s ${Math.round(stats.fastest.ms / 1000)} seconds yet.`,
+      ], [stats.fastest.uid]);
+    }
+    const serial = ids.find(id => statsFor(stats, id).blitzes >= 3);
+    if (serial) {
+      add('blitz-hoarder', 70, [
+        `${nameOf(serial)} has ended ${plural(statsFor(stats, serial).blitzes, 'of these rounds', 'of these rounds')}. Somebody stop them.`,
+        `${plural(statsFor(stats, serial).blitzes, 'round')} finished by ${nameOf(serial)}. This is becoming a pattern.`,
+      ], [serial]);
+    }
+    if (games >= 3) {
+      const quiet = ids.find(id => statsFor(stats, id).blitzes === 0);
+      if (quiet) {
+        add('never-blitzed', 44, [
+          `${nameOf(quiet)} has yet to end a single round. There is still time. Probably.`,
+          `${plural(games, 'round')} and ${nameOf(quiet)} has not called Blitz once.`,
+        ], [quiet]);
+      }
+    }
+    if (stats.allStuck >= 3) {
+      add('all-stuck', 52, [
+        `You have all seized up at the same time ${plural(stats.allStuck, 'time')} now. Impressive teamwork.`,
+        `${plural(stats.allStuck, 'full standstill')} this game. The cards are not the problem.`,
+      ]);
+    }
+  }
+
   // === meta ================================================================
   const gone = ids.find(id => !players[id].connected && !players[id].isBot);
   if (gone) {
@@ -322,7 +399,10 @@ export function commentary(input: CommentaryInput): Remark[] {
       `${nameOf(leader)} takes it by ${margin}. Close enough to hurt.`,
       `${nameOf(leader)} wins, barely. ${nameOf(current[1])} will be thinking about that one.`,
     ], [leader, ...(current[1] ? [current[1]] : [])]);
-    if (total(last) < 0) {
+    // Strictly lowest, not merely sorted last: on a table where everyone is level on
+  // the same negative score, naming one of them is just picking on whoever RTDB
+  // happened to key first.
+  if (total(last) < 0 && total(last) < total(leader)) {
       add('negative-finish', 58, [
         `${nameOf(last)} finished on ${total(last)}. It takes real commitment to end below zero.`,
         `${nameOf(last)} ends in the red. Well played, in a sense.`,
@@ -364,6 +444,7 @@ export function remarksForRoom(room: Room, final = false): Remark[] {
     // clients' own clocks are not.
     durationMs: started > 0 && ended > started ? ended - started : null,
     stuckRounds: round?.stuckRounds ?? 0,
+    stats: room.stats ?? null,
     final,
   });
 }

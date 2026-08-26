@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { commentary, type CommentaryInput } from './commentary';
+import type { GameStats } from '../game/stats';
 import type { CenterSpace, PlayerInfo, RoundScore, Suit } from '../game/types';
 
 const player = (name: string, score: number, extra: Partial<PlayerInfo> = {}): PlayerInfo => ({
@@ -14,7 +15,7 @@ const base = (over: Partial<CommentaryInput> = {}): CommentaryInput => ({
   players: { ann: player('Ann', 20), bo: player('Bo', 18) },
   scores: { ann: sc(6, 0), bo: sc(4, 1) },
   spaces: [], duels: null, blitzedBy: 'ann', roundNumber: 3, targetScore: 75,
-  durationMs: 120_000, stuckRounds: 0, ...over,
+  durationMs: 120_000, stuckRounds: 0, stats: null, ...over,
 });
 const ids = (input: CommentaryInput) => commentary(input).map(r => r.id);
 const textOf = (input: CommentaryInput, id: string) =>
@@ -29,6 +30,15 @@ describe('commentary', () => {
     expect(ids(base({ durationMs: 38_000 }))).toContain('speed-blitz');
     expect(textOf(base({ durationMs: 38_000 }), 'speed-blitz')).toContain('38');
     expect(ids(base({ durationMs: 120_000 }))).not.toContain('speed-blitz');
+  });
+
+  it('counts in English', () => {
+    // "1 seconds" and "0 apart" both turned up in a real round.
+    expect(textOf(base({ durationMs: 1_000 }), 'speed-blitz')).toContain('1 second.');
+    expect(textOf(base({ durationMs: 2_000 }), 'speed-blitz')).toContain('2 seconds');
+    const level = base({ players: { ann: player('Ann', 12), bo: player('Bo', 12) } });
+    expect(textOf(level, 'photo-finish')).not.toContain('0 ');
+    expect(textOf(level, 'photo-finish')).toMatch(/level|Not a point/);
   });
 
   it('knows a round nobody won', () => {
@@ -71,6 +81,9 @@ describe('commentary', () => {
   it('is ruder about a negative score than a merely bad one', () => {
     expect(ids(base({ players: { ann: player('Ann', 20), bo: player('Bo', -6) } }))).toContain('basement');
     expect(ids(base())).not.toContain('basement');
+    // ...but names nobody when the whole table is equally in the hole: which of
+    // them sorts last is an accident of key order, not a fact about the game.
+    expect(ids(base({ players: { ann: player('Ann', -8), bo: player('Bo', -8) } }))).not.toContain('basement');
   });
 
   it('reserves its worst for humans losing to the easy bot', () => {
@@ -125,6 +138,60 @@ describe('commentary', () => {
     const later = commentary(base({ roundNumber: 4 }));
     expect(later.map(r => r.id)).toEqual(a.map(r => r.id));   // same situation...
     expect(later).not.toEqual(a);                             // ...different words
+  });
+
+  const stats = (over: Partial<GameStats> = {}): GameStats => ({
+    rounds: 4, players: {}, fastest: null, best: null, worst: null, allStuck: 0, races: 0, ...over,
+  });
+  const pStats = (over = {}) =>
+    ({ blitzes: 0, lastPlaces: 0, lastStreak: 0, racesWon: 0, racesLost: 0, ...over });
+
+  it('notices a losing streak, which one round on its own cannot see', () => {
+    const input = base({ stats: stats({ players: { bo: pStats({ lastStreak: 3 }) } }) });
+    expect(textOf(input, 'last-streak')).toContain('Bo');
+    expect(textOf(input, 'last-streak')).toMatch(/\b3\b/);
+  });
+
+  it('calls a record round only in the round that set it', () => {
+    const best = { uid: 'ann', delta: 21, round: 3 };
+    expect(ids(base({ roundNumber: 3, stats: stats({ best }) }))).toContain('record-round');
+    // Round 4: still the record, no longer news.
+    expect(ids(base({ roundNumber: 4, stats: stats({ best }) }))).not.toContain('record-round');
+  });
+
+  it('salutes a player who has never lost a race, once there have been some', () => {
+    // Bo, not Ann: this fixture already spends both of Ann's slots on the round
+    // itself, and the thinning pass would drop a third remark about her.
+    const players = { bo: pStats({ racesWon: 4, racesLost: 0 }), ann: pStats({ racesLost: 4 }) };
+    expect(ids(base({ stats: stats({ players, races: 8 }) }))).toContain('unbeaten');
+    // Two races between them is not yet a record worth defending.
+    expect(ids(base({ stats: stats({ players, races: 2 }) }))).not.toContain('unbeaten');
+  });
+
+  it('keeps the standing fastest blitz, except in the round that set it', () => {
+    const fastest = { uid: 'bo', ms: 31_000, round: 2 };
+    expect(textOf(base({ roundNumber: 3, stats: stats({ fastest }) }), 'standing-record')).toContain('31');
+    expect(ids(base({ roundNumber: 2, stats: stats({ fastest }) }))).not.toContain('standing-record');
+  });
+
+  it('waits three rounds before mentioning that somebody has never blitzed', () => {
+    const players = { ann: pStats({ blitzes: 2 }), bo: pStats({ blitzes: 0 }) };
+    expect(ids(base({ stats: stats({ rounds: 2, players }) }))).not.toContain('never-blitzed');
+    expect(textOf(base({ stats: stats({ rounds: 4, players }) }), 'never-blitzed')).toContain('Bo');
+  });
+
+  it('counts the standstills across the whole game', () => {
+    expect(textOf(base({ stats: stats({ allStuck: 4 }) }), 'all-stuck')).toMatch(/\b4\b/);
+    expect(ids(base({ stats: stats({ allStuck: 2 }) }))).not.toContain('all-stuck');
+  });
+
+  it('says nothing game-long in the first round of a game', () => {
+    const long = ['last-streak', 'record-round', 'unbeaten', 'standing-record', 'blitz-hoarder', 'all-stuck'];
+    const first = ids(base({
+      roundNumber: 1,
+      stats: stats({ rounds: 1, allStuck: 5, players: { bo: pStats({ lastStreak: 1 }) } }),
+    }));
+    expect(long.filter(id => first.includes(id))).toEqual([]);
   });
 
   it('saves the champion line for the final sheet', () => {
