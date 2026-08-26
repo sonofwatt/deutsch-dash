@@ -1,13 +1,23 @@
 :root {
   --bg: #f4f2ec; --surface: #ffffff; --ink: #23211c; --ink-soft: #7a766c;
   --line: #e3e0d7; --accent: #23211c; --danger: #b3261e;
+  /* Empty-slot outlines on the play surface. Deliberately far darker than --line:
+     at playing-card size a hairline border reads as nothing at all on a phone in
+     daylight, and the 16 center slots are the thing players aim at. */
+  --pile-line: #6f6a5b; --pile-fill: #ebe8e0;
   --suit-red: #d92d20; --suit-blue: #2563eb; --suit-green: #16a34a; --suit-yellow: #eab308;
-  --card-w: clamp(44px, 12vw, 72px); --card-h: calc(var(--card-w) * 1.4);
+  --card-w: clamp(44px, 12vw, 72px);
+  /* Card height comes from aspect-ratio: 2.5 / 3.5 (poker-standard playing card
+     proportions) at each use site, deliberately NOT from a --card-h token here.
+     A custom property containing var() is substituted where it is DECLARED and
+     inherited already-resolved, so a --card-h on :root would stay pinned to this
+     --card-w and ignore every local override. */
   --radius: 10px; --shadow: 0 1px 2px rgb(0 0 0 / .08), 0 4px 12px rgb(0 0 0 / .06);
 }
 @media (prefers-color-scheme: dark) {
   :root { --bg: #171613; --surface: #23211c; --ink: #f2f0ea; --ink-soft: #a29d92;
-          --line: #37342d; --accent: #f2f0ea; }
+          --line: #37342d; --accent: #f2f0ea;
+          --pile-line: #8b8577; --pile-fill: #1f1e19; }
 }
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; }

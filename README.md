@@ -92,18 +92,63 @@ that rule would lock out the entire game.
 
 ## Deploy to GitHub Pages
 
-1. Push this repo to GitHub (repo name `flemish-fury`; default branch `main`).
+1. Push this repo to GitHub (repo name `deutsch-dash`; default branch `main`).
    The Firebase project keeps its original id `holland-hustle` — project ids are
-   immutable, and it is never shown to players.
+   immutable, and it is never shown to players. The Pages base path is derived
+   from the repo name by the workflow, so renaming the repo is all it takes to
+   move the site; no config change here.
 2. Repo Settings -> Pages -> Source: **GitHub Actions**.
 3. Push to `main` (or run the workflow manually). The site lands at
    `https://<user>.github.io/<repo>/`.
 
+## AI players
+
+The host can add AI players in the lobby at Easy, Medium or Hard. Difficulty is
+mostly hands, not brains: every level only ever makes legal moves, and the levels
+differ in how fast they act (`BOT_PROFILES` in `src/game/bot.ts`) and how often
+they take a worse legal move than the best one available. Move quality is ranked
+the way the game actually rewards — anything that takes a card off the Blitz pile,
+or empties a post so the Blitz pile refills it, beats an equivalent wood play.
+
+Bots have no client and no auth identity of their own: **the host plays their
+hands**, and if the host changes mid-game the new host picks them up. They are
+never handed the host role themselves. Their badge is claimed under the host's
+uid, which is what stops a human taking the same one without needing a rules
+change. Bots do not count toward `meta/playerCount` (the server-side cap on human
+joins, which can never decrease); the eight-seat total is held on the client.
+
 ## House rules vs. the physical game
 
-16 fixed center spaces (completed piles clear to free their space) and digital
-stuck-handling: when every player is stuck, wood piles rotate automatically;
-three fruitless rotations end the round.
+A pile that reaches 1..10 is turned face down and **clears its space**, then
+appears on one of the two rails flanking the board — so the finished count and
+the suits that have gone stay readable instead of the cards simply vanishing.
+
+Board size is **4 × players center spaces, capped at 24**. Four per player is the
+natural figure: only an Ace opens a space, and each player holds exactly one Ace
+per suit. The cap is a legibility choice — because finished piles clear, the board
+only ever has to hold the piles open at one moment, so past six players the extra
+slots would just shrink the cards. A full board is transient (the next pile to
+finish frees a space), and a genuine deadlock is what stuck detection handles.
+Two players get 8 spaces, four get 16, six or more get 24; the layout stays four
+rows and grows sideways.
+
+Cards are drawn at poker-standard 2.5 × 3.5 proportions.
+
+Digital stuck-handling: when every player is stuck, wood piles rotate
+automatically and three fruitless rotations end the round. **Being stuck is
+detected, not declared** — the "I'm stuck" button stays off behind
+`ENABLE_STUCK_BUTTON` in `src/ui/screens/Game.tsx`, and `isStuck` in
+`src/game/rules.ts` decides instead. Having no legal move is not enough on its
+own: with wood left you can turn the next three over, which is what the old
+button got wrong (you could claim stuck holding 25 unflipped cards). Two cases
+are conclusive — no wood at all, or having turned the whole pile over since your
+last successful play. The claim is withdrawn the instant somebody else's play
+frees you, and it covers AI players too, so a bot game can still reach the
+rotation.
+
+**Placing an Ace:** drag any card onto the band under the board and it lands in
+the nearest space it can legally reach — for an Ace, simply the closest free one,
+so you never have to aim at a particular slot mid-race.
 
 Tied at the target? The round simply continues to another round until someone
 stands alone on top.

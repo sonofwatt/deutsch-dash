@@ -30,9 +30,13 @@ export interface RoomMeta {
 }
 
 import type { BadgeId } from './badges';
+import type { BotLevel } from './bot';
 export interface PlayerInfo {
   name: string; badgeId: BadgeId; joinedAt: number; connected: boolean;
   stuckAt: number | null; score: number;
+  // AI players. Absent on humans. A bot has no auth identity of its own: the
+  // host owns its record and plays its hand (see the bot driver in store.ts).
+  isBot?: boolean; botLevel?: BotLevel;
 }
 
 export interface RoundScore { centerCount: number; blitzLeft: number; delta: number }

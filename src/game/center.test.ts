@@ -9,9 +9,10 @@ describe('normalize', () => {
     expect(normalizeSpace(null)).toEqual({ stack: [], history: [] });
     expect(normalizeSpace({ stack: [c(1, 'red')] })).toEqual({ stack: [c(1, 'red')], history: [] });
   });
-  it('always returns 16 spaces', () => {
-    expect(normalizeSpaces(null)).toHaveLength(16);
-    const arr = normalizeSpaces({ 3: { stack: [c(1, 'red')] } });
+  it('returns exactly the number of spaces asked for', () => {
+    expect(normalizeSpaces(null, 16)).toHaveLength(16);
+    expect(normalizeSpaces(null, 8)).toHaveLength(8); // a two-player board
+    const arr = normalizeSpaces({ 3: { stack: [c(1, 'red')] } }, 16);
     expect(arr[3].stack).toEqual([c(1, 'red')]);
     expect(arr[0]).toEqual({ stack: [], history: [] });
   });
@@ -36,12 +37,21 @@ describe('centerPlayTxn', () => {
     expect(centerPlayTxn(c(2, 'red'))(space)).toBeUndefined();
     expect(centerPlayTxn(c(1, 'blue'))(space)).toBeUndefined();
   });
-  it('archives a completed 1..10 stack and frees the space atomically', () => {
+  it('archives a completed 1..10 stack atomically, freeing the space', () => {
     const stack = Array.from({ length: 9 }, (_, i) => c(i + 1, 'green'));
     const out = centerPlayTxn(c(10, 'green'))({ stack, history: [] })!;
     expect(out.stack).toEqual([]);
     expect(out.history).toHaveLength(1);
     expect(out.history[0]).toHaveLength(10);
+  });
+  it('lets a new Ace reuse a cleared space, keeping the archive', () => {
+    const cleared: CenterSpace = {
+      stack: [], history: [Array.from({ length: 10 }, (_, i) => c(i + 1, 'green'))],
+    };
+    const out = centerPlayTxn(c(1, 'red'))(cleared)!;
+    expect(out.stack).toEqual([c(1, 'red')]);
+    expect(out.history).toHaveLength(1); // the finished pile is still counted on the rail
+    expect(centerPlayTxn(c(2, 'red'))(cleared)).toBeUndefined();
   });
 });
 
@@ -50,7 +60,7 @@ describe('reconcileTableau', () => {
     const dupe = c(3, 'red', 'me');
     const t = { blitz: [dupe, c(9, 'blue', 'me')], post: [[c(3, 'red', 'other')]],
                 wood: [c(5, 'green', 'me')], woodIndex: 0 };
-    const spaces = normalizeSpaces({ 0: { stack: [c(3, 'red', 'me')] } });
+    const spaces = normalizeSpaces({ 0: { stack: [c(3, 'red', 'me')] } }, 16);
     const out = reconcileTableau(t, spaces);
     expect(out.blitz).toEqual([c(9, 'blue', 'me')]);
     expect(out.post).toEqual([[c(3, 'red', 'other')]]); // other players' ids never match mine
@@ -62,7 +72,7 @@ describe('reconcileTableau', () => {
       wood: [c(1, 'red'), c(2, 'red'), c(3, 'red'), c(4, 'blue'), c(5, 'blue')],
       woodIndex: 3, // flipped top is red 3
     };
-    const spaces = normalizeSpaces({ 0: { stack: [c(3, 'red')] } }); // red 3 already in center
+    const spaces = normalizeSpaces({ 0: { stack: [c(3, 'red')] } }, 16); // red 3 already in center
     const out = reconcileTableau(t, spaces);
     expect(out.wood).toEqual([c(1, 'red'), c(2, 'red'), c(4, 'blue'), c(5, 'blue')]);
     expect(out.woodIndex).toBe(2); // top is now red 2, same as a normal play would leave it

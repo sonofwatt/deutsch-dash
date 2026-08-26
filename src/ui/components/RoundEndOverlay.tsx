@@ -6,6 +6,7 @@ export function RoundEndOverlay() {
   const uid = useGameStore(s => s.uid);
   const next = useGameStore(s => s.next);
   const host = isHost({ uid, room });
+  const actionError = useGameStore(s => s.actionError);
   const scores = room.round?.scores;
   if (!scores) return null;
   const rows = Object.entries(room.players)
@@ -30,6 +31,7 @@ export function RoundEndOverlay() {
             </div>
           );
         })}
+        {actionError && <p className="error" style={{ margin: 0 }}>{actionError}</p>}
         {host
           ? <button className="btn btn-primary" onClick={next}>Next round</button>
           : <p className="muted" style={{ textAlign: 'center' }}>Waiting for the host…</p>}

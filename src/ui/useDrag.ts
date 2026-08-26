@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import type React from 'react'; // React.PointerEvent type only (new-JSX files do not auto-import React)
 import type { Card, PlaySource } from '../game/types';
 
-export type DropTarget = { space: number } | { post: number };
+export type DropTarget = { space: number } | { post: number } | { nearest: true };
+export interface Point { x: number; y: number }
 
 export interface DragState { card: Card; source: PlaySource; x: number; y: number }
 
@@ -13,10 +14,35 @@ export function parseDrop(el: Element | null): DropTarget | null {
   const [kind, n] = v.split(':');
   if (kind === 'space') return { space: Number(n) };
   if (kind === 'post') return { post: Number(n) };
+  if (kind === 'nearest') return { nearest: true };
   return null;
 }
 
-export function useDrag(onDrop: (source: PlaySource, target: DropTarget) => void) {
+/** Closest candidate to (x, y) by centre distance. Pure, so it can be tested. */
+export function nearestOf(
+  candidates: { index: number; cx: number; cy: number }[], x: number, y: number,
+): number | null {
+  let best: number | null = null;
+  let bestDistance = Infinity;
+  for (const cand of candidates) {
+    const d = (x - cand.cx) ** 2 + (y - cand.cy) ** 2;
+    if (d < bestDistance) { bestDistance = d; best = cand.index; }
+  }
+  return best;
+}
+
+/** Which of these centre spaces is nearest the point, by where they are on screen. */
+export function nearestSpace(indices: number[], x: number, y: number): number | null {
+  const candidates = indices.flatMap(index => {
+    const el = document.querySelector(`[data-drop="space:${index}"]`);
+    if (!el) return [];
+    const r = el.getBoundingClientRect();
+    return [{ index, cx: r.left + r.width / 2, cy: r.top + r.height / 2 }];
+  });
+  return nearestOf(candidates, x, y);
+}
+
+export function useDrag(onDrop: (source: PlaySource, target: DropTarget, at: Point) => void) {
   const [drag, setDrag] = useState<DragState | null>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
 
@@ -40,7 +66,7 @@ export function useDrag(onDrop: (source: PlaySource, target: DropTarget) => void
       setDrag(null);
       if (ev.type === 'pointerup') {
         const target = parseDrop(document.elementFromPoint(ev.clientX, ev.clientY));
-        if (target) onDrop(source, target);
+        if (target) onDrop(source, target, { x: ev.clientX, y: ev.clientY });
       }
     };
     const cleanup = () => {

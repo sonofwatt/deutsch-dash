@@ -2,9 +2,10 @@ import { createStore, type StoreApi } from 'zustand/vanilla';
 import { useStore } from 'zustand';
 import type { BadgeId } from '../game/badges';
 import type { Card, CenterSpace, PlayerInfo, PlaySource, Room, Tableau } from '../game/types';
-import { canBuildOnPost, canPlayToCenter, hasLegalMove, placeOnPost, sourceTop, takeCard } from '../game/rules';
+import { canBuildOnPost, canPlayToSpace, isStuck, placeOnPost, sourceTop, takeCard } from '../game/rules';
 import { flipWood, rotateWood } from '../game/wood';
 import { reconcileTableau } from '../game/center';
+import { botDelay, chooseBotAction, type BotLevel } from '../game/bot';
 import * as netRooms from '../net/rooms';
 import * as netPlays from '../net/plays';
 import { pickNextHost, allConnectedStuck } from '../net/plays';
@@ -35,6 +36,8 @@ export interface Deps {
   nextRound(code: string, room: Room): Promise<void>;
   rematch(code: string, room: Room): Promise<void>;
   claimHost(code: string, uid: string): Promise<unknown>;
+  addBot(code: string, badgeId: BadgeId, level: BotLevel, name: string): Promise<string>;
+  removeBot(code: string, id: string, badgeId: BadgeId): Promise<void>;
   stopPresence: () => void;
 }
 
@@ -47,6 +50,13 @@ export interface GameStore {
   lastRejected: { card: Card; at: number } | null;
   joinPhase: 'idle' | 'joining' | 'in-room';
   joinError: string | null;
+  // Hands of the AI players this client is driving. Only ever populated on the
+  // host, which owns every bot's record and plays its cards (see driveBot).
+  botTableaus: Record<string, Tableau>;
+  // A host action (start / next round / rematch / bot management) that was
+  // rejected or dropped. These used to be fire-and-forget, so a failed write
+  // left the button looking dead with nothing on screen to explain it.
+  actionError: string | null;
   online: boolean;
   setOnline(v: boolean): void;
   hostRoom(name: string, badgeId: BadgeId): Promise<string>;
@@ -60,6 +70,8 @@ export interface GameStore {
   start(): void;
   next(): void;
   again(): void;
+  addBot(badgeId: BadgeId, level: BotLevel, name: string): void;
+  removeBot(id: string, badgeId: BadgeId): void;
 }
 
 export function legalTargets(
@@ -68,7 +80,7 @@ export function legalTargets(
   const card = sourceTop(t, source);
   if (!card) return { spaces: [], posts: [] };
   return {
-    spaces: spaces.flatMap((s, i) => (canPlayToCenter(card, s.stack) ? [i] : [])),
+    spaces: spaces.flatMap((s, i) => (canPlayToSpace(card, s) ? [i] : [])),
     posts: t.post.flatMap((s, i) =>
       source.kind === 'post' && source.index === i ? [] : canBuildOnPost(card, s) ? [i] : []),
   };
@@ -86,12 +98,151 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
   let unwatch: (() => void) | null = null;
   let hostTimer: ReturnType<typeof setTimeout> | null = null;
   let inSnapshot = false;
+  // One pending turn per bot. botBusy covers the gap between a timer firing and
+  // its follow-up being scheduled, so a snapshot arriving mid-turn cannot start
+  // a second loop for the same bot.
+  const botTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  const botBusy = new Set<string>();
+  // Wood flips since each player last actually played a card. isStuck needs it to
+  // tell "no move right now" (flip and try again) from "been through the whole
+  // pile and there is nothing" - see isStuck in rules.ts.
+  const flips = new Map<string, number>();
 
   const store = createStore<GameStore>((set, get) => {
 
     async function persist(t: Tableau) {
       const { code, uid } = get();
       if (code && uid) await deps.persistTableau(code, uid, t);
+    }
+
+    /**
+     * Declare or withdraw a player's stuck claim to match the board. Replaces the
+     * old "I'm stuck" button: the player never has to notice or press anything,
+     * and the claim is withdrawn the moment somebody else's play frees them.
+     * Writes only on a transition, so a steady state costs nothing.
+     */
+    function syncStuck(id: string, t: Tableau | null | undefined) {
+      const { room, code, online } = get();
+      if (!room || !code || !t || !online) return;
+      if (room.meta.phase !== 'playing' || !room.round) return;
+      const p = room.players[id];
+      if (!p) return;
+      const stuck = isStuck(t, room.round.spaces, flips.get(id) ?? 0);
+      if (stuck && p.stuckAt == null) void deps.declareStuck(code, id);
+      else if (!stuck && p.stuckAt != null) void deps.clearStuck(code, id);
+    }
+
+    /** Re-check everyone this client is responsible for: me, plus my bots. */
+    function syncAllStuck() {
+      const s = get();
+      if (!s.uid) return;
+      syncStuck(s.uid, s.tableau);
+      if (!isHost(s) || !s.room) return;
+      for (const [id, p] of Object.entries(s.room.players)) {
+        if (p.isBot) syncStuck(id, s.botTableaus[id]);
+      }
+    }
+
+    /** Run a host action, surfacing a rejected write instead of dropping it. */
+    function hostAction(work: Promise<unknown>, whatFailed: string) {
+      set({ actionError: null });
+      work.catch(() => set({ actionError: `Could not ${whatFailed}. Check your connection and try again.` }));
+    }
+
+    function stopBots() {
+      for (const t of botTimers.values()) clearTimeout(t);
+      botTimers.clear();
+    }
+
+    function setBotTableau(id: string, t: Tableau) {
+      set({ botTableaus: { ...get().botTableaus, [id]: t } });
+    }
+
+    /**
+     * Play one bot turn. Bots have no client of their own, so the host plays
+     * their hands; keeping the hand in local state (rather than re-reading the
+     * room each tick) mirrors how a human's own tableau is handled, and the host
+     * is the only writer of a bot's tableau so it cannot go stale underneath us.
+     */
+    async function driveBot(id: string) {
+      const s0 = get();
+      const { room, code } = s0;
+      if (!room || !code || !s0.online) return;
+      if (room.meta.phase !== 'playing' || !room.round) return;
+      if (!isHost(s0)) return; // exactly one client drives the bots: whoever is host
+      const p = room.players[id];
+      if (!p?.isBot) return;
+      const level: BotLevel = p.botLevel ?? 'medium';
+
+      let t = get().botTableaus[id];
+      if (!t) {
+        const dealt = room.round.tableaus[id];
+        if (!dealt) return; // not dealt in yet, or host changed mid-round
+        t = reconcileTableau(dealt, room.round.spaces);
+        setBotTableau(id, t);
+      }
+
+      const action = chooseBotAction(t, room.round.spaces, level);
+      if (!action) { syncStuck(id, t); return; } // nothing to do, and maybe nothing possible
+
+      const commit = (next: Tableau) => {
+        setBotTableau(id, next);
+        void deps.persistTableau(code, id, next);
+        flips.set(id, 0);
+        if (p.stuckAt != null) void deps.clearStuck(code, id);
+        if (next.blitz.length === 0) void deps.announceBlitz(code, id);
+      };
+
+      if (action.kind === 'flip') {
+        const next = flipWood(t);
+        setBotTableau(id, next);
+        void deps.persistTableau(code, id, next);
+        flips.set(id, (flips.get(id) ?? 0) + 1);
+        syncStuck(id, next);
+        return;
+      }
+      if (action.kind === 'post') {
+        const next = placeOnPost(t, action.source, action.post);
+        if (next) commit(next);
+        return;
+      }
+      const card = sourceTop(t, action.source);
+      const space = room.round.spaces[action.space];
+      if (!card || !space || !canPlayToSpace(card, space)) return;
+      const taken = takeCard(t, action.source);
+      if (!taken) return;
+      // Not optimistic, unlike a human's play: a bot has no rejection animation
+      // to roll back, and losing the race just means it retries next tick.
+      const committed = await deps.playToCenter(code, action.space, card);
+      if (get().code !== code) return; // room changed mid-flight
+      if (committed) commit(taken.next);
+    }
+
+    function scheduleBot(id: string, level: BotLevel) {
+      if (botTimers.has(id) || botBusy.has(id)) return;
+      const fire = () => {
+        botTimers.delete(id);
+        botBusy.add(id);
+        void driveBot(id).catch(() => {}).finally(() => {
+          botBusy.delete(id);
+          const s = get();
+          const p = s.room?.players[id];
+          if (p?.isBot && s.online && s.room?.meta.phase === 'playing' && isHost(s)) {
+            scheduleBot(id, p.botLevel ?? 'medium');
+          }
+        });
+      };
+      botTimers.set(id, setTimeout(fire, botDelay(level)));
+    }
+
+    /** Start or stop the bot loops to match the room we are looking at. */
+    function syncBots(room: Room) {
+      const s = get();
+      const shouldRun = room.meta.phase === 'playing' && isHost({ uid: s.uid, room }) && s.online;
+      if (!shouldRun) { stopBots(); return; }
+      for (const [id, p] of Object.entries(room.players)) {
+        if (p.isBot) scheduleBot(id, p.botLevel ?? 'medium');
+      }
     }
 
     function onSnapshot(room: Room | null) {
@@ -114,12 +265,17 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
           void persist(adopted);
         }
         if (phase !== 'playing' && get().tableau) set({ tableau: null, selection: null });
+        // (2) AI players. Bot hands belong to a single round, exactly like ours.
+        if (phase !== 'playing') { if (Object.keys(get().botTableaus).length) set({ botTableaus: {} }); flips.clear(); }
+        syncBots(room);
+        syncAllStuck(); // the centre moved: someone may have just been freed, or trapped
 
         // (3) all-stuck rotation
         const meP = room.players[me];
         if (phase === 'playing' && meP?.stuckAt != null && allConnectedStuck(room.players)) {
           // clear first: a snapshot raised synchronously by the writes below must not see me still stuck
           void deps.clearStuck(get().code!, me);
+          flips.set(me, 0); // a rotation changes which third of the pile is reachable
           const t = get().tableau;
           if (t) {
             const rotated = rotateWood(t);
@@ -127,6 +283,18 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
             void persist(rotated);
           }
           if (isHost({ uid: me, room })) {
+            // Nobody else will rotate the bots' piles - the host owns their hands.
+            for (const [id, p] of Object.entries(room.players)) {
+              if (!p.isBot) continue;
+              void deps.clearStuck(get().code!, id);
+              flips.set(id, 0);
+              const bt = get().botTableaus[id];
+              if (bt) {
+                const rotated = rotateWood(bt);
+                setBotTableau(id, rotated);
+                void deps.persistTableau(get().code!, id, rotated);
+              }
+            }
             void deps.incrementStuckRounds(get().code!).then(n => {
               if (n >= 3) void deps.endRoundStalled(get().code!);
             });
@@ -180,8 +348,13 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
     return {
       uid: null, code: null, room: null, tableau: null, selection: null,
       lastRejected: null, joinPhase: 'idle', joinError: null, online: true,
+      botTableaus: {}, actionError: null,
 
-      setOnline(v) { set({ online: v }); },
+      setOnline(v) {
+        set({ online: v });
+        const room = get().room;
+        if (room) syncBots(room); // bots idle while we are offline, resume when back
+      },
 
       async hostRoom(name, badgeId) {
         set({ joinPhase: 'joining', joinError: null });
@@ -204,8 +377,11 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         unwatch?.();
         unwatch = null;
         if (hostTimer) { clearTimeout(hostTimer); hostTimer = null; }
+        stopBots();
+        flips.clear();
         deps.stopPresence();
-        set({ code: null, room: null, tableau: null, selection: null, joinPhase: 'idle' });
+        set({ code: null, room: null, tableau: null, selection: null, joinPhase: 'idle',
+              botTableaus: {}, actionError: null });
       },
 
       select(source) {
@@ -224,6 +400,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
           if (!next) return;
           set({ tableau: next });
           void persist(next);
+          flips.set(uid, 0); // progress: the wood cycle counts from here again
           void deps.clearStuck(code, uid);
           if (next.blitz.length === 0) void deps.announceBlitz(code, uid);
           return;
@@ -231,7 +408,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
 
         const card = sourceTop(tableau, selection);
         const spaceState = room?.round?.spaces[target.space];
-        if (!card || !spaceState || !canPlayToCenter(card, spaceState.stack)) return;
+        if (!card || !spaceState || !canPlayToSpace(card, spaceState)) return;
         const taken = takeCard(tableau, selection);
         if (!taken) return;
         set({ tableau: taken.next }); // optimistic
@@ -242,31 +419,52 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
           return;
         }
         void persist(taken.next);
+        flips.set(uid, 0);
         void deps.clearStuck(code, uid);
         if (taken.next.blitz.length === 0) void deps.announceBlitz(code, uid);
       },
 
       flip() {
         if (!get().online) return;
-        const t = get().tableau;
-        if (!t) return;
+        const { tableau: t, uid } = get();
+        if (!t || !uid) return;
         const next = flipWood(t);
         set({ tableau: next, selection: null });
         void persist(next);
+        flips.set(uid, (flips.get(uid) ?? 0) + 1);
+        syncStuck(uid, next); // one more flip may be the one that proves it
       },
 
       markStuck() {
         if (!get().online) return;
         const { code, uid, tableau, room } = get();
         if (!code || !uid || !tableau || !room?.round) return;
-        if (hasLegalMove(tableau, room.round.spaces)) return; // button is a claim; verify it
+        // The button is a claim; hold it to the same bar the automatic check uses.
+        if (!isStuck(tableau, room.round.spaces, flips.get(uid) ?? 0)) return;
         void deps.declareStuck(code, uid);
       },
 
       setTarget(n) { const c = get().code; if (c) void deps.setTargetScore(c, n); },
-      start() { const { code, room } = get(); if (code && room) void deps.startRound(code, room); },
-      next() { const { code, room } = get(); if (code && room) void deps.nextRound(code, room); },
-      again() { const { code, room } = get(); if (code && room) void deps.rematch(code, room); },
+      start() {
+        const { code, room } = get();
+        if (code && room) hostAction(deps.startRound(code, room), 'start the game');
+      },
+      next() {
+        const { code, room } = get();
+        if (code && room) hostAction(deps.nextRound(code, room), 'start the next round');
+      },
+      again() {
+        const { code, room } = get();
+        if (code && room) hostAction(deps.rematch(code, room), 'start a rematch');
+      },
+      addBot(badgeId, level, name) {
+        const code = get().code;
+        if (code) hostAction(deps.addBot(code, badgeId, level, name), 'add an AI player');
+      },
+      removeBot(id, badgeId) {
+        const code = get().code;
+        if (code) hostAction(deps.removeBot(code, id, badgeId), 'remove that AI player');
+      },
     };
   });
 
@@ -291,6 +489,8 @@ const realDeps: Deps = {
   nextRound: netPlays.nextRound,
   rematch: netPlays.rematch,
   claimHost: netPlays.claimHost,
+  addBot: netRooms.addBot,
+  removeBot: netRooms.removeBot,
   stopPresence: netRooms.stopPresenceNow,
 };
 

@@ -8,10 +8,41 @@ export function postCountForPlayers(playerCount: number): number {
   return playerCount === 2 ? 5 : 3;
 }
 
+/** Never more than this many centre spaces - see spaceCountForPlayers. */
+export const MAX_SPACES = 24;
+
+/**
+ * Centre spaces for a game. 4 x players is the natural size: only an Ace opens
+ * a space (canPlayToCenter admits a 1 only onto an empty stack), and each player
+ * holds exactly one Ace per suit, so that is one space per Ace in the game.
+ *
+ * Capped at MAX_SPACES because a completed pile now CLEARS its space again, so
+ * the board only ever has to hold the piles that are open at one moment, not
+ * every pile the round will ever produce. Past six players the uncapped count
+ * would only add clutter and shrink the cards on a phone. A full board is
+ * transient - the next pile to finish frees a space - and a genuine deadlock is
+ * what the stuck detection is for.
+ *
+ * Two players get 8 (not the old fixed 16), which is why cards are bigger there.
+ */
+export function spaceCountForPlayers(playerCount: number): number {
+  return Math.min(MAX_SPACES, 4 * Math.max(1, playerCount));
+}
+
 export function canPlayToCenter(card: Card, stack: Card[]): boolean {
   if (stack.length === 0) return card.v === 1;
   const top = stack[stack.length - 1];
   return card.suit === top.suit && card.v === top.v + 1;
+}
+
+/**
+ * Space-level legality. A completed pile is archived into space.history and its
+ * stack cleared, freeing the space for a new Ace, so this is just the stack test
+ * - it stays a named function because every caller (highlighting, the bot, the
+ * centre transaction) must agree on one definition of "can this land here".
+ */
+export function canPlayToSpace(card: Card, space: CenterSpace): boolean {
+  return canPlayToCenter(card, space.stack);
 }
 
 export function canBuildOnPost(card: Card, stack: Card[]): boolean {
@@ -65,6 +96,28 @@ export function placeOnPost(t: Tableau, source: PlaySource, postIndex: number): 
   return refillPosts({ ...taken.next, post });
 }
 
+/**
+ * Is this player genuinely stuck, as opposed to merely out of moves this instant?
+ *
+ * "No legal move" alone is not enough: with wood left they can turn the next
+ * three over and try again, which is exactly what the old "I'm stuck" button got
+ * wrong - it let you claim stuck with 25 unflipped wood cards. Two cases are
+ * conclusive:
+ *
+ *  - No wood at all. flipWood is a no-op at zero cards and a player's own tops
+ *    cannot change without a play, so nothing they do alone will help. Only
+ *    another player's centre play can free them.
+ *  - They have turned over the whole pile since their last successful play
+ *    (a flip advances 3, so ceil(wood/3) flips is one full traversal) and still
+ *    have nothing. Only a rotation, which changes which third of the pile is
+ *    reachable, can help.
+ */
+export function isStuck(t: Tableau, spaces: CenterSpace[], flipsSinceProgress: number): boolean {
+  if (hasLegalMove(t, spaces)) return false;
+  if (t.wood.length === 0) return true;
+  return flipsSinceProgress >= Math.ceil(t.wood.length / 3);
+}
+
 export function hasLegalMove(t: Tableau, spaces: CenterSpace[]): boolean {
   const sources: PlaySource[] = [
     { kind: 'blitz' }, { kind: 'wood' },
@@ -73,7 +126,7 @@ export function hasLegalMove(t: Tableau, spaces: CenterSpace[]): boolean {
   for (const source of sources) {
     const card = sourceTop(t, source);
     if (!card) continue;
-    if (spaces.some(sp => canPlayToCenter(card, sp.stack))) return true;
+    if (spaces.some(sp => canPlayToSpace(card, sp))) return true;
     for (let j = 0; j < t.post.length; j++) {
       if (source.kind === 'post' && source.index === j) continue;
       if (canBuildOnPost(card, t.post[j])) return true;

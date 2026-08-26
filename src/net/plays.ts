@@ -9,7 +9,9 @@ import { scoreRound, winnerIds } from '../game/scoring';
 const r = (code: string, path = '') => ref(db, `rooms/${code}${path ? '/' + path : ''}`);
 
 export function pickNextHost(players: Record<string, PlayerInfo>): string | null {
-  const connected = Object.entries(players).filter(([, p]) => p.connected);
+  // Bots are always "connected" but have no client to run the room - the host
+  // drives them - so they can never stand in as host.
+  const connected = Object.entries(players).filter(([, p]) => p.connected && !p.isBot);
   if (connected.length === 0) return null;
   connected.sort(([ua, a], [ub, b]) => a.joinedAt - b.joinedAt || (ua < ub ? -1 : 1));
   return connected[0][0];

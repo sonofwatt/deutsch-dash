@@ -1,6 +1,12 @@
+import { useState } from 'react';
 import { useGameStore, isHost } from '../../state/store';
-import { BADGES } from '../../game/badges';
+import { BADGES, BADGE_IDS, type BadgeId } from '../../game/badges';
+import { BOT_LABELS, BOT_LEVELS, type BotLevel } from '../../game/bot';
+import { MAX_PLAYERS } from '../../net/rooms';
 import { ShareInvite } from '../components/ShareInvite';
+
+// Dutch/German-flavoured, to sit alongside the human names without pretending to be one.
+const BOT_NAMES = ['Ada', 'Bram', 'Cleo', 'Dirk', 'Elke', 'Fritz', 'Greta', 'Hans'];
 
 export function Lobby({ code }: { code: string }) {
   const room = useGameStore(s => s.room)!;
@@ -8,8 +14,23 @@ export function Lobby({ code }: { code: string }) {
   const host = isHost({ uid, room });
   const setTarget = useGameStore(s => s.setTarget);
   const start = useGameStore(s => s.start);
+  const addBot = useGameStore(s => s.addBot);
+  const removeBot = useGameStore(s => s.removeBot);
+  const actionError = useGameStore(s => s.actionError);
+  const [level, setLevel] = useState<BotLevel>('medium');
+
   const players = Object.entries(room.players).sort(([, a], [, b]) => a.joinedAt - b.joinedAt);
   const hostConnected = room.players[room.meta.hostId]?.connected ?? true;
+  const taken = new Set(players.map(([, p]) => p.badgeId));
+  const freeBadge: BadgeId | undefined = BADGE_IDS.find(b => !taken.has(b));
+  const usedNames = new Set(players.map(([, p]) => p.name));
+  const full = players.length >= MAX_PLAYERS;
+
+  function add() {
+    if (!freeBadge) return;
+    const name = BOT_NAMES.find(n => !usedNames.has(n)) ?? `${BADGES[freeBadge].label} bot`;
+    addBot(freeBadge, level, name);
+  }
 
   return (
     <div className="screen stack">
@@ -21,10 +42,25 @@ export function Lobby({ code }: { code: string }) {
             {BADGES[p.badgeId].glyph}
           </span>
           <span>{p.name}{id === room.meta.hostId ? ' (host)' : ''}</span>
+          {p.isBot && <span className="tag">AI · {BOT_LABELS[p.botLevel ?? 'medium']}</span>}
           <span className="spacer" />
-          <span className={`dot${p.connected ? '' : ' off'}`} />
+          {p.isBot
+            ? host && <button className="btn btn-slim" onClick={() => removeBot(id, p.badgeId)}
+                aria-label={`Remove ${p.name}`}>Remove</button>
+            : <span className={`dot${p.connected ? '' : ' off'}`} />}
         </div>
       ))}
+
+      {host && (
+        <div className="row">
+          <button className="btn" onClick={add} disabled={full || !freeBadge}>Add AI player</button>
+          <select className="field" style={{ width: 'auto', flex: 1 }} value={level}
+            aria-label="AI difficulty" onChange={e => setLevel(e.target.value as BotLevel)}>
+            {BOT_LEVELS.map(l => <option key={l} value={l}>{BOT_LABELS[l]}</option>)}
+          </select>
+        </div>
+      )}
+
       <div className="row">
         <label className="muted" htmlFor="target">Play to</label>
         <select id="target" className="field" disabled={!host} value={room.meta.targetScore}
@@ -32,6 +68,7 @@ export function Lobby({ code }: { code: string }) {
           {[25, 50, 75, 100].map(n => <option key={n} value={n}>{n} points</option>)}
         </select>
       </div>
+      {actionError && <p className="error">{actionError}</p>}
       {host
         ? <button className="btn btn-primary" disabled={players.length < 2} onClick={start}>
             {players.length < 2 ? 'Waiting for players…' : 'Start game'}

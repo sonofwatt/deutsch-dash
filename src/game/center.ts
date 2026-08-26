@@ -1,6 +1,6 @@
 import type { Card, CenterSpace, Tableau } from './types';
 import { cardId } from './types';
-import { canPlayToCenter } from './rules';
+import { canPlayToSpace } from './rules';
 
 function asCards(raw: unknown): Card[] {
   return Array.isArray(raw) ? (raw as Card[]) : raw ? (Object.values(raw) as Card[]) : [];
@@ -14,9 +14,9 @@ export function normalizeSpace(raw: unknown): CenterSpace {
   return { stack: asCards(r.stack), history };
 }
 
-export function normalizeSpaces(raw: unknown): CenterSpace[] {
+export function normalizeSpaces(raw: unknown, count: number): CenterSpace[] {
   const r = (raw ?? {}) as Record<number, unknown>;
-  return Array.from({ length: 16 }, (_, i) => normalizeSpace(r[i]));
+  return Array.from({ length: count }, (_, i) => normalizeSpace(r[i]));
 }
 
 export function normalizeTableau(raw: unknown, postCount: number): Tableau {
@@ -33,8 +33,10 @@ export function normalizeTableau(raw: unknown, postCount: number): Tableau {
 export function centerPlayTxn(card: Card) {
   return (raw: unknown): CenterSpace | undefined => {
     const space = normalizeSpace(raw);
-    if (!canPlayToCenter(card, space.stack)) return undefined;
+    if (!canPlayToSpace(card, space)) return undefined;
     const stack = [...space.stack, card];
+    // Completed: archive the run and clear the stack, which frees the space for
+    // a new Ace. history is what the finished-pile rails count and colour.
     if (stack.length === 10) return { stack: [], history: [...space.history, stack] };
     return { ...space, stack };
   };

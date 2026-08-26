@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createGameStore, legalTargets, HOST_AWAY_MS, type Deps } from './store';
 import { deal, buildDeck } from '../game/deck';
-import type { Card, PlayerInfo, RoomMeta, Suit, Room, Tableau } from '../game/types';
+import type { Card, CenterSpace, PlayerInfo, RoomMeta, Suit, Room, Tableau } from '../game/types';
 
 const c = (v: number, suit: Suit, owner = 'me'): Card => ({ v, suit, owner });
 
@@ -24,6 +24,8 @@ function fakeDeps(over: Partial<Deps> = {}): Deps {
     nextRound: vi.fn(async () => {}),
     rematch: vi.fn(async () => {}),
     claimHost: vi.fn(async () => {}),
+    addBot: vi.fn(async () => 'bot_star'),
+    removeBot: vi.fn(async () => {}),
     stopPresence: vi.fn(),
     ...over,
   };
@@ -356,5 +358,106 @@ describe('creator reclaim', () => {
     };
     cb!(room);
     expect(deps.claimHost).not.toHaveBeenCalled();
+  });
+});
+
+describe('AI players', () => {
+  function roomWithBot(hostId = 'me'): Room {
+    return {
+      meta: { createdAt: 1, hostId, creatorId: hostId, targetScore: 75, phase: 'playing', roundNumber: 1 },
+      players: {
+        me: { name: 'D', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, score: 0 },
+        [hostId]: { name: 'H', badgeId: 'bell', joinedAt: 0, connected: true, stuckAt: null, score: 0 },
+        bot_star: { name: 'Ada', badgeId: 'star', joinedAt: 2, connected: true, stuckAt: null,
+                    score: 0, isBot: true, botLevel: 'hard' },
+      },
+      round: {
+        spaces: Array.from({ length: 16 }, () => ({ stack: [], history: [] })),
+        tableaus: { me: deal(buildDeck('me'), 3), bot_star: deal(buildDeck('bot_star'), 3) },
+        blitzedBy: null, scores: null, stuckRounds: 0, startedAt: 1,
+      },
+    };
+  }
+
+  async function run(hostId: string) {
+    let cb!: (r: Room | null) => void;
+    const deps = fakeDeps({
+      watchRoom: vi.fn((_code: string, f: (room: Room | null) => void) => { cb = f; return () => {}; }),
+    });
+    const store = createGameStore(deps);
+    await store.getState().enterRoom('ABCDEF', 'D', 'tulip');
+    vi.useFakeTimers();
+    cb(roomWithBot(hostId));
+    await vi.advanceTimersByTimeAsync(4000);
+    store.getState().leave();
+    vi.useRealTimers();
+    return deps;
+  }
+
+  it('the host plays the bot hand on a timer', async () => {
+    const deps = await run('me');
+    // deal(buildDeck) puts blue 1 on the bot's first post, the only card it can
+    // legally place with the centre empty
+    expect(deps.playToCenter).toHaveBeenCalledWith('ABCDEF', 0, { v: 1, suit: 'blue', owner: 'bot_star' });
+    expect(deps.persistTableau).toHaveBeenCalledWith('ABCDEF', 'bot_star', expect.anything());
+  });
+
+  it('a client that is not host never touches a bot hand', async () => {
+    const deps = await run('someone-else');
+    expect(deps.playToCenter).not.toHaveBeenCalled();
+    expect(deps.persistTableau).not.toHaveBeenCalledWith('ABCDEF', 'bot_star', expect.anything());
+    expect(deps.persistTableau).toHaveBeenCalledWith('ABCDEF', 'me', expect.anything()); // still adopts its own
+  });
+});
+
+describe('automatic stuck detection', () => {
+  // Only a red 6 could land here, so a blue 9 on top of the Blitz pile is dead
+  const blocked = (): CenterSpace[] => [{ stack: [c(5, 'red')], history: [] }];
+  const noMoves = (over: Partial<Tableau> = {}): Tableau =>
+    ({ blitz: [c(9, 'blue')], post: [[], [], []], wood: [], woodIndex: 0, ...over });
+
+  function room(t: Tableau, stuckAt: number | null = null): Room {
+    return {
+      meta: { createdAt: 1, hostId: 'me', creatorId: 'me', targetScore: 75, phase: 'playing', roundNumber: 1 },
+      players: { me: { name: 'D', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt, score: 0 } },
+      round: { spaces: blocked(), tableaus: { me: t }, blitzedBy: null, scores: null,
+               stuckRounds: 0, startedAt: 1 },
+    };
+  }
+
+  async function feed(t: Tableau, stuckAt: number | null = null) {
+    let cb!: (r: Room | null) => void;
+    const deps = fakeDeps({
+      watchRoom: vi.fn((_code: string, f: (r: Room | null) => void) => { cb = f; return () => {}; }),
+    });
+    const store = createGameStore(deps);
+    await store.getState().enterRoom('ABCDEF', 'D', 'tulip');
+    cb(room(t, stuckAt));
+    return { deps, store, cb };
+  }
+
+  it('declares immediately when the wood pile is gone - nothing left to turn over', async () => {
+    const { deps } = await feed(noMoves());
+    expect(deps.declareStuck).toHaveBeenCalledWith('ABCDEF', 'me');
+  });
+
+  it('does not declare while there is wood left to turn over', async () => {
+    const wood = Array.from({ length: 9 }, () => c(9, 'blue'));
+    const { deps } = await feed(noMoves({ wood }));
+    expect(deps.declareStuck).not.toHaveBeenCalled();
+  });
+
+  it('declares once the whole pile has been turned over with nothing to show', async () => {
+    const wood = Array.from({ length: 9 }, () => c(9, 'blue'));
+    const { deps, store } = await feed(noMoves({ wood }));
+    for (let i = 0; i < 3; i++) store.getState().flip(); // 3 flips of 3 = the whole pile
+    expect(deps.declareStuck).toHaveBeenCalledWith('ABCDEF', 'me');
+  });
+
+  it('withdraws the claim as soon as the board frees the player', async () => {
+    // already flagged stuck, and now holding a card that fits the centre
+    const { deps } = await feed(noMoves({ blitz: [c(6, 'red')] }), 12345);
+    expect(deps.clearStuck).toHaveBeenCalledWith('ABCDEF', 'me');
+    expect(deps.declareStuck).not.toHaveBeenCalled();
   });
 });

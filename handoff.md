@@ -103,7 +103,7 @@ opening the same link still sees the join form.
 ~~Anonymous auth, Realtime Database, config paste, rules deploy, GitHub repo,
 Pages deploy~~ — all done.
 
-**Live at https://sonofwatt.github.io/flemish-fury/** — repo `sonofwatt/flemish-fury`,
+**Live at https://sonofwatt.github.io/deutsch-dash/** — repo `sonofwatt/deutsch-dash`,
 deployed by GitHub Actions on every push to `main` (CI runs the tests first).
 Verified on the live origin: anonymous auth works from `sonofwatt.github.io`,
 rules enforce (authenticated room read returns data, unauthenticated returns 401),
@@ -130,6 +130,66 @@ Note on PowerShell: `npx` is blocked by the execution policy on this machine; us
 
 **Triaged fix-later list (non-blocking, in the ledger):** ShareInvite clipboard
 try/catch; rejection-shake remounts the tableau; room-code collision check on
-create; bundle code-split; combined roundEnd→gameOver snapshot skips the final
-score breakdown; kite/bell badge hues sit near suit blue/red; host transfer
-disabled in lobby (deliberate).
+create; bundle code-split; ~~combined roundEnd→gameOver snapshot skips the final
+score breakdown~~ (fixed 2026-08-25: the game-over sheet now carries the final
+round's +center/-blitz breakdown and the target); kite/bell badge hues sit near
+suit blue/red; host transfer disabled in lobby (deliberate).
+
+## Playtest pass — 2026-08-25 (2 players, Android + Windows Chrome)
+
+First real two-player game. Everything in this pass came out of that session:
+
+- **Darker slot outlines** — `--pile-line`/`--pile-fill` in `theme.css`, a
+  deliberately heavy token separate from `--line`, because a hairline at card
+  size reads as nothing on a phone.
+- **Completed piles stay put**, turned face down, retiring their space. Enforced
+  in both directions: `canPlayToSpace` on the client, and `centerPlayTxn`
+  rejecting a finished space server-side so a stale client cannot revive one.
+- **Washroom pictograms** replace the ◆/○ boy/girl dingbats (`FaceGlyph` in
+  `CardView.tsx`) — post building turns on that distinction, so it has to read
+  at a glance.
+- **Pile depth cues** (`PileStack`) under the wood draw pile, the turned-over
+  wood group (max 2, matching a flip of 3), the Blitz pile and post stacks.
+- **Wood recycle** is now reachable from the turned-over pile itself (a ↻ button
+  that does not steal the tap-to-play target) as well as from the empty draw
+  slot, which now shows ↻ rather than looking like dead space.
+- **Board sizing is height-aware** — `min(12vw, 8vh)`. The board is a fixed
+  four-row layout in 100dvh, and the new opponent row plus the peek reserve
+  would otherwise push the bottom row under `overflow: hidden` on a short
+  window. Grid columns are fixed card widths and centre, instead of `1fr`
+  columns scattering the piles across a desktop window.
+- **Opponents' face-up cards** are mirrored in the opponent strip (wood top,
+  post tops, Blitz top + count) — all public information in the physical game.
+- **"I'm stuck" hidden** behind `ENABLE_STUCK_BUTTON`. See the caveat in the
+  README: with it off, a genuine stalemate has no way out.
+- **One-tap join** — Home joins outright with the name and badge already on
+  screen; the Join form is now only the fallback for an invite link (or a
+  rejected join, whose reason it still shows).
+- **Game-over threshold pinned by test** (`plays.emu.test.ts`): target-1 keeps
+  playing, target ends it, asserted through the real write path. The playtest
+  report of "the game ended at 24" turned out to be the ROUND-end sheet (it
+  carries a "Next round" button); the emulator test now replays that exact board
+  — Dave +24/-0, sonofwatt +8/-20, target 25 — and asserts both that the game
+  does not end and that "Next round" deals round 2.
+- **Host actions no longer fail silently.** `start` / `next` / `again` / bot
+  management were `void`-ed promises, so a rejected or dropped write left the
+  button looking dead with nothing on screen. They now land in `actionError`,
+  rendered by the lobby and both overlays.
+- **AI players** (`src/game/bot.ts`, driver in `store.ts`, lobby UI). See the
+  README section for the design and why bots are host-driven.
+
+## Second pass — 2026-08-25
+
+- **Finished piles clear again** and show on rails flanking the board. The
+  dead-space rule lasted one iteration; clearing removes the starvation question
+  entirely and the rails keep the information the vanishing cards used to lose.
+- **Board is 4 x players spaces, capped at 24** (`spaceCountForPlayers`). 32 at
+  eight players was too cluttered to be worth the theoretical guarantee, and with
+  clearing restored the guarantee is no longer needed - a full board is transient.
+- **Automatic stuck detection** (`isStuck` in `rules.ts`, `syncStuck` in
+  `store.ts`) replaces the button, covers bots, and rotates bot wood piles on the
+  all-stuck path (nobody else can - the host owns their hands).
+- **Snap-to-nearest drop band** under the board (`nearestOf` / `nearestSpace` in
+  `useDrag.ts`). Tap works too, for the tap-to-play path.
+- **Cards are poker-standard 2.5 x 3.5** via `aspect-ratio`, which also makes the
+  `--card-h` class of bug structurally impossible to reintroduce.

@@ -1,20 +1,77 @@
 .game { display: grid; grid-template-rows: auto auto 1fr auto; height: 100dvh; gap: 8px;
   padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right))
            max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+  /* Desktop was letting the grid columns stretch edge to edge, which scattered the
+     centre piles across a 1920px window. Cap and centre the whole board instead. */
+  width: 100%; max-width: 820px; margin-inline: auto;
+  /* Card size is bounded by viewport HEIGHT as well as width. The board is a fixed
+     four-row layout inside 100dvh, so sizing on vw alone lets a short window (a
+     laptop, a phone in landscape) push the bottom row under overflow:hidden. */
+  --card-w: clamp(40px, min(12vw, 8vh), 96px);
   user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; overflow: hidden; }
 .game-head { display: flex; align-items: center; gap: 8px; font-size: 13px; }
-.game-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px;
-  align-content: center; justify-items: center; min-height: 0; }
-.pile-space { width: var(--card-w); height: var(--card-h); border-radius: var(--radius);
-  border: 1.5px dashed var(--line); display: grid; place-items: center; position: relative; }
+
+/* Board = finished-pile rail | centre grid + snap band | finished-pile rail */
+.board { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px;
+  min-height: 0; min-width: 0; }
+
+/* Fixed-width columns (not 1fr) so the gaps are identical on a phone and a desktop:
+   the block is exactly as wide as the cards and centres in whatever is left. The
+   column count comes from the player count (gridColumns), so a slot has to shrink
+   below --card-w when the columns would not otherwise fit - hence the container
+   query on the wrapper rather than a plain vw sum. */
+.grid-wrap { container-type: inline-size; display: grid; grid-template-rows: 1fr auto;
+  min-height: 0; min-width: 0; }
+.game-grid { --gap: clamp(4px, 1.4vw, 10px);
+  --slot: min(var(--card-w), calc((100cqw - (var(--cols) - 1) * var(--gap)) / var(--cols)));
+  display: grid; grid-template-columns: repeat(var(--cols), var(--slot));
+  gap: var(--gap); justify-content: center; align-self: center; }
+.game-grid > * { --card-w: var(--slot); }
+
+/* Drop target that places a card in the nearest space it can legally land in.
+   Always present so it is a stable target; lit only when the held card has
+   somewhere to go. */
+.snap-band { margin-top: 6px; min-height: 34px; border-radius: var(--radius);
+  border: 2px dashed var(--pile-line); display: grid; place-items: center;
+  font-size: 11px; color: var(--ink-soft); opacity: .3;
+  transition: opacity .15s ease, border-color .15s ease; }
+.snap-band.on { opacity: 1; border-color: #22c55e; color: var(--ink); }
+
+/* Completed piles, stacked down each side of the board. */
+.done-rail { --rail-w: clamp(16px, 4.5vw, 26px); width: var(--rail-w);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.done-chip { width: var(--rail-w); aspect-ratio: 2.5 / 3.5; border-radius: 4px;
+  background: color-mix(in srgb, var(--suit) 32%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--suit) 60%, var(--line));
+  margin-top: calc(var(--rail-w) * -0.85); }
+.done-chip:first-of-type { margin-top: 0; }
+.done-more { font-size: 10px; font-weight: 800; color: var(--ink-soft); margin-bottom: 2px; }
+
+/* Cards are poker-standard 2.5 x 3.5 in. aspect-ratio rather than a --card-h token:
+   a custom property containing var() is substituted where it is DECLARED and
+   inherited already-resolved, so a --card-h on :root would stay pinned to the root
+   --card-w and ignore every local override (tight tableau, opponent strip, slots). */
+.pile-space { width: var(--card-w); aspect-ratio: 2.5 / 3.5; border-radius: var(--radius);
+  border: 2px dashed var(--pile-line); display: grid; place-items: center; position: relative; }
 .pile-space .card { position: absolute; inset: 0; }
-.card { width: var(--card-w); height: var(--card-h); border-radius: var(--radius);
+
+/* Stack-depth cue: underlying card outlines peeking out below the top card. The
+   wrapper reserves the peek height so nothing overlaps the label beneath it. */
+.pile-depth { position: relative; width: var(--card-w);
+  height: calc(var(--card-w) / 2.5 * 3.5 + var(--peek, 9px)); }
+.pile-layer { position: absolute; left: 0; width: var(--card-w); aspect-ratio: 2.5 / 3.5;
+  border-radius: var(--radius); background: var(--pile-fill);
+  border: 2px solid var(--pile-line); }
+.pile-top { position: absolute; top: 0; left: 0; }
+
+.card { width: var(--card-w); aspect-ratio: 2.5 / 3.5; border-radius: var(--radius);
   background: var(--surface); box-shadow: var(--shadow); border: 1px solid var(--line);
   display: grid; place-items: center; position: relative; touch-action: none; }
-.card.sm { --card-w: clamp(30px, 8vw, 48px); }
 .card-v { font-size: calc(var(--card-w) * .52); font-weight: 800; color: var(--suit); }
-.card-group { position: absolute; top: 4px; left: 6px; font-size: calc(var(--card-w) * .2);
-  color: var(--suit); }
+/* Washroom-style boy/girl pictogram - the post-building rule turns on it, so it is
+   sized to be read at a glance rather than tucked away as a tiny dingbat. */
+.card-group { position: absolute; top: 3px; left: 4px; display: block;
+  width: calc(var(--card-w) * .26); height: calc(var(--card-w) * .39); color: var(--suit); }
 .card-badge { position: absolute; bottom: 3px; right: 5px; font-size: calc(var(--card-w) * .24); }
 .card-back { background: color-mix(in srgb, var(--badge) 22%, var(--surface));
   border-color: color-mix(in srgb, var(--badge) 45%, var(--line)); }
@@ -22,19 +79,44 @@
 .card.selected { outline: 3px solid var(--accent); outline-offset: 1px; }
 .card.dimmed { opacity: .55; }
 .glow { border-color: #22c55e; border-style: solid; box-shadow: 0 0 0 3px rgb(34 197 94 / .35); }
+
 .tableau-zone { display: flex; gap: 10px; align-items: flex-end; justify-content: center;
   padding-bottom: 4px; }
-.tableau-zone.tight { gap: 6px; --card-w: clamp(44px, 11.5vw, 58px); }
+.tableau-zone.tight { gap: 6px; --card-w: clamp(40px, min(11.5vw, 6.6vh), 72px); }
 .pile-label { font-size: 10px; text-align: center; color: var(--ink-soft); margin-top: 3px; }
 .count-bubble { position: absolute; top: -6px; right: -6px; background: var(--accent);
   color: var(--bg); font-size: 11px; font-weight: 800; border-radius: 999px;
   min-width: 20px; height: 20px; display: grid; place-items: center; padding: 0 4px; }
+
+/* Recycle affordance: appears once the face-down wood is exhausted. */
+.recycle { position: absolute; bottom: 3px; left: 3px; z-index: 2; width: 22px; height: 22px;
+  border-radius: 999px; border: 1px solid var(--pile-line); background: var(--surface);
+  color: var(--ink); font-size: 14px; line-height: 1; display: grid; place-items: center;
+  padding: 0; cursor: pointer; box-shadow: var(--shadow); }
+.pile-space.recycle-slot { border-style: solid; color: var(--ink-soft); cursor: pointer;
+  font-size: calc(var(--card-w) * .4); }
+
 .opp-strip { display: flex; gap: 6px; overflow-x: auto; }
-.opp { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: var(--radius);
-  background: var(--surface); border: 1px solid var(--line); font-size: 12px; white-space: nowrap; }
+.opp { display: flex; flex-direction: column; gap: 4px; padding: 4px 8px 5px;
+  border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line);
+  font-size: 12px; white-space: nowrap; }
+.opp-head { display: flex; align-items: center; gap: 6px; }
 .opp.away { opacity: .5; }
 .opp-blitz { font-weight: 800; color: var(--badge); }
+.opp-ai { font-size: 9px; font-weight: 800; letter-spacing: .06em; color: var(--ink-soft);
+  border: 1px solid var(--line); border-radius: 999px; padding: 0 5px; }
+.opp-cards { display: flex; gap: 3px; align-items: flex-end;
+  --card-w: clamp(22px, min(7vw, 3.4vh), 32px); }
+.opp-cards .card { box-shadow: none; }
+.opp-cards .card-badge { display: none; } /* every card in a tableau is that player's own */
+.opp-cards .pile-space { border-width: 1.5px; }
+.opp-slot { position: relative; }
+.opp-count { position: absolute; bottom: -2px; right: -2px; background: var(--accent);
+  color: var(--bg); font-size: 9px; font-weight: 800; border-radius: 999px;
+  min-width: 14px; height: 14px; display: grid; place-items: center; padding: 0 3px; }
+
 .drag-ghost { position: fixed; z-index: 50; pointer-events: none; will-change: transform; }
 .stuck-btn { min-height: 44px; }
+.stuck-note { margin: 6px 0 0; text-align: center; font-size: 12px; color: var(--ink-soft); }
 .conn-pill { margin-left: auto; font-size: 11px; padding: 3px 10px; border-radius: 999px;
   background: var(--danger); color: #fff; }

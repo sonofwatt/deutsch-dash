@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   faceGroup, postCountForPlayers, canPlayToCenter, canBuildOnPost,
   refillPosts, sourceTop, takeCard, placeOnPost, hasLegalMove,
+  canPlayToSpace, spaceCountForPlayers, isStuck, MAX_SPACES,
 } from './rules';
 import type { Card, Suit, Tableau, CenterSpace } from './types';
 
@@ -27,6 +28,39 @@ describe('postCountForPlayers', () => {
   });
 });
 
+describe('spaceCountForPlayers', () => {
+  it('is one space per Ace in the game, up to the cap', () => {
+    expect(spaceCountForPlayers(2)).toBe(8);
+    expect(spaceCountForPlayers(3)).toBe(12);
+    expect(spaceCountForPlayers(4)).toBe(16);
+    expect(spaceCountForPlayers(5)).toBe(20);
+  });
+  it('caps rather than growing to a cluttered 32', () => {
+    expect(spaceCountForPlayers(6)).toBe(MAX_SPACES);
+    expect(spaceCountForPlayers(8)).toBe(MAX_SPACES);
+    expect(MAX_SPACES).toBe(24);
+  });
+  it('never returns zero for a degenerate room', () => {
+    expect(spaceCountForPlayers(0)).toBe(4);
+  });
+});
+
+describe('isStuck', () => {
+  const blocked = [space([c(5, 'red')])]; // only a red 6 could land
+  it('is false while a legal move exists, however much wood is left', () => {
+    expect(isStuck(tab({ blitz: [c(6, 'red')], wood: [c(9, 'blue')] }), blocked, 99)).toBe(false);
+  });
+  it('is false with wood still unturned - flip first, that is not stuck', () => {
+    // 9 wood cards is three flips to see the pile; one flip proves nothing
+    const t = tab({ blitz: [c(9, 'blue')], wood: Array.from({ length: 9 }, () => c(9, 'blue')) });
+    expect(isStuck(t, blocked, 1)).toBe(false);
+    expect(isStuck(t, blocked, 3)).toBe(true); // been all the way round
+  });
+  it('is true immediately with no wood at all - nothing left to turn over', () => {
+    expect(isStuck(tab({ blitz: [c(9, 'blue')], wood: [] }), blocked, 0)).toBe(true);
+  });
+});
+
 describe('canPlayToCenter', () => {
   it('only a 1 starts an empty space', () => {
     expect(canPlayToCenter(c(1, 'red'), [])).toBe(true);
@@ -37,6 +71,21 @@ describe('canPlayToCenter', () => {
     expect(canPlayToCenter(c(3, 'red', 'other'), stack)).toBe(true);
     expect(canPlayToCenter(c(3, 'blue'), stack)).toBe(false);
     expect(canPlayToCenter(c(4, 'red'), stack)).toBe(false);
+  });
+});
+
+describe('canPlayToSpace', () => {
+  const cleared = (stack: Card[] = []): CenterSpace =>
+    ({ stack, history: [Array.from({ length: 10 }, (_, i) => c(i + 1, 'green'))] });
+
+  it('matches canPlayToCenter on an empty space', () => {
+    expect(canPlayToSpace(c(1, 'red'), space())).toBe(true);
+    expect(canPlayToSpace(c(2, 'red'), space())).toBe(false);
+    expect(canPlayToSpace(c(2, 'red'), space([c(1, 'red')]))).toBe(true);
+  });
+  it('lets a new Ace start on a space whose last pile was cleared away', () => {
+    expect(canPlayToSpace(c(1, 'red'), cleared())).toBe(true);
+    expect(canPlayToSpace(c(2, 'red'), cleared())).toBe(false); // still needs an Ace
   });
 });
 
@@ -152,6 +201,12 @@ describe('hasLegalMove', () => {
     const t = tab({ blitz: [c(9, 'blue')], post: [[c(8, 'red')], [c(7, 'green')], [c(3, 'blue')]] });
     // post[1] green 7 fits on post[0] red 8; nothing fits center (no 1s, center empty needs 1)
     expect(hasLegalMove(t, [space()])).toBe(true);
+  });
+  it('counts a cleared space as somewhere to play again', () => {
+    const t = tab({ blitz: [c(1, 'red')] });
+    const cleared: CenterSpace = { stack: [], history: [Array.from({ length: 10 }, (_, i) => c(i + 1, 'blue'))] };
+    expect(hasLegalMove(t, [cleared])).toBe(true);  // the finished pile moved to the rail
+    expect(hasLegalMove(t, [space([c(5, 'red')])])).toBe(false); // an occupied one does not
   });
   it('false when nothing fits anywhere', () => {
     const t = tab({ blitz: [c(9, 'blue')], post: [[c(8, 'blue')], [c(4, 'yellow')], [c(3, 'green')]],

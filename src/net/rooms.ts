@@ -4,9 +4,10 @@ import {
 import { db, ensureSignedIn } from './firebase';
 import { makeRoomCode } from './roomCodes';
 import type { BadgeId } from '../game/badges';
+import { botId, type BotLevel } from '../game/bot';
 import type { PlayerInfo, Room, RoomMeta, RoundState } from '../game/types';
 import { normalizeSpaces, normalizeTableau } from '../game/center';
-import { postCountForPlayers } from '../game/rules';
+import { postCountForPlayers, spaceCountForPlayers } from '../game/rules';
 
 export const ROOM_TTL_MS = 24 * 60 * 60 * 1000;
 // Mirrored in database.rules.json's rooms/$code/meta/playerCount .validate
@@ -28,12 +29,13 @@ export function normalizeRoom(raw: unknown): Room | null {
     players[uid] = { ...p, stuckAt: p.stuckAt ?? null, connected: p.connected ?? false, score: p.score ?? 0 };
   }
   const meta: RoomMeta = { ...r.meta, creatorId: r.meta.creatorId ?? r.meta.hostId };
-  const postCount = postCountForPlayers(Object.keys(players).length);
+  const playerCount = Object.keys(players).length;
+  const postCount = postCountForPlayers(playerCount);
   let round: RoundState | null = null;
   if (r.round && typeof r.round === 'object') {
     const rr = r.round as Partial<RoundState> & { tableaus?: Record<string, unknown> };
     round = {
-      spaces: normalizeSpaces(rr.spaces),
+      spaces: normalizeSpaces(rr.spaces, spaceCountForPlayers(playerCount)),
       tableaus: Object.fromEntries(
         Object.entries(rr.tableaus ?? {}).map(([uid, t]) => [uid, normalizeTableau(t, postCount)]),
       ),
@@ -124,6 +126,37 @@ export async function peekRoom(code: string): Promise<Room | null> {
   await ensureSignedIn();
   const snap = await get(roomRef(code));
   return normalizeRoom(snap.val());
+}
+
+/**
+ * Add an AI player. The host owns the record outright: bots have no auth identity,
+ * so `players/$botId` is written under the host's rules grant.
+ *
+ * Two deliberate choices:
+ * - The badge is claimed with the HOST's uid as the value, not the bot's. The
+ *   badges/$badgeId .validate rule only accepts `newData.val() === auth.uid`, and
+ *   claiming it this way still blocks a human from taking the same badge - which
+ *   is the whole point of that node - with no rules change to deploy.
+ * - meta/playerCount is left alone. It is the server-side cap on HUMAN joins, and
+ *   its validate rule forbids ever decreasing it, so counting bots there would
+ *   permanently eat a seat every time one was removed. The 8-seat total is held
+ *   on the client instead (see MAX_PLAYERS at the call site).
+ */
+export async function addBot(code: string, badgeId: BadgeId, level: BotLevel, name: string): Promise<string> {
+  const uid = await ensureSignedIn();
+  const id = botId(badgeId);
+  await update(roomRef(code), {
+    [`players/${id}`]: {
+      name, badgeId, joinedAt: serverTimestamp(), connected: true,
+      stuckAt: null, score: 0, isBot: true, botLevel: level,
+    },
+    [`badges/${badgeId}`]: uid,
+  });
+  return id;
+}
+
+export function removeBot(code: string, id: string, badgeId: BadgeId): Promise<void> {
+  return update(roomRef(code), { [`players/${id}`]: null, [`badges/${badgeId}`]: null });
 }
 
 export function setTargetScore(code: string, target: number): Promise<void> {

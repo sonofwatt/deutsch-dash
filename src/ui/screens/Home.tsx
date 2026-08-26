@@ -5,6 +5,7 @@ import type { BadgeId } from '../../game/badges';
 
 export function Home() {
   const hostRoom = useGameStore(s => s.hostRoom);
+  const enterRoom = useGameStore(s => s.enterRoom);
   const joinPhase = useGameStore(s => s.joinPhase);
   const [name, setName] = useState(localStorage.getItem('bz.name') ?? '');
   const [badge, setBadge] = useState<BadgeId | null>(localStorage.getItem('bz.badge') as BadgeId | null);
@@ -20,9 +21,15 @@ export function Home() {
     const c = await hostRoom(name.trim(), badge!);
     location.hash = `#/room/${c}`;
   }
-  function goJoin() {
+  // Name and badge are already filled in here, so join outright rather than
+  // handing the Join screen a second, identical form to fill in. If the room
+  // rejects us (badge taken in that room, room full, already started) the store
+  // holds the reason and the Join screen renders it with the form as a fallback.
+  async function goJoin() {
     remember();
-    location.hash = `#/room/${code.trim().toUpperCase()}`;
+    const c = code.trim().toUpperCase();
+    await enterRoom(c, name.trim(), badge!);
+    location.hash = `#/room/${c}`;
   }
 
   return (
@@ -38,7 +45,10 @@ export function Home() {
       <div className="row">
         <input className="field" placeholder="Room code" maxLength={6}
           value={code} onChange={e => setCode(e.target.value.toUpperCase())} />
-        <button className="btn" disabled={code.trim().length !== 6} onClick={goJoin}>Join</button>
+        <button className="btn" disabled={!ready || code.trim().length !== 6 || joinPhase === 'joining'}
+          onClick={goJoin}>
+          {joinPhase === 'joining' ? 'Joining…' : 'Join'}
+        </button>
       </div>
     </div>
   );
