@@ -19,6 +19,15 @@ export const HINT_DELAY_MS = 5000;
 export const HINT_SHOW_MS = 1000;
 
 /**
+ * And again this often, for as long as the player goes on not playing. A player
+ * who is genuinely stuck has nothing on the grid to point at, so nothing shows
+ * for them and the amber band in the drop band is what speaks instead - but the
+ * moment somebody else's card opens a move up, the next tick of this is what
+ * says so. Any input at all restarts the whole cycle from HINT_DELAY_MS.
+ */
+export const HINT_REPEAT_MS = 10000;
+
+/**
  * Which centre space to flash. The hint points at the DESTINATION, never at the
  * card in the player's own tableau: they still have to work out which of their
  * cards fits and drag it there, which is the part of the game worth keeping. It

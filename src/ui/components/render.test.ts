@@ -145,6 +145,18 @@ describe('CenterGrid', () => {
     expect(out).toContain('--suit:var(--suit-yellow)');
     expect(html).not.toContain('owned');   // an ordinary board claims nothing
   });
+  it('hands the rails back to the grid once the board gets crowded', () => {
+    // Seven and eight players only: at eight columns every pixel a rail holds is
+    // one the slots do not get, and a third of a chip is still legible as "piles
+    // have finished, in these colours", which is all the rail is for.
+    const empty = (n: number): CenterSpace[] => Array.from({ length: n }, () => ({ stack: [], history: [] }));
+    const board = (n: number) => renderToStaticMarkup(createElement(CenterGrid, {
+      spaces: empty(n), highlight: [], badgeOf: () => 'star' as const, onTap: noop, onSnapTap: noop,
+    }));
+    expect(board(24)).toContain('class="board"');       // six players: rails as they were
+    expect(board(28)).toContain('class="board crowded"'); // seven
+    expect(board(32)).toContain('class="board crowded"'); // eight
+  });
   it('lays the board out in four rows at every game size', () => {
     // Every real board size, ordinary and orderly, in at most four rows out. Eight
     // players is 32 spaces now rather than 24, and it is this that has to hold:

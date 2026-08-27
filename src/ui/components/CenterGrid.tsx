@@ -23,6 +23,16 @@ export function gridColumns(count: number, orderly = false): number {
 const RAIL_CAP = 8;
 
 /**
+ * Past this many spaces the board is crowded enough that the finished-pile rails
+ * stop paying their way: at seven and eight players the grid is eight columns
+ * wide and every pixel the rails hold is one the slots do not get. Above this the
+ * rails keep a third of their width and let the chips hang off the edge of the
+ * screen instead - still legible as "piles have finished, in these colours",
+ * which is all they are for.
+ */
+const CROWDED_SPACES = 24;
+
+/**
  * Finished piles, stacked down the side of the board. A completed 1..10 pile
  * clears its space (so the space can be reused), and lands here face down in its
  * suit colour - so the pile count and the suits that have gone are both readable
@@ -64,7 +74,7 @@ export function CenterGrid(props: {
   const right = done.filter((_, i) => i % 2 === 1);
 
   return (
-    <div className="board">
+    <div className={`board${props.spaces.length > CROWDED_SPACES ? ' crowded' : ''}`}>
       <DoneRail runs={left} />
       <div className="grid-wrap">
         <div className="game-grid"

@@ -7,7 +7,7 @@ for a day, so anything it changed - the keeper's round timer, the wood/Blitz sid
 picker - was "built" but not live; check `git status -sb` before trusting a
 playtest._
 
-_**245 tests green** (225 unit + 20 emulator). This is the only place in the repo
+_**246 tests green** (226 unit + 20 emulator). This is the only place in the repo
 that quotes a count — it drifted three separate ways when it lived in four
 places, so keep it here and nowhere else._
 
@@ -269,7 +269,14 @@ deliberate.
 
 - `centerPlayTxn` archives a pile into `space.history` and clears `stack` at
   exactly 10, freeing the space server-side, so a stale client cannot revive a
-  finished pile. Finished piles show on the rails flanking the board.
+  finished pile. Finished piles show on the rails flanking the board — **except
+  above 24 spaces** (`CROWDED_SPACES` in `CenterGrid.tsx`, i.e. seven and eight
+  players), where the rails leave the board's column flow altogether and hang off
+  the screen edges with a third of a chip showing. At eight columns every pixel a
+  rail holds is one the slots do not get, and that alone is worth ~15% on the card
+  size. The `+N` overflow marker is suppressed there — a 10px glyph sliced to a
+  third is a smear rather than a number — but the rail's `aria-label` still
+  carries the true count.
 - Board size is `4 × players` — `spaceCountForPlayers`, capped only by
   `MAX_SPACES = 32`, which is `4 × MAX_PLAYERS` and so no longer binds. Four per
   player is **one space per Ace in the game**, and keeping that exact is what
@@ -277,7 +284,8 @@ deliberate.
   every Ace is already down, so nobody can be holding one. The cap used to be 24
   and broke that at seven and eight players - survivable on an ordinary board,
   fatal on an orderly one, which cannot lend one suit's space to another. Eight
-  players now get 32 spaces at 8 × 4 and the slots shrink to fit.
+  players now get 32 spaces at 8 × 4, and the finished-pile rails get out of the
+  way to pay for them (see below).
 - **`ENABLE_STUCK_BUTTON` is `false`** and the whole stuck path still runs
   underneath. Being stuck is *detected* by `isStuck` + `syncStuck`, not declared.
   `isStuck` needs more than "no legal move": either zero wood, or
@@ -544,11 +552,17 @@ Decisions taken:
   a fast table would otherwise keep resetting the clock of the one player who has
   actually stalled.
 - **Two pulses over `HINT_SHOW_MS` (1s), and then it is gone**, rather than
-  breathing on the board until it becomes furniture and stops being read. It does
-  not come back on its own: another one costs a tap and another five seconds of
-  stillness. The *element* is removed on the timer rather than the animation being
-  left to end itself, which is what makes reduced motion behave identically - the
-  same one-second mark, held steady instead of pulsed.
+  breathing on the board until it becomes furniture and stops being read. The
+  *element* is removed on the timer rather than the animation being left to end
+  itself, which is what makes reduced motion behave identically - the same
+  one-second mark, held steady instead of pulsed.
+- **And again every `HINT_REPEAT_MS` (10s) for as long as the player goes on not
+  playing.** A player who is genuinely stuck has nothing on the grid to point at,
+  so nothing shows for them and the amber band speaks instead - but the moment
+  somebody else's card opens a move up, the next tick of this is what says so,
+  because the hint is recomputed at render rather than stored. Any input at all
+  restarts the cycle from `HINT_DELAY_MS`. Measured: on at 4.6s, 14.6s and 24.6s,
+  a second each, and a tap puts the next one back to five seconds out.
 - **Violet** (`--hint`), never green: green on this board means exactly one thing,
   "the card you are holding lands here", and a second green would erode it.
 - **Reduced motion is handled**, which it was not anywhere else: `MotionConfig
@@ -728,15 +742,21 @@ features, at 393px in **both themes**:
 Then, after the tweaks:
 
 - **A full eight-player board, measured rather than guessed.** 32 slots at 8 x 4,
-  no overflow in either axis: the slot lands at **36.9 x 51.6px at 393px** and
-  **33.5 x 46.9px at 360px**, against a grid area that stays a constant 303.6px
-  wide at 360px - the finished-pile rails are a fixed `--rail-w`, so they do not
-  eat into the board as piles complete. Rows do not change (a 24-space board was
-  already four deep at six columns), so the extra spaces cost width only.
-  33.5px is under the 34px `--card-w` floor, which is the honest cost of eight
-  players on a small phone; `--slot` has no floor of its own, by design.
-- The hint's whole life, sampled: visible for **975ms**, and still hidden four
-  seconds later.
+  no overflow in either axis. Rows do not change (a 24-space board was already
+  four deep at six columns), so the extra spaces cost width only - and floating
+  the rails off the screen edge paid for most of that:
+
+  | | slot before the rails moved | after |
+  |---|---|---|
+  | 393px | 36.9 x 51.6px | **42.3 x 59.2px** |
+  | 360px | 33.5 x 46.9px | **38.6 x 54.0px** |
+
+  A 393px eight-player slot is now 42.3px against a `--card-w` of about 43px, so
+  it is effectively full size, and the 360px board clears the 34px floor it had
+  dropped under. Exactly a third of a chip shows at each edge (5.9px of 17.7px at
+  393px). A six-player board is untouched: rails in flow, fully on screen.
+- The hint's whole life, sampled: on at 4.6s, 14.6s and 24.6s, about **975ms**
+  each, and a tap restarts the cycle five seconds out.
 - An away player dimmed in the opponent strip while still `connected: true` in the
   room - the case `.opp.absent` was renamed for.
 

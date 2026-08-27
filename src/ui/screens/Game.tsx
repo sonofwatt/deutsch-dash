@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useGameStore, legalTargets, gameStore } from '../../state/store';
 import { hasLegalMove } from '../../game/rules';
-import { HINT_DELAY_MS, HINT_SHOW_MS, hintSpace } from '../../game/hint';
+import { HINT_DELAY_MS, HINT_REPEAT_MS, HINT_SHOW_MS, hintSpace } from '../../game/hint';
 import type { BadgeId } from '../../game/badges';
 import { CardView } from '../components/CardView';
 import { CenterGrid } from '../components/CenterGrid';
@@ -40,18 +40,27 @@ export function Game() {
   // board changes, or a fast table would keep resetting the clock of the one
   // player who has actually stalled. Comparing the two counters (rather than
   // setting a flag from inside the effect) is what keeps the timer out of render.
-  // It shows once per quiet spell and then goes: two pulses and away, rather than
-  // a mark breathing on the board until it stops being read. Another one costs a
-  // tap and another five seconds of stillness.
+  // Two pulses and away, then again every HINT_REPEAT_MS for as long as the player
+  // goes on not playing - a mark that simply sat there breathing would become
+  // furniture and stop being read, but one that never came back is no use to
+  // somebody who has been staring at the board for a minute.
+  //
+  // `showing` holds the activity epoch it is showing FOR, so any input both stops
+  // the timers (the effect re-runs) and hides the mark on the spot, without the
+  // cleanup having to set state. The epoch is why this needs no separate "hide".
   const hintsOn = room.meta.hintsOn ?? false;
   const [activity, setActivity] = useState(0);
-  const [shownFor, setShownFor] = useState(-1);
-  const [doneFor, setDoneFor] = useState(-1);
+  const [showing, setShowing] = useState<number | null>(null);
   useEffect(() => {
     if (!hintsOn) return;
-    const show = setTimeout(() => setShownFor(activity), HINT_DELAY_MS);
-    const hide = setTimeout(() => setDoneFor(activity), HINT_DELAY_MS + HINT_SHOW_MS);
-    return () => { clearTimeout(show); clearTimeout(hide); };
+    let hide: ReturnType<typeof setTimeout> | undefined;
+    let again: ReturnType<typeof setInterval> | undefined;
+    const fire = () => {
+      setShowing(activity);
+      hide = setTimeout(() => setShowing(null), HINT_SHOW_MS);
+    };
+    const first = setTimeout(() => { fire(); again = setInterval(fire, HINT_REPEAT_MS); }, HINT_DELAY_MS);
+    return () => { clearTimeout(first); clearTimeout(hide); clearInterval(again); };
   }, [hintsOn, activity]);
 
   const round = room.round;
@@ -88,8 +97,10 @@ export function Game() {
   const stuckAvailable = !hasLegalMove(hand, round.spaces);
   // Recomputed every render rather than stored, so it can never point at a space
   // somebody else has since filled.
-  const showingHint = hintsOn && shownFor === activity && doneFor !== activity;
-  const hint = showingHint ? hintSpace(hand, round.spaces) : null;
+  // Recomputed every render rather than stored, so a re-fire ten seconds later
+  // points at the board as it is now - which is the case that matters most, a
+  // player who WAS stuck and has just had a move opened up for them.
+  const hint = hintsOn && showing === activity ? hintSpace(hand, round.spaces) : null;
 
   return (
     // Every tap and every drag on this screen is a sign of life, which is a wider

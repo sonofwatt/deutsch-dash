@@ -76,6 +76,26 @@
   border: 1px solid color-mix(in srgb, var(--suit) 60%, var(--line));
   margin-top: calc(var(--rail-w) * -0.85); }
 .done-chip:first-of-type { margin-top: 0; }
+/* Seven and eight players: the rails come out of the board's column flow entirely
+   and hang off the edges of the screen, leaving the grid the whole width. At
+   eight columns every pixel a rail holds is one the slots do not get, and a third
+   of a chip still reads as "piles have finished, in these colours", which is all
+   a rail is for.
+
+   The offset is the page padding PLUS two thirds of a chip, measured from the
+   board's edge, so that exactly a third is left inside the viewport. .game's
+   overflow: hidden clips the rest at the screen edge - its padding box IS the
+   viewport, which is what makes this land on the edge rather than on the padding.
+
+   The +N overflow marker is suppressed here: a 10px glyph sliced to a third is a
+   smear rather than a number. The rail's aria-label still carries the true count. */
+.board.crowded { grid-template-columns: minmax(0, 1fr); position: relative; }
+.board.crowded .done-rail { position: absolute; top: 50%; transform: translateY(-50%); }
+.board.crowded > .done-rail:first-child {
+  left: calc(-1 * (max(8px, env(safe-area-inset-left)) + var(--rail-w) * 2 / 3)); }
+.board.crowded > .done-rail:last-child {
+  right: calc(-1 * (max(8px, env(safe-area-inset-right)) + var(--rail-w) * 2 / 3)); }
+.board.crowded .done-more { display: none; }
 .done-more { font-size: 10px; font-weight: 800; color: var(--ink-soft); margin-bottom: 2px; }
 
 /* Cards are poker-standard 2.5 x 3.5 in. aspect-ratio rather than a --card-h token:
