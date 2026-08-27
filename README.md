@@ -101,6 +101,40 @@ that rule would lock out the entire game.
 3. Push to `main` (or run the workflow manually). The site lands at
    `https://<user>.github.io/<repo>/`.
 
+## Host options
+
+Three controls in the lobby, all set by the host and all applying to the whole
+room rather than to one device — everybody should be playing the same game.
+
+**Play to** 25, 50, 75 or 100 points.
+
+**Helper hints** (off by default). After five seconds of touching nothing, the
+space where your best move would land pulses twice and fades. It marks the
+*destination*, never the card: you still have to work out which of your cards
+fits and get it there. It returns every ten seconds for as long as you go on not
+playing, and any tap restarts the clock. Room-wide rather than per-device on
+purpose — a hint is a real advantage, and the bots were tuned against a human
+playing without one.
+
+Two silences are deliberate. A move from one post pile to another has no square
+on the board to point at, so nothing flashes for it — which early in a round,
+before anyone has an Ace down, can mean no hint at all. And a player who is
+genuinely stuck has no move to be shown, so the amber "no moves left" note in the
+drop band speaks for them instead.
+
+**Orderly grid** (off by default). Every center space belongs to one colour for
+the whole round, so the board reads as blocks of colour rather than a jumble, and
+an Ace can only start a pile in its own colour's block. The constraint is enforced
+by the same center transaction that settles every other play, so a client that
+disagrees cannot slip a card in. The columns follow the suits: four columns up to
+sixteen spaces, eight above that, paired so each colour owns two adjacent ones.
+
+It does not narrow the game as much as it looks like it should. Because the board
+is 4 × players spaces and every player holds one Ace per colour, each colour has
+exactly as many spaces as there are Aces of it — so an Ace always has somewhere to
+go. (That is only true because the space cap was raised to 32; see the house rules
+below.)
+
 ## AI players
 
 The host can add AI players in the lobby at Easy, Medium or Hard. Difficulty is
@@ -126,16 +160,25 @@ joins, which can never decrease); the eight-seat total is held on the client.
 
 A pile that reaches 1..10 is turned face down and **clears its space**, then
 appears on one of the two rails flanking the board — so the finished count and
-the suits that have gone stay readable instead of the cards simply vanishing.
+the suits that have gone stay readable instead of the cards simply vanishing. At
+seven and eight players the rails leave the board and hang over the edges of the
+screen with about a third of each chip showing: by then the grid is eight columns
+wide, and the width the rails were holding is worth more to the cards.
 
-Board size is **4 × players center spaces, capped at 24**. Four per player is the
-natural figure: only an Ace opens a space, and each player holds exactly one Ace
-per suit. The cap is a legibility choice — because finished piles clear, the board
-only ever has to hold the piles open at one moment, so past six players the extra
-slots would just shrink the cards. A full board is transient (the next pile to
-finish frees a space), and a genuine deadlock is what stuck detection handles.
-Two players get 8 spaces, four get 16, six or more get 24; the layout stays four
-rows and grows sideways.
+Board size is **4 × players center spaces**. Four per player is an exact figure
+rather than a rounded one: only an Ace opens a space, and each player holds
+exactly one Ace per suit, so it is one space per Ace in the game — which is what
+guarantees an Ace always has somewhere to go. If every space is occupied, every
+Ace is already down and nobody can be holding one. Two players get 8, four get 16,
+eight get 32; the layout stays four rows and grows sideways, with the slots
+shrinking to fit.
+
+It used to be capped at 24 for legibility, which quietly broke that guarantee at
+seven and eight players. An ordinary board survives the shortfall — a full board
+is transient, and a real deadlock is what stuck detection handles — but the
+orderly grid splits its spaces between four colours and cannot lend one colour's
+space to another, so the whole shortfall lands on a single colour and starves it.
+The cap is now 32, which is 4 × the eight-player maximum, so it no longer binds.
 
 Cards are drawn at poker-standard 2.5 × 3.5 proportions.
 
