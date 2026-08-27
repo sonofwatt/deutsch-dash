@@ -101,7 +101,9 @@ export function commentary(input: CommentaryInput): Remark[] {
   const lead = current.length > 1 ? total(leader) - total(current[1]) : 0;
   const delta = (id: string) => scores?.[id]?.delta ?? 0;
   const deltas = ids.map(delta).sort((a, b) => b - a);
-  const seconds = Math.round((input.durationMs ?? 0) / 1000);
+  // Floored, not rounded: the keeper shows a clock, and a round it displayed as
+  // 0:11 must not be described a moment later as twelve seconds.
+  const seconds = Math.floor((input.durationMs ?? 0) / 1000);
 
   // === the round itself ====================================================
   if (!blitzedBy) {

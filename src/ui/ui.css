@@ -84,6 +84,10 @@
 .keep-step-value { text-align: center; font-size: 18px; font-weight: 800;
   font-variant-numeric: tabular-nums; }
 
+.keep-playing { justify-content: center; }
+.keep-clock { margin: 0; text-align: center; font-size: clamp(56px, 22vw, 120px);
+  font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+
 /* Commentary carousel under the scores. The floor is two lines' worth, so the
    sheet does not jump as remarks of different lengths rotate through; a rare
    three-liner grows the box rather than being clipped, because a cut-off joke is

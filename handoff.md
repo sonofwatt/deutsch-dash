@@ -1,10 +1,10 @@
 # Project Handoff — Deutsch Dash
 
-_Last updated: 2026-08-26 at `5d7039d`. Working tree clean, `main` ==
+_Last updated: 2026-08-26 at `c90e6df`. Working tree clean, `main` ==
 `origin/main`, CI green including the emulator suite, and the live site matches
 `HEAD`._
 
-_**211 tests green** (193 unit + 18 emulator). This is the only place in the repo
+_**213 tests green** (195 unit + 18 emulator). This is the only place in the repo
 that quotes a count — it drifted three separate ways when it lived in four
 places, so keep it here and nowhere else._
 
@@ -292,7 +292,16 @@ moving it right puts that dead-to-drag zone on the side the thumb arrives from.
 substring including the closing quote, so adding any second class to that button
 breaks it. Nothing pins the button's position, so the move itself is unguarded.
 
-### 2. Choose which side wood and Blitz sit on — _small_
+### 2. Choose which side wood and Blitz sit on — _built 2026-08-26_
+
+`src/ui/prefs.ts` holds it: local to the device, not the room, because it is
+about the phone in your hand and two players at one table can want opposite
+answers. The `⇄` in the game head flips it **mid-game on purpose** - a player who
+was auto-rejoined never sees a form again, so pre-join only would have stranded
+them. Only the two ends trade places; the posts stay where they are, because
+moving four positions to fix one costs more muscle memory than it buys. The
+opponent strip mirrors it too, so a glance across the table reads the same way.
+The notes below are what that decision was weighed against.
 
 New `src/ui/prefs.ts` + a `SidePicker` on Home and Join, storing `bz.woodSide`
 alongside `bz.name` / `bz.badge`. Thread a `woodSide` prop into `TableauView` and

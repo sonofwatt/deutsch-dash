@@ -22,8 +22,8 @@ describe('keeper model', () => {
 
   it('adds the rounds up, and ignores a player who has since been removed', () => {
     const g = game({ rounds: [
-      { tulip: roundScore(9, 0), star: roundScore(2, 5), ghost: roundScore(50, 0) },
-      { tulip: roundScore(4, 3), star: roundScore(6, 1) },
+      { scores: { tulip: roundScore(9, 0), star: roundScore(2, 5), ghost: roundScore(50, 0) }, ms: null },
+      { scores: { tulip: roundScore(4, 3), star: roundScore(6, 1) }, ms: null },
     ] });
     expect(totals(g)).toEqual({ tulip: 7, star: -4 });
   });
@@ -40,24 +40,27 @@ describe('keeper model', () => {
   });
 
   it('declares a winner only when somebody stands alone at the target', () => {
-    const won = game({ targetScore: 25, rounds: [{ tulip: roundScore(30, 0), star: roundScore(1, 2) }] });
+    const won = game({ targetScore: 25,
+      rounds: [{ scores: { tulip: roundScore(30, 0), star: roundScore(1, 2) }, ms: null }] });
     expect(winnerOf(won)).toBe('tulip');
-    const tied = game({ targetScore: 25, rounds: [{ tulip: roundScore(30, 0), star: roundScore(30, 0) }] });
+    const tied = game({ targetScore: 25,
+      rounds: [{ scores: { tulip: roundScore(30, 0), star: roundScore(30, 0) }, ms: null }] });
     expect(winnerOf(tied)).toBeNull();   // level at the top plays another round
     expect(winnerOf(game({ targetScore: 25 }))).toBeNull();
   });
 
   it('folds the rounds into the same stats the online game keeps', () => {
     const g = game({ rounds: [
-      { tulip: roundScore(9, 0), star: roundScore(2, 5) },
-      { tulip: roundScore(5, 2), star: roundScore(1, 6) },
+      { scores: { tulip: roundScore(9, 0), star: roundScore(2, 5) }, ms: 47_000 },
+      { scores: { tulip: roundScore(5, 2), star: roundScore(1, 6) }, ms: null },
     ] });
     const stats = statsOf(g)!;
     expect(stats.rounds).toBe(2);
     expect(statsFor(stats, 'tulip').blitzes).toBe(1);      // only round one was emptied
     expect(statsFor(stats, 'star').lastStreak).toBe(2);
     expect(stats.races).toBe(0);                           // nothing to race across a table
-    expect(stats.fastest).toBeNull();                      // nobody is holding a stopwatch
+    // Timed rounds do count, when somebody used the clock.
+    expect(stats.fastest).toEqual({ uid: 'tulip', ms: 47_000, round: 1 });
   });
 
   it('has no stats to speak of before the first round', () => {
@@ -89,7 +92,10 @@ describe('keeper storage', () => {
 
   it('survives the tab being closed mid-game', () => {
     shim();
-    const g = game({ rounds: [{ tulip: roundScore(9, 0), star: roundScore(2, 5) }], snark: false });
+    const g = game({
+      rounds: [{ scores: { tulip: roundScore(9, 0), star: roundScore(2, 5) }, ms: 61_000 }],
+      snark: false,
+    });
     saveGame(g);
     expect(loadGame()).toEqual(g);
     saveGame(null);
@@ -107,7 +113,21 @@ describe('keeper storage', () => {
   it('fills in a field added after a game was saved', () => {
     const store = shim();
     store.set('bz.keeper', JSON.stringify({ players: [], rounds: [], targetScore: 50 }));
-    expect(loadGame()).toEqual({ players: [], rounds: [], targetScore: 50, snark: true });
+    expect(loadGame()).toEqual(
+      { players: [], rounds: [], targetScore: 50, snark: true, runningSince: null, pendingMs: null });
+  });
+
+  it('reads a game saved before rounds could be timed', () => {
+    // Rounds used to be a bare map of scores. One saved that way must still open.
+    const store = shim();
+    store.set('bz.keeper', JSON.stringify({
+      players: [{ id: 'tulip', name: 'Ann', badgeId: 'tulip' }], targetScore: 25,
+      rounds: [{ tulip: { centerCount: 9, blitzLeft: 0, delta: 9 } }],
+    }));
+    const loaded = loadGame()!;
+    expect(loaded.rounds[0].ms).toBeNull();
+    expect(loaded.rounds[0].scores.tulip.delta).toBe(9);
+    expect(totals(loaded)).toEqual({ tulip: 9 });
   });
 
   it('keeps playing when the browser refuses to store anything', () => {

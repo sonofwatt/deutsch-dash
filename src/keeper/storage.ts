@@ -1,4 +1,5 @@
-import { emptyGame, type KeeperGame } from './model';
+import { emptyGame, type KeeperGame, type KeeperRound } from './model';
+import type { RoundScore } from '../game/types';
 
 const KEY = 'bz.keeper';
 
@@ -22,11 +23,20 @@ export function loadGame(): KeeperGame | null {
       ...emptyGame(),
       ...parsed,
       players: parsed.players,
-      rounds: parsed.rounds,
+      rounds: parsed.rounds.map(asRound),
     };
   } catch {
     return null;   // corrupt or unreadable: start clean rather than crash on launch
   }
+}
+
+/** Rounds were a bare map of scores before they could be timed. */
+function asRound(raw: unknown): KeeperRound {
+  const r = (raw ?? {}) as Partial<KeeperRound>;
+  if (r.scores && typeof r.scores === 'object') {
+    return { scores: r.scores, ms: typeof r.ms === 'number' ? r.ms : null };
+  }
+  return { scores: raw as Record<string, RoundScore>, ms: null };
 }
 
 export function saveGame(game: KeeperGame | null): void {

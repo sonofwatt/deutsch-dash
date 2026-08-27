@@ -29,6 +29,8 @@ describe('commentary', () => {
   it('calls out a fast blitz, and stays quiet about an ordinary one', () => {
     expect(ids(base({ durationMs: 38_000 }))).toContain('speed-blitz');
     expect(textOf(base({ durationMs: 38_000 }), 'speed-blitz')).toContain('38');
+    // Floored to agree with the keeper's clock, which cannot show 11.6 seconds.
+    expect(textOf(base({ durationMs: 11_600 }), 'speed-blitz')).toContain('11 seconds');
     expect(ids(base({ durationMs: 120_000 }))).not.toContain('speed-blitz');
   });
 

@@ -9,6 +9,7 @@ import { OpponentStrip } from '../components/OpponentStrip';
 import { ConnectionPill } from '../components/ConnectionPill';
 import { nearestSpace, useDrag, type DropTarget, type Point } from '../useDrag';
 import { raceFlashes } from '../raceFlash';
+import { useWoodSide } from '../prefs';
 import type { PlaySource } from '../../game/types';
 import '../game.css';
 
@@ -29,6 +30,7 @@ export function Game() {
   const markStuck = useGameStore(s => s.markStuck);
   const lastRejected = useGameStore(s => s.lastRejected);
   const online = useGameStore(s => s.online);
+  const [woodSide, swapSides] = useWoodSide();
 
   const round = room.round;
   const me = room.players[uid];
@@ -68,9 +70,14 @@ export function Game() {
       <div className="game-head">
         <strong>Round {room.meta.roundNumber}</strong>
         <span className="muted">{me.name} · {me.score} pts · to {room.meta.targetScore}</span>
+        {/* Which thumb the wood pile sits under, changeable mid-game on purpose:
+            a player who was auto-rejoined never sees a form again. */}
+        <button className="side-swap" onClick={swapSides}
+          aria-label={`Move the wood pile to the ${woodSide === 'right' ? 'left' : 'right'}`}
+          title="Swap Blitz and wood">⇄</button>
         <ConnectionPill />
       </div>
-      <OpponentStrip me={uid} players={room.players} tableaus={round.tableaus} />
+      <OpponentStrip me={uid} players={room.players} tableaus={round.tableaus} woodSide={woodSide} />
       <CenterGrid spaces={round.spaces} highlight={targets.spaces} badgeOf={badgeOf}
         onTap={i => void playTo({ space: i })} races={races}
         snapping={targets.spaces.length > 0}
@@ -79,7 +86,7 @@ export function Game() {
         <motion.div key={lastRejected?.at ?? 0}
           animate={lastRejected ? { x: [0, -8, 8, -5, 5, 0] } : { x: 0 }}
           transition={{ duration: 0.35 }}>
-          <TableauView t={hand} badgeId={me.badgeId} selection={selection}
+          <TableauView t={hand} badgeId={me.badgeId} selection={selection} woodSide={woodSide}
             postHighlight={targets.posts} onSelect={select} onFlip={flip}
             onTapPost={i => void playTo({ post: i })} startDrag={startDrag} />
         </motion.div>

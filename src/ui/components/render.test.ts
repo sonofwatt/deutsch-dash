@@ -56,6 +56,20 @@ describe('TableauView', () => {
     expect(html.indexOf('>wood ')).toBeGreaterThan(-1);
     expect(html.indexOf('>blitz ')).toBeLessThan(html.indexOf('>wood '));
   });
+  it('puts the wood under whichever thumb the player asked for', () => {
+    const right = renderToStaticMarkup(createElement(TableauView, {
+      t: tableau(), badgeId: 'tulip' as const, selection: null, postHighlight: [],
+      onSelect: noop, onFlip: noop, onTapPost: noop, startDrag: noop, woodSide: 'left' as const,
+    }));
+    expect(right.indexOf('>wood ')).toBeLessThan(right.indexOf('>blitz '));
+    // ...and the posts do not move with it: shuffling four positions to fix one
+    // would cost more muscle memory than it buys.
+    const labels = [...right.matchAll(/<div class="pile-label">([^<]*)</g)].map(m => m[1]);
+    expect(labels[0]).toMatch(/^wood /);
+    expect(labels[labels.length - 1]).toMatch(/^blitz /);
+    expect(labels.slice(1, -1)).toEqual(['2', '1', ' ']);
+  });
+
   it('offers the recycle control only once the face-down wood runs out', () => {
     expect(renderTableau(tableau({ woodIndex: 3 }))).not.toContain('recycle-slot');
     // The empty draw slot IS the control - there is no button on the face-up card,

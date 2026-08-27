@@ -14,11 +14,21 @@ export interface KeeperPlayer { id: string; name: string; badgeId: BadgeId }
  * the scoreboard, the ranking animation, the stats and the commentary work here
  * without knowing a card was never dealt.
  */
+export interface KeeperRound {
+  scores: Record<string, RoundScore>;
+  /** How long the round took, when it was timed and the number is believable. */
+  ms: number | null;
+}
+
 export interface KeeperGame {
   players: KeeperPlayer[];
   targetScore: number;
   snark: boolean;
-  rounds: Record<string, RoundScore>[];
+  rounds: KeeperRound[];
+  /** Epoch ms the round in progress was started at, or null if nothing is running. */
+  runningSince: number | null;
+  /** A finished round's length, held between stopping the clock and entering the scores. */
+  pendingMs: number | null;
 }
 
 export const MAX_KEEPER_PLAYERS = 8;
@@ -27,7 +37,18 @@ export const MAX_BLITZ_LEFT = 10;
 export const MAX_CENTER = 40;
 
 export const emptyGame = (targetScore = 75): KeeperGame =>
-  ({ players: [], targetScore, snark: true, rounds: [] });
+  ({ players: [], targetScore, snark: true, rounds: [], runningSince: null, pendingMs: null });
+
+/**
+ * A timed round only counts if the number is believable. Ten seconds is faster
+ * than a deal, and an hour means somebody started the clock and went to lunch -
+ * either way it would put nonsense in the commentary, so it is thrown away
+ * rather than recorded.
+ */
+export const TIMED_MIN_MS = 10_000;
+export const TIMED_MAX_MS = 60 * 60_000;
+export const believableMs = (ms: number): number | null =>
+  (ms >= TIMED_MIN_MS && ms <= TIMED_MAX_MS ? ms : null);
 
 export const roundScore = (centerCount: number, blitzLeft: number): RoundScore =>
   ({ centerCount, blitzLeft, delta: centerCount - 2 * blitzLeft });
@@ -37,7 +58,7 @@ export function totals(game: KeeperGame): Record<string, number> {
   const out: Record<string, number> = {};
   for (const p of game.players) out[p.id] = 0;
   for (const round of game.rounds) {
-    for (const [id, s] of Object.entries(round)) {
+    for (const [id, s] of Object.entries(round.scores)) {
       if (id in out) out[id] += s.delta;
     }
   }
@@ -67,15 +88,15 @@ export function statsOf(game: KeeperGame): GameStats | null {
   for (const p of game.players) running[p.id] = 0;
   let stats: GameStats | null = null;
   game.rounds.forEach((round, i) => {
-    for (const [id, s] of Object.entries(round)) {
+    for (const [id, s] of Object.entries(round.scores)) {
       if (id in running) running[id] += s.delta;
     }
     stats = nextStats(stats, {
       roundNumber: i + 1,
-      scores: round,
+      scores: round.scores,
       duels: null,                 // no races to see across a real table
-      blitzedBy: blitzerOf(round),
-      durationMs: null,            // nobody is holding a stopwatch
+      blitzedBy: blitzerOf(round.scores),
+      durationMs: round.ms,
       stuckRounds: 0,
       totals: { ...running },
     });

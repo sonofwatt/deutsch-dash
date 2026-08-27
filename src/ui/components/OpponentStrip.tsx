@@ -1,5 +1,6 @@
 import { BADGES, type BadgeId } from '../../game/badges';
 import { CardView } from './CardView';
+import type { WoodSide } from '../prefs';
 import type { Card, PlayerInfo, Tableau } from '../../game/types';
 
 /**
@@ -16,8 +17,19 @@ function Slot({ card, badgeId, count }: { card: Card; badgeId: BadgeId; count?: 
   );
 }
 
+const blitzSlot = (card: Card | null, t: Tableau, p: PlayerInfo) =>
+  card ? <Slot key="blitz" card={card} badgeId={p.badgeId} count={t.blitz.length} /> : null;
+const woodSlot = (card: Card | null, p: PlayerInfo) =>
+  card ? <Slot key="wood" card={card} badgeId={p.badgeId} /> : null;
+const postSlots = (t: Tableau, p: PlayerInfo) => t.post.map((stack, i) => {
+  const top = stack[stack.length - 1];
+  return top ? <Slot key={i} card={top} badgeId={p.badgeId} /> : null;
+});
+
 export function OpponentStrip(props: {
   me: string; players: Record<string, PlayerInfo>; tableaus: Record<string, Tableau>;
+  /** Optional: mirrors your own tableau, so a glance across reads the same way. */
+  woodSide?: WoodSide;
 }) {
   const rows = Object.entries(props.players)
     .filter(([uid]) => uid !== props.me)
@@ -46,12 +58,10 @@ export function OpponentStrip(props: {
                 strip that has to fit seven other players. */}
             {t && (
               <div className="opp-cards">
-                {blitzTop && <Slot card={blitzTop} badgeId={p.badgeId} count={t.blitz.length} />}
-                {t.post.map((s, i) => {
-                  const top = s[s.length - 1];
-                  return top ? <Slot key={i} card={top} badgeId={p.badgeId} /> : null;
-                })}
-                {woodTop && <Slot card={woodTop} badgeId={p.badgeId} />}
+                {(props.woodSide === 'left'
+                  ? [woodSlot(woodTop, p), ...postSlots(t, p), blitzSlot(blitzTop, t, p)]
+                  : [blitzSlot(blitzTop, t, p), ...postSlots(t, p), woodSlot(woodTop, p)]
+                )}
               </div>
             )}
           </div>

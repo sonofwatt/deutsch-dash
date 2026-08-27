@@ -84,6 +84,7 @@ export function Join({ code }: { code: string }) {
         <h1 className="title">Rejoining…</h1>
         <div className="code-pill">{code}</div>
         <p className="muted">Putting you back in the room.</p>
+        <a className="muted keep-back" href="#/">Home</a>
       </div>
     );
   }
@@ -99,6 +100,7 @@ export function Join({ code }: { code: string }) {
             : 'Waiting for your connection to come back — this will retry by itself.'}
         </p>
         <button className="btn btn-primary" onClick={retry}>Try again</button>
+        <a className="muted keep-back" href="#/">Home</a>
       </div>
     );
   }
@@ -114,6 +116,9 @@ export function Join({ code }: { code: string }) {
       <button className="btn btn-primary" disabled={!ready || joinPhase === 'joining'} onClick={join}>
         {joinPhase === 'joining' ? 'Joining…' : 'Join game'}
       </button>
+      {/* An invite link is often the only way into this app, and a stale one used
+          to be a dead end: no room to join, and nothing on screen going anywhere. */}
+      <a className="muted keep-back" href="#/">Home</a>
     </div>
   );
 }
