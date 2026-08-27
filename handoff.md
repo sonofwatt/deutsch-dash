@@ -1,6 +1,6 @@
 # Project Handoff — Deutsch Dash
 
-_Last updated: 2026-08-26 at `c90e6df`. Working tree clean, `main` ==
+_Last updated: 2026-08-26 at `92f57d0`. Working tree clean, `main` ==
 `origin/main`, CI green including the emulator suite, and the live site matches
 `HEAD`._
 
@@ -74,10 +74,18 @@ Firebase config at all.
 
 It reuses the online game rather than copying it. A round is the same
 `RoundScore`, which is what lets `ScoreList`, the ranking animation, `nextStats`
-and the commentary all work without a card being dealt. Two things are inferred
-rather than asked for: the blitzer is whoever is entered with an empty Blitz pile
-(nobody, if two people are), and there is no round duration, so the speed rules
-never fire.
+and the commentary all work without a card being dealt. The blitzer is inferred
+rather than asked for: whoever is entered with an empty Blitz pile, or nobody if
+two people are.
+
+**Rounds are timed.** Dealing starts a clock and "Blitz! Count the cards" stops
+it, which is what makes the speed remarks work at a table with real cards. A
+length under ten seconds or over an hour is discarded rather than recorded
+(`believableMs`) - it was a mis-tap or somebody went to lunch. The clock lives in
+the saved game, not in component state, so it survives a screen lock, and
+`pendingMs` carries a finished round's length between stopping the clock and
+entering the numbers. `storage.ts` still reads rounds saved before any of this
+existed, when a round was a bare map of scores.
 
 **The badge is the player's identity**, because badges are unique per table and
 that avoids inventing ids. It also means changing somebody's badge after a round
@@ -265,11 +273,71 @@ deliberate.
 
 ## Pending work
 
-Seven requests from the 2026-08-25/26 playtests. **#7 landed** and **#4 is
-deferred**; the other five are unstarted. Each was specced against the real code;
-the open questions are decisions only the product owner can make, and several
-genuinely change the game rather than the interface. Numbering is kept as-is so
-earlier notes still point at the right item.
+**Start with the hang below.** It is the only known bug in here; everything after
+it is a feature request.
+
+Of the seven requests from the 2026-08-25/26 playtests, **#1, #2 and #7 are
+built** and **#4 is deferred**; #3, #5 and #6 are unstarted. Each was specced
+against the real code; the open questions are decisions only the product owner
+can make. Numbering is kept as-is so earlier notes still point at the right item.
+
+### FIRST: two bots and an idle human hang the round — _a real bug_
+
+**Reproduced 2026-08-26**, by accident, while trying to watch a round end on its
+own: one human client, two medium bots, and the human doing nothing at all. Five
+minutes later the round had not ended, no score sheet, no stuck note. A second
+run where the human *did* play finished a round in about two minutes, so the
+bots are not the problem on their own.
+
+**The leading hypothesis, read off the code rather than instrumented.** The
+all-stuck rotation needs `allConnectedStuck`, which needs *every* connected
+player marked stuck. An idle player is never marked stuck, by either of
+`isStuck`'s two gates:
+
+- `isStuck` returns false the moment `hasLegalMove` is true, and an idle player
+  usually has one - their wood is untouched and their Blitz top will land
+  somewhere. They are **correctly** not stuck. The table is waiting for a player
+  who can move and is not moving, which is the right behaviour right up until
+  they have left the room.
+- And in the case where they genuinely have nothing, the second gate wants
+  `flipsSinceProgress >= ceil(wood.length / 3)` - proof they have been all the
+  way round their own wood pile. A player who never flips never gets there.
+
+Either way the rotation never fires, so the three-fruitless-rotations round end
+is unreachable, and the bots sit there having correctly concluded they have
+nothing to do.
+
+Note what is *not* broken: a player who closes the tab stops blocking, because
+`allConnectedStuck` filters on `connected`. It takes a player who is present and
+idle - a phone face-up on the table - which is exactly what happens when someone
+goes to make tea.
+
+**Decide before coding.** A player with legal moves who is not playing is not
+stuck; the game waiting for them is correct, and only becomes a hang when they
+have actually gone. So the question is what stands in for "gone":
+
+- An idle timeout that counts a player as stuck after N seconds of no action,
+  but only while every other connected player is already stuck. Least
+  disruptive, and it does nothing in a game where people are playing.
+- Let the host force the rotation when everyone *else* has been stuck for N
+  seconds. Same effect, decided in one place, but it is the host acting for
+  somebody else.
+- Do nothing in the round, and treat it as a presence problem: mark a player
+  away after N seconds of no input and let `allConnectedStuck` ignore them. This
+  one also fixes the same hang for a player who backgrounded the tab without
+  disconnecting.
+
+**Watch:** `flips` is a closure-scoped `Map` in `createGameStore` that is never
+persisted, so it resets to zero on any reload - a player who reloads mid-round
+starts again from "has not been round their wood". Whatever the fix, it should
+not make a reload look like activity. And `syncStuck` writes stuck claims
+automatically: anything that marks a player stuck also puts a note on their
+screen saying so, which for an idle player is the right message at the wrong
+time.
+
+**Repro script:** `/tmp/pw/realround.mjs` from this session - create a room, add
+two bots, start, and wait. See the live-app recipe under "What still needs
+testing".
 
 ### 1. Move the recycle button to the bottom right — _retired 2026-08-26_
 
