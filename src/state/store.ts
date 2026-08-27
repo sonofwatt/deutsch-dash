@@ -679,7 +679,14 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
       },
       setSittingOut(on) {
         const { code, uid } = get();
-        if (code && uid) hostAction(deps.setSittingOut(code, uid, on), 'change whether you are sitting out');
+        if (!code || !uid) return;
+        // Drop the hand locally in the same breath as the write. The snapshot
+        // that removes it is a round trip away, and the board must not stay
+        // playable in between - a card played out of a hand that is being
+        // deleted would land in the centre owned by somebody no longer in the
+        // round. Coming back does NOT restore it: the next deal does that.
+        if (on) set({ tableau: null, selection: null });
+        hostAction(deps.setSittingOut(code, uid, on), 'change whether you are sitting out');
       },
       setPaleCards(on) { const c = get().code; if (c) void deps.setPaleCards(c, on); },
       setIdentity(name, badgeId) {

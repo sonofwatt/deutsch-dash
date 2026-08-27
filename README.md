@@ -114,12 +114,17 @@ harmlessly.
 
 ## Sitting out
 
-**Sit out the next rounds**, in the lobby or under the board, deals you out from
-the next round on. You are not scored, nobody waits on you, and the round can end
-without you. Tap **I'm back — deal me in** and you are in the next one.
+The **‖ button** in the top corner of the board takes you out of the round you are
+in, right now — press it twice, because it forfeits that round. Your hand goes
+back in the box, you are not scored for the round in either direction, and nobody
+waits on you. There is a plainer **Sit out the next rounds** button in the lobby
+for the same thing before a round starts.
 
-It takes effect at the next deal rather than immediately, because a hand already
-on the table cannot be taken back without stranding its cards in the middle.
+Tap **I'm back — deal me in** and you are dealt into the next round. You cannot
+rejoin the round you left: the cards have already been dealt.
+
+Cards you had already played to the middle stay there. Other people are building
+on them.
 
 ## Host options
 

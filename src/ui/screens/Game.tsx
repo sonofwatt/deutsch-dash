@@ -13,8 +13,13 @@ import { nearestSpace, useDrag, type DropTarget, type Point } from '../useDrag';
 import { raceFlashes } from '../raceFlash';
 import { useOpenings } from '../openings';
 import { useWoodSide } from '../prefs';
-import type { PlaySource } from '../../game/types';
+import type { CenterSpace, PlaySource } from '../../game/types';
 import '../game.css';
+
+// Module-level so its identity is stable. useOpenings compares `spaces` by
+// reference to decide whether the board moved, and a fresh [] every render would
+// look like a change every render - which, since it sets state, would spin.
+const NO_SPACES: CenterSpace[] = [];
 
 // Feature flag, off after the first live playtest. The whole stuck path is intact
 // underneath - markStuck, the all-stuck wood rotation and the three-fruitless-
@@ -54,6 +59,14 @@ export function Game() {
   const hintsOn = room.meta.hintsOn ?? false;
   const [activity, setActivity] = useState(0);
   const [showing, setShowing] = useState<number | null>(null);
+  // The sit-out button's confirm step. Disarms itself, so a stray tap in the
+  // corner of a fast board costs nothing but a glance.
+  const [arming, setArming] = useState(false);
+  useEffect(() => {
+    if (!arming) return;
+    const t = setTimeout(() => setArming(false), 4000);
+    return () => clearTimeout(t);
+  }, [arming]);
   useEffect(() => {
     if (!hintsOn) return;
     let hide: ReturnType<typeof setTimeout> | undefined;
@@ -92,38 +105,42 @@ export function Game() {
   // word "dealing…" flashing up behind the moment someone won. Nothing can be
   // played from it - playTo refuses outside 'playing'.
   const hand = tableau ?? round?.tableaus[uid] ?? null;
-  // Sitting out is the ONLY reason to have no hand in a live round, and it is not
-  // a transient one - "dealing…" would sit there for the whole round. Give them
-  // the board to watch and the one button that gets them back in.
-  if (round && !hand && me?.sittingOut) {
+  // ABOVE the returns below, and it has to stay there. This is a hook, and both
+  // returns are now reachable mid-round - sitting out deletes the hand out from
+  // under a board that was rendering a moment ago - so calling it after them
+  // changes the hook count between renders and React tears the tree down. It
+  // used to sit lower on the reasoning that a round either has a board for its
+  // whole life or never does, which sitting out is exactly the end of.
+  const openings = useOpenings(round?.spaces ?? NO_SPACES, hand, uid, hintsOn);
+  if (!round) return <div className="screen"><p className="muted">dealing…</p></div>;
+  // No hand in a live round means sitting out, and it is not a transient state -
+  // "dealing…" would sit there for the rest of the round. Keyed on the missing
+  // HAND rather than on the flag, so tapping "I'm back" mid-round does not drop
+  // through to that placeholder while waiting for the next deal.
+  if (!hand) {
+    const out = me?.sittingOut === true;
     return (
       <div className="screen stack">
-        <h1 className="title">Sitting out</h1>
+        <h1 className="title">{out ? 'Sitting out' : 'Back next round'}</h1>
         <p className="muted">
-          Round {room.meta.roundNumber} is being played without you. You are not
-          being scored and nobody is waiting on you.
+          {out
+            ? `Round ${room.meta.roundNumber} is being played without you. You are not being
+               scored for it, and nobody is waiting on you.`
+            : `You are in from the next deal. Round ${room.meta.roundNumber} finishes without you.`}
         </p>
-        <button className="btn ready-btn" onClick={() => setSittingOut(false)}>
-          I'm back — deal me in
-        </button>
-        <p className="muted" style={{ fontSize: 13 }}>
-          You will be dealt into the next round.
-        </p>
+        {out
+          ? <button className="btn ready-btn" onClick={() => setSittingOut(false)}>
+              I'm back — deal me in
+            </button>
+          : <button className="btn btn-slim sit-out" onClick={() => setSittingOut(true)}>
+              Actually, keep me out
+            </button>}
         <a className="muted keep-back" href="#/">Home</a>
       </div>
     );
   }
-  if (!round || !hand) return <div className="screen"><p className="muted">dealing…</p></div>;
 
   const races = raceFlashes({ races: round.races, spaces: round.spaces, uid, lastRejected });
-  // Called after the early return above, which is safe only because that return
-  // is unconditional for the whole life of a round: no round means no board and
-  // no hand, and the screen is the "dealing…" placeholder either way.
-  //
-  // Behind the same host switch as the five-second hint: it is a smaller
-  // advantage, but the same kind, and the bots were tuned against a human
-  // playing without one.
-  const openings = useOpenings(round.spaces, hand, uid, hintsOn);
   const active = drag ? drag.source : selection;
   const targets = active ? legalTargets(hand, active, round.spaces) : { spaces: [], posts: [] };
   const stuckAvailable = !hasLegalMove(hand, round.spaces);
@@ -146,10 +163,21 @@ export function Game() {
         <span className="muted">{me.name} · {me.score} pts · to {room.meta.targetScore}</span>
         {/* Which thumb the wood pile sits under, changeable mid-game on purpose:
             a player who was auto-rejoined never sees a form again. */}
-        <button className="side-swap" onClick={swapSides}
-          aria-label={`Move the wood pile to the ${woodSide === 'right' ? 'left' : 'right'}`}
-          title="Swap Blitz and wood">⇄</button>
-        <ConnectionPill />
+        <span className="head-btns">
+          <ConnectionPill />
+          <button className="side-swap" onClick={swapSides}
+            aria-label={`Move the wood pile to the ${woodSide === 'right' ? 'left' : 'right'}`}
+            title="Swap Blitz and wood">⇄</button>
+          {/* Two taps, never one. This now ends the player's round outright and
+              forfeits its score, which is far too much to hang on one stray
+              thumb in the corner of a board being played at speed. The armed
+              state times out by itself so a mis-tap costs nothing. */}
+          {arming
+            ? <button className="side-swap arming" onClick={() => { setArming(false); setSittingOut(true); }}
+                aria-label="Confirm sitting out of this round">out?</button>
+            : <button className="side-swap" onClick={() => setArming(true)}
+                aria-label="Sit out" title="Sit out of the round">‖</button>}
+        </span>
       </div>
       <OpponentStrip me={uid} players={room.players} tableaus={round.tableaus} woodSide={woodSide} />
       <CenterGrid spaces={round.spaces} highlight={targets.spaces} badgeOf={badgeOf}
@@ -172,11 +200,7 @@ export function Game() {
         {actionError && <p className="error" style={{ margin: '6px 0 0', fontSize: 13 }}>{actionError}</p>}
         {/* The automatic "no moves left" note is in the drop band now (CenterGrid),
             where it costs no layout. This slot carries the away note instead. */}
-        {me.sittingOut
-          ? <button className="btn btn-slim sit-out" onClick={() => setSittingOut(false)}>
-              Sitting out from the next round — tap to stay in
-            </button>
-          : me.awayAt != null
+        {me.awayAt != null
           ? <button className="away-note" onClick={noteActivity}>Away — tap to rejoin the round</button>
           : ENABLE_STUCK_BUTTON && (
               <button className="btn stuck-btn" disabled={!stuckAvailable || me.stuckAt != null}

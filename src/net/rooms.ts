@@ -180,14 +180,36 @@ export function setReady(code: string, uid: string, on: boolean): Promise<void> 
 }
 
 /**
- * "Deal me out" / "deal me back in." Own record, own uid, same grant as `ready`.
- * Readying is cleared on the way out: a player who is not in the round cannot
- * meaningfully be ready for it, and leaving the flag set would have them counted
- * by `tableReady` on the way back in without their having said so.
+ * "Deal me out" / "deal me back in."
+ *
+ * Sitting out takes the player OUT OF THE ROUND IN PROGRESS: their tableau is
+ * deleted in the same write. Everything downstream follows from the hand being
+ * gone rather than needing to know about the flag - `scoreRound` iterates the
+ * tableaus, so a player without one gets no `RoundScore`, so `commitScores`
+ * leaves their total exactly where it was. Leaving mid-round forfeits that
+ * round's arithmetic in both directions: no penalty for the Blitz pile they
+ * abandoned, and no credit for what they had already played to the middle.
+ *
+ * Cards they already played to the centre stay there. They are part of piles
+ * other people are building on and cannot be taken back off the table.
+ *
+ * `ready` and `stuckAt` are cleared with it: a player who is not in the round
+ * cannot meaningfully be ready for it or stuck in it, and either flag left set
+ * would go on speaking for them - `tableReady` would count them on the way back
+ * in without their having said so.
+ *
+ * Both paths are the player's own (`players/$uid` and `round/tableaus/$uid`), so
+ * this needs no rules change and no host.
  */
 export function setSittingOut(code: string, uid: string, on: boolean): Promise<void> {
-  return update(ref(db, `rooms/${code}/players/${uid}`),
-    on ? { sittingOut: true, ready: null } : { sittingOut: null });
+  return update(roomRef(code), on
+    ? {
+        [`players/${uid}/sittingOut`]: true,
+        [`players/${uid}/ready`]: null,
+        [`players/${uid}/stuckAt`]: null,
+        [`round/tableaus/${uid}`]: null,
+      }
+    : { [`players/${uid}/sittingOut`]: null });
 }
 
 /**

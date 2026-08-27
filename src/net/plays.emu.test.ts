@@ -1,6 +1,6 @@
 /// <reference types="node" />
 import { describe, it, expect } from 'vitest';
-import { createRoom, normalizeRoom, setOrderly } from './rooms';
+import { createRoom, normalizeRoom, setOrderly, setSittingOut } from './rooms';
 import { commitScores, nextRound, playToCenter, startRound } from './plays';
 import { get, onValue, ref, update } from 'firebase/database';
 import type { Card, CenterSpace, Room, Suit } from '../game/types';
@@ -207,5 +207,58 @@ emu('the score commit does not ride on the stats write', () => {
     expect(seen.some(v => v.scores && !v.stats), 'scores and stats landed as one write').toBe(true);
     const written = (await get(ref(db, `rooms/${code}`))).val() as { stats?: unknown };
     expect(written.stats, 'the stats still get written, just separately').not.toBeNull();
+  });
+});
+
+emu('sitting out leaves the round in progress', () => {
+  // Two claims worth checking against the real rules rather than reasoning
+  // about: that a player can delete their OWN tableau mid-round (both paths of
+  // setSittingOut are their own, so it needs no host), and that having no
+  // tableau is genuinely what makes commitScores leave their total alone.
+  it('deletes the hand, and the round then scores without them', async () => {
+    const code = await createRoom('Dave', 'tulip');
+    const { db, ensureSignedIn } = await import('./firebase');
+    const dave = await ensureSignedIn();
+    const other = 'other-player-uid';
+    // Real totals, IN THE DATABASE - commitScores reads the room it is given, and
+    // a fixture that only claims a score in memory proves nothing about it.
+    await update(ref(db, `rooms/${code}`), {
+      [`players/${other}`]: { name: 'Sam', badgeId: 'anchor', joinedAt: 2, connected: true,
+                              stuckAt: null, awayAt: null, score: 5 },
+      [`players/${dave}/score`]: 12,
+    });
+    const players = {
+      [dave]: { name: 'Dave', badgeId: 'tulip' as const, joinedAt: 1, connected: true,
+                stuckAt: null, awayAt: null, score: 12 },
+      [other]: { name: 'Sam', badgeId: 'anchor' as const, joinedAt: 2, connected: true,
+                 stuckAt: null, awayAt: null, score: 5 },
+    };
+    const meta = { createdAt: Date.now(), hostId: dave, creatorId: dave, targetScore: 75,
+                   phase: 'lobby' as const, roundNumber: 1 };
+    await startRound(code, { meta, players, round: null });
+    expect(Object.keys((await normalizeRoom((await get(ref(db, `rooms/${code}`))).val()))!.round!.tableaus))
+      .toHaveLength(2);
+
+    // Dave walks away mid-round. His own client writes both paths.
+    await setSittingOut(code, dave, true);
+    const mid = normalizeRoom((await get(ref(db, `rooms/${code}`))).val())!;
+    expect(Object.keys(mid.round!.tableaus), 'the hand is gone').toEqual([other]);
+    expect(mid.players[dave].sittingOut).toBe(true);
+    expect(mid.players[dave].ready ?? null, 'ready cleared with it').toBeNull();
+
+    // Sam blitzes; the round is scored.
+    await update(ref(db, `rooms/${code}`), { 'round/blitzedBy': other, 'meta/phase': 'roundEnd' });
+    const atEnd = normalizeRoom((await get(ref(db, `rooms/${code}`))).val())!;
+    await commitScores(code, atEnd);
+    const after = normalizeRoom((await get(ref(db, `rooms/${code}`))).val())!;
+
+    expect(after.round!.scores![dave], 'no RoundScore for a player with no hand').toBeUndefined();
+    expect(after.players[dave].score, 'his total stands exactly still').toBe(12);
+    expect(after.players[other].score, 'and everyone else is scored as usual').not.toBe(5);
+
+    // The next deal leaves him out until he says otherwise.
+    await nextRound(code, after);
+    const dealt = normalizeRoom((await get(ref(db, `rooms/${code}`))).val())!.round!.tableaus;
+    expect(Object.keys(dealt)).toEqual([other]);
   });
 });

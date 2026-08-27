@@ -8,7 +8,7 @@ for a day, so anything it changed - the keeper's round timer, the wood/Blitz sid
 picker - was "built" but not live; check `git status -sb` before trusting a
 playtest._
 
-_**289 tests green** (267 unit + 22 emulator). This is the only place in the repo
+_**290 tests green** (267 unit + 23 emulator). This is the only place in the repo
 that quotes a count — it drifted three separate ways when it lived in four
 places, so keep it here and nowhere else._
 
@@ -562,11 +562,31 @@ the button.
 **#19. Sitting out.** — _built 2026-08-27._ `players/$uid/sittingOut`, owner-written
 like `ready` and `awayAt`, so no rules change.
 
-**It takes effect at the next DEAL, never mid-round, and the button says so.** A
-hand already on the table cannot be withdrawn without stranding its cards in the
-middle. What it does is make `startRound` skip them - no tableau at all - and
-almost everything else falls out of that for free: nothing to play, and no
-`RoundScore`, so `commitScores` leaves their total exactly where it was.
+**It ejects them from the round in progress.** `setSittingOut` deletes their
+tableau in the same write - both paths are the player's own, so no host and no
+rules change - and almost everything else falls out of the hand being gone:
+nothing to play, and no `RoundScore`, so `commitScores` leaves their total
+exactly where it was. Leaving mid-round therefore forfeits that round's
+arithmetic **in both directions**: no penalty for the Blitz pile they abandoned,
+and no credit for what they had already played to the middle. Cards already in
+the centre stay there - other people are building on them.
+
+`startRound` then keeps skipping them until they say otherwise.
+
+**The button is in the game head with the wood swap and the theme toggle, and it
+takes TWO taps.** It ends a player's round and forfeits its score, which is far
+too much to hang on one stray thumb in the corner of a board being played at
+speed; the armed state disarms itself after four seconds.
+
+**Trap this uncovered:** `useOpenings` used to be called AFTER the "no board"
+early return, on the reasoning that a round either has a board for its whole life
+or never does. Ejection is exactly the end of that: the hand vanishes under a
+board that was rendering a moment ago, the early return fires, the hook count
+changes and React tears the tree down - *"Rendered fewer hooks than expected."*
+It is hoisted above every conditional return now and must stay there. The stable
+`NO_SPACES` constant beside it is load-bearing too: the hook compares `spaces` by
+reference, so a fresh `[]` per render would look like a change every render, and
+it sets state.
 
 Two things did NOT fall out and had to be written:
 
