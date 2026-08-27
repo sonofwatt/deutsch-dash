@@ -4,6 +4,7 @@ import { BADGES, BADGE_IDS, type BadgeId } from '../../game/badges';
 import { BOT_LABELS, BOT_LEVELS, type BotLevel } from '../../game/bot';
 import { MAX_PLAYERS } from '../../net/rooms';
 import { ShareInvite } from '../components/ShareInvite';
+import { useWoodSide } from '../prefs';
 
 // Dutch/German-flavoured, to sit alongside the human names without pretending to be one.
 const BOT_NAMES = ['Ada', 'Bram', 'Cleo', 'Dirk', 'Elke', 'Fritz', 'Greta', 'Hans'];
@@ -20,6 +21,7 @@ export function Lobby({ code }: { code: string }) {
   const removeBot = useGameStore(s => s.removeBot);
   const actionError = useGameStore(s => s.actionError);
   const [level, setLevel] = useState<BotLevel>('medium');
+  const [woodSide, swapSides] = useWoodSide();
 
   const players = Object.entries(room.players).sort(([, a], [, b]) => a.joinedAt - b.joinedAt);
   const hostConnected = room.players[room.meta.hostId]?.connected ?? true;
@@ -86,6 +88,18 @@ export function Lobby({ code }: { code: string }) {
         <input id="orderly" type="checkbox" className="toggle" disabled={!host}
           checked={room.meta.orderlyGrid ?? false} onChange={e => setOrderly(e.target.checked)} />
       </div>
+      {/* Not a host option and not disabled for anybody: this one is about the
+          phone in your hand, so every player sets their own (see prefs.ts). The
+          same ⇄ is on the board mid-game; this is only the chance to get it
+          right before the cards land. */}
+      <div className="row">
+        <label className="muted">Wood pile</label>
+        <span className="spacer" />
+        <button className="btn btn-slim" onClick={swapSides}
+          aria-label={`Wood pile under the ${woodSide} thumb. Move it to the ${woodSide === 'right' ? 'left' : 'right'}.`}>
+          {woodSide === 'right' ? 'Right thumb ⇄' : 'Left thumb ⇄'}
+        </button>
+      </div>
       {actionError && <p className="error">{actionError}</p>}
       {host
         ? <button className="btn btn-primary" disabled={players.length < 2} onClick={start}>
@@ -94,6 +108,9 @@ export function Lobby({ code }: { code: string }) {
         : <p className="muted">
             {hostConnected ? 'Waiting for the host to start…' : 'Host is away — someone else can start shortly…'}
           </p>}
+      {/* A lobby nobody ever starts is a dead end too - most often a room whose
+          host wandered off before pressing anything. */}
+      <a className="muted keep-back" href="#/">Home</a>
     </div>
   );
 }

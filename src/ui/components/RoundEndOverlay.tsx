@@ -23,6 +23,10 @@ export function RoundEndOverlay() {
         {host
           ? <button className="btn btn-primary" onClick={next}>Next round</button>
           : <p className="muted" style={{ textAlign: 'center' }}>Waiting for the host…</p>}
+        {/* "Waiting for the host…" is a dead end when the host has put their
+            phone in a pocket and gone home. Quiet, because leaving mid-game is
+            not the thing to reach for first - but it has to be reachable. */}
+        <a className="muted keep-back" href="#/">Leave game</a>
       </div>
     </div>
   );

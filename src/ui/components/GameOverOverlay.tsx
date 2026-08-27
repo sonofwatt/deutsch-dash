@@ -32,6 +32,10 @@ export function GameOverOverlay() {
         {host
           ? <button className="btn btn-primary" onClick={again}>Rematch</button>
           : <p className="muted" style={{ textAlign: 'center' }}>Waiting for the host…</p>}
+        {/* A finished game is the most likely place for somebody to want out,
+            and until now it had no exit at all: the overlay covers the screen
+            and only the host had a button on it. */}
+        <a className="muted keep-back" href="#/">Home</a>
       </div>
     </div>
   );

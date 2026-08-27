@@ -196,6 +196,16 @@ export function Keeper() {
         {game.players.map(p => {
           const e = entries[p.id] ?? blankEntry();
           const delta = clamp(e.center, MAX_CENTER) - 2 * e.blitz;
+          const step = (by: number, label: string) => (
+            <button className="btn btn-slim" aria-label={label} key={by}
+              disabled={e.blitz === (by < 0 ? 0 : MAX_BLITZ_LEFT)}
+              onClick={() => setEntries(s => ({
+                ...s,
+                [p.id]: { ...e, blitz: Math.min(MAX_BLITZ_LEFT, Math.max(0, e.blitz + by)) },
+              }))}>
+              {by > 0 ? `+${by === 1 ? '' : by}` : `−${by === -1 ? '' : -by}`}
+            </button>
+          );
           return (
             <div className="keep-card" key={p.id}>
               <div className="keep-card-head">
@@ -207,23 +217,27 @@ export function Keeper() {
               </div>
               <div className="keep-fields">
                 <label className="keep-field">
-                  <span className="muted">In the middle</span>
+                  {/* Their proper name. "In the middle" was a description of
+                      where they are; at a table people say Dutch piles. */}
+                  <span className="muted">Dutch piles count</span>
                   <input className="field" type="number" inputMode="numeric" min={0} max={MAX_CENTER}
                     value={e.center} placeholder="0"
                     onChange={ev => setEntries(s => ({ ...s, [p.id]: { ...e, center: ev.target.value } }))} />
                 </label>
                 <div className="keep-field">
                   <span className="muted">Left in Blitz</span>
+                  {/* Ten cards, so single steps are up to ten taps for one
+                      player and the pile is usually counted in threes anyway.
+                      The coarse pair sits OUTSIDE the fine one: the value stays
+                      in the middle and the jump gets bigger the further your
+                      thumb travels from it. Both clamp, so ±3 near an end lands
+                      on the end rather than refusing to move. */}
                   <div className="keep-step">
-                    <button className="btn btn-slim" aria-label={`One fewer left for ${p.name}`}
-                      onClick={() => setEntries(s => ({ ...s, [p.id]: { ...e, blitz: Math.max(0, e.blitz - 1) } }))}>
-                      −
-                    </button>
+                    {step(-3, `Three fewer left for ${p.name}`)}
+                    {step(-1, `One fewer left for ${p.name}`)}
                     <span className="keep-step-value">{e.blitz}</span>
-                    <button className="btn btn-slim" aria-label={`One more left for ${p.name}`}
-                      onClick={() => setEntries(s => ({ ...s, [p.id]: { ...e, blitz: Math.min(MAX_BLITZ_LEFT, e.blitz + 1) } }))}>
-                      +
-                    </button>
+                    {step(1, `One more left for ${p.name}`)}
+                    {step(3, `Three more left for ${p.name}`)}
                   </div>
                 </div>
               </div>

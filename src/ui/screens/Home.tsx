@@ -49,8 +49,9 @@ export function Home() {
       <button className="btn btn-primary" disabled={!ready || joinPhase === 'joining'} onClick={create}>
         Create room
       </button>
-      <a className="btn keep-link" href="#/keeper">Keep score for real cards</a>
-      <div className="row">
+      {/* Create and join are the two ways into a game and now sit together. The
+          code field no longer takes the whole row to itself - see .join-row. */}
+      <div className="row join-row">
         <input className="field" placeholder="Room code" maxLength={6}
           value={code} onChange={e => setCode(e.target.value.toUpperCase())} />
         <button className="btn" disabled={!ready || code.trim().length !== 6 || joinPhase === 'joining'}
@@ -58,6 +59,10 @@ export function Home() {
           {joinPhase === 'joining' ? 'Joining…' : 'Join'}
         </button>
       </div>
+      {/* The scorepad is a different app for a different evening - a real deck on
+          a real table - so it is set well below the two buttons that start an
+          online game rather than sitting between them. */}
+      <a className="btn keep-link keep-entry" href="#/keeper">Keep score for meat space</a>
     </div>
   );
 }

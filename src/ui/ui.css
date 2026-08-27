@@ -5,7 +5,14 @@
 .badge-chip.selected { border-color: var(--badge); box-shadow: 0 0 0 2px var(--badge) inset; }
 .badge-chip:disabled { opacity: .3; }
 .badge-glyph { font-size: 20px; }
-.stack { display: flex; flex-direction: column; gap: 12px; max-width: 420px; width: 100%; margin: 0 auto; }
+.stack { --stack-gap: 12px;
+  display: flex; flex-direction: column; gap: var(--stack-gap); max-width: 420px;
+  width: 100%; margin: 0 auto; }
+/* `input.field` is width:100%, which in a wrapping .row pushed the button onto a
+   line of its own. The code is six characters; it does not need the whole row. */
+.join-row { flex-wrap: nowrap; }
+.join-row .field { flex: 1; min-width: 0; width: auto; }
+.join-row .btn { flex: 0 0 auto; }
 .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .spacer { flex: 1; }
 /* Host options in the lobby. 28px so the switch itself clears the 44px touch
@@ -65,6 +72,10 @@
 }
 /* Score keeper: a phone-shaped scorepad for a real deck. */
 .keep-link { display: grid; place-items: center; text-decoration: none; }
+/* Set apart from the two buttons that start an online game by exactly one field
+   height, so it reads as a separate offer rather than a third way to play this
+   one. The stack's own gap is already there, hence the subtraction. */
+.keep-entry { margin-top: calc(48px - var(--stack-gap)); }
 .keep-setup-row { display: grid; grid-template-columns: 40px minmax(0, 1fr) 44px; gap: 8px;
   align-items: center; }
 .keep-setup-row .chip { width: 40px; height: 40px; font-size: 20px; cursor: pointer;
@@ -78,12 +89,17 @@
 .keep-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-weight: 600; }
 .keep-delta { font-weight: 800; font-variant-numeric: tabular-nums; }
-.keep-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+/* One field per row. Side by side left the Blitz stepper about 160px on a
+   360px phone, which is not enough for four 44px buttons around a value - and
+   shrinking the buttons to fit would put the most-tapped control on this screen
+   under the touch-target floor. */
+.keep-fields { display: grid; gap: 10px; }
 .keep-field { display: grid; gap: 4px; font-size: 12px; }
 /* Steppers, not a keyboard: the Blitz pile is ten cards, so this is at most ten
    taps and never a wrong number. The middle count can be forty, which is why
    that one is a real numeric field. */
-.keep-step { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; gap: 4px; }
+.keep-step { display: grid; grid-template-columns: 44px 44px 1fr 44px 44px;
+  align-items: center; gap: 4px; }
 .keep-step .btn { min-height: 44px; padding: 0; }
 .keep-step-value { text-align: center; font-size: 18px; font-weight: 800;
   font-variant-numeric: tabular-nums; }
