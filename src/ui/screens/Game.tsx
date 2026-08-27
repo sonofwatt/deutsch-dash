@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useGameStore, legalTargets, gameStore } from '../../state/store';
 import { hasLegalMove } from '../../game/rules';
-import { HINT_DELAY_MS, hintSpace } from '../../game/hint';
+import { HINT_DELAY_MS, HINT_SHOW_MS, hintSpace } from '../../game/hint';
 import type { BadgeId } from '../../game/badges';
 import { CardView } from '../components/CardView';
 import { CenterGrid } from '../components/CenterGrid';
@@ -40,13 +40,18 @@ export function Game() {
   // board changes, or a fast table would keep resetting the clock of the one
   // player who has actually stalled. Comparing the two counters (rather than
   // setting a flag from inside the effect) is what keeps the timer out of render.
+  // It shows once per quiet spell and then goes: two pulses and away, rather than
+  // a mark breathing on the board until it stops being read. Another one costs a
+  // tap and another five seconds of stillness.
   const hintsOn = room.meta.hintsOn ?? false;
   const [activity, setActivity] = useState(0);
-  const [idleAt, setIdleAt] = useState(-1);
+  const [shownFor, setShownFor] = useState(-1);
+  const [doneFor, setDoneFor] = useState(-1);
   useEffect(() => {
     if (!hintsOn) return;
-    const t = setTimeout(() => setIdleAt(activity), HINT_DELAY_MS);
-    return () => clearTimeout(t);
+    const show = setTimeout(() => setShownFor(activity), HINT_DELAY_MS);
+    const hide = setTimeout(() => setDoneFor(activity), HINT_DELAY_MS + HINT_SHOW_MS);
+    return () => { clearTimeout(show); clearTimeout(hide); };
   }, [hintsOn, activity]);
 
   const round = room.round;
@@ -83,7 +88,8 @@ export function Game() {
   const stuckAvailable = !hasLegalMove(hand, round.spaces);
   // Recomputed every render rather than stored, so it can never point at a space
   // somebody else has since filled.
-  const hint = hintsOn && idleAt === activity ? hintSpace(hand, round.spaces) : null;
+  const showingHint = hintsOn && shownFor === activity && doneFor !== activity;
+  const hint = showingHint ? hintSpace(hand, round.spaces) : null;
 
   return (
     // Every tap and every drag on this screen is a sign of life, which is a wider

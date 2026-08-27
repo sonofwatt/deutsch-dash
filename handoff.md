@@ -1,7 +1,7 @@
 # Project Handoff — Deutsch Dash
 
-_Last updated: 2026-08-27, with the away-presence fix and the last three playtest
-requests (#3, #5, #6). Working tree
+_Last updated: 2026-08-27, with the away-presence fix, the last three playtest
+requests (#3, #5, #6), and the round of tweaks that followed them. Working tree
 clean, CI green including the emulator suite. Note that `92f57d0` sat unpushed
 for a day, so anything it changed - the keeper's round timer, the wood/Blitz side
 picker - was "built" but not live; check `git status -sb` before trusting a
@@ -270,8 +270,14 @@ deliberate.
 - `centerPlayTxn` archives a pile into `space.history` and clears `stack` at
   exactly 10, freeing the space server-side, so a stale client cannot revive a
   finished pile. Finished piles show on the rails flanking the board.
-- Board size is `min(24, 4 × players)` — `spaceCountForPlayers`. Four per player
-  is one space per Ace in the game; the cap is a legibility choice.
+- Board size is `4 × players` — `spaceCountForPlayers`, capped only by
+  `MAX_SPACES = 32`, which is `4 × MAX_PLAYERS` and so no longer binds. Four per
+  player is **one space per Ace in the game**, and keeping that exact is what
+  guarantees an Ace always has somewhere to go: if every space is occupied then
+  every Ace is already down, so nobody can be holding one. The cap used to be 24
+  and broke that at seven and eight players - survivable on an ordinary board,
+  fatal on an orderly one, which cannot lend one suit's space to another. Eight
+  players now get 32 spaces at 8 × 4 and the slots shrink to fit.
 - **`ENABLE_STUCK_BUTTON` is `false`** and the whole stuck path still runs
   underneath. Being stuck is *detected* by `isStuck` + `syncStuck`, not declared.
   `isStuck` needs more than "no legal move": either zero wood, or
@@ -474,9 +480,10 @@ none of them can offer a move another refuses.
 **The starvation worry in the original spec does not survive the arithmetic.**
 `spaceCountForPlayers` is `4 x players`, so spaces-per-suit exactly equals
 Aces-per-suit: if all four red spaces are busy at four players, all four red Aces
-are already down and nobody can be holding a fifth. It only bites above the
-24-space cap, at **7-8 players**, where the ordinary board is over-subscribed
-anyway. `rules.test.ts` pins that property rather than the reasoning.
+are already down and nobody can be holding a fifth. The one place it *did* bite
+was above the old 24-space cap, at 7-8 players - and that was fixed by removing
+the cap rather than by softening the rule: `MAX_SPACES` is 32 now, so the ratio
+holds at every player count. `rules.test.ts` pins the property, not the reasoning.
 
 What actually constrained the design was the column count, not card size:
 `gridColumns` is `max(4, ceil(count/4))`, so a 20-space board is **5 columns** -
@@ -485,9 +492,10 @@ which cannot be one colour per column with four suits. Hence:
 - **Four columns up to 16 spaces, eight above** (`orderlyColumns`), with adjacent
   columns paired per suit so eight columns read as four wide bands rather than a
   stripe pattern. 2-4 players get exactly the layout they get today.
-- **A 5-player orderly board rounds 20 up to 24**, the one natural size that
-  divides into neither. Everything else already divides, and no orderly board
-  goes past four rows.
+- **An orderly board rounds up to a whole number of rows**: 20 -> 24 and 28 -> 32,
+  both of which would otherwise leave holes in the bottom row. Everything else
+  already divides, no orderly board goes past four rows, and the rounding is
+  stable under its own output so nothing downstream can disagree about the size.
 - Cards land ~42px on a 360px phone at eight columns, which is about what they
   are now - the spec's "~34px, at the floor" was pessimistic in the same way the
   six-column estimate was.
@@ -535,18 +543,23 @@ Decisions taken:
   playing at speed. The idle counter watches *your* input only, not board changes -
   a fast table would otherwise keep resetting the clock of the one player who has
   actually stalled.
+- **Two pulses over `HINT_SHOW_MS` (1s), and then it is gone**, rather than
+  breathing on the board until it becomes furniture and stops being read. It does
+  not come back on its own: another one costs a tap and another five seconds of
+  stillness. The *element* is removed on the timer rather than the animation being
+  left to end itself, which is what makes reduced motion behave identically - the
+  same one-second mark, held steady instead of pulsed.
 - **Violet** (`--hint`), never green: green on this board means exactly one thing,
   "the card you are holding lands here", and a second green would erode it.
 - **Reduced motion is handled**, which it was not anywhere else: `MotionConfig
   reducedMotion="user"` does not reach CSS keyframes, so the pulse has its own
   `prefers-reduced-motion` rule. The outline stays; it just stops breathing.
 
-**Known and intended:** a post-to-post move has no square on the grid to point at,
-so nothing flashes for it. Early in a round, before anyone has an Ace down, a
-player with no centre move at all gets no hint - which is correct (there is
-nothing on the grid to point at) but does mean the feature looks inert for the
-first few seconds of about half of all deals. Worth knowing before calling it
-broken.
+**Intended, and confirmed as wanted:** a post-to-post move has no square on the
+grid to point at, so nothing flashes for it. Early in a round, before anyone has
+an Ace down, a player with no centre move at all gets no hint at all. That is the
+behaviour asked for - the hint is about the grid - so a quiet first few seconds is
+the feature working, not the feature broken. Do not "fix" it.
 
 ### 7. Score screen: round arithmetic — _landed in `b38da9b`_
 
@@ -712,6 +725,21 @@ features, at 393px in **both themes**:
   shift when it appears. `--warn-ink` at #fbbf24 reads well on the dark surface -
   the check that `--danger` originally failed.
 
+Then, after the tweaks:
+
+- **A full eight-player board, measured rather than guessed.** 32 slots at 8 x 4,
+  no overflow in either axis: the slot lands at **36.9 x 51.6px at 393px** and
+  **33.5 x 46.9px at 360px**, against a grid area that stays a constant 303.6px
+  wide at 360px - the finished-pile rails are a fixed `--rail-w`, so they do not
+  eat into the board as piles complete. Rows do not change (a 24-space board was
+  already four deep at six columns), so the extra spaces cost width only.
+  33.5px is under the 34px `--card-w` floor, which is the honest cost of eight
+  players on a small phone; `--slot` has no floor of its own, by design.
+- The hint's whole life, sampled: visible for **975ms**, and still hidden four
+  seconds later.
+- An away player dimmed in the opponent strip while still `connected: true` in the
+  room - the case `.opp.absent` was renamed for.
+
 And the away fix, from earlier the same day:
 
 - A player's own client marking itself away after 45s of nothing, and the away
@@ -807,11 +835,6 @@ game is frozen, including the bot. That is inherent to a serverless design.
   the loser being human in `driveBot`.
 - **The board's dead space** (see above) is unchanged: cards stay at 12vw even
   when a four-column board has room for far more.
-- **The opponent strip does not show that somebody is away.** `.opp.away` dims a
-  *disconnected* player and predates `awayAt`; a player who is present but has
-  wandered off looks entirely normal to everyone else. One condition would fix it,
-  but the class name would then mean two things - worth renaming in the same
-  breath.
 - An opponent's empty slots are gone, but **your own wood still shows an empty
   slot** under the face-down pile before the first flip. That one is arguably a
   target rather than a gap - it is where the turned-over card lands.

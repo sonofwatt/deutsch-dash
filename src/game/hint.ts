@@ -9,6 +9,16 @@ import { botMoves, rankMove } from './bot';
 export const HINT_DELAY_MS = 5000;
 
 /**
+ * How long the hint stays on screen once it fires: two pulses, half a second
+ * each, and then it is gone. A mark that sat there breathing indefinitely turns
+ * into part of the furniture and stops being read at all. Kept in step with the
+ * .pile-space.hint keyframes in game.css - the CSS does the pulsing, this decides
+ * when the mark exists at all, which is also what makes it behave the same way
+ * for somebody who has asked for reduced motion.
+ */
+export const HINT_SHOW_MS = 1000;
+
+/**
  * Which centre space to flash. The hint points at the DESTINATION, never at the
  * card in the player's own tableau: they still have to work out which of their
  * cards fits and drag it there, which is the part of the game worth keeping. It

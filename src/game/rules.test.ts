@@ -36,20 +36,31 @@ describe('spaceCountForPlayers', () => {
     expect(spaceCountForPlayers(4)).toBe(16);
     expect(spaceCountForPlayers(5)).toBe(20);
   });
-  it('caps rather than growing to a cluttered 32', () => {
-    expect(spaceCountForPlayers(6)).toBe(MAX_SPACES);
-    expect(spaceCountForPlayers(8)).toBe(MAX_SPACES);
-    expect(MAX_SPACES).toBe(24);
+  it('keeps one space per Ace all the way to eight players', () => {
+    // The ratio is the whole point: if every space is occupied then every Ace is
+    // already down, so nobody can be holding one with nowhere to put it. The old
+    // cap of 24 broke that at seven and eight - fatally so on an orderly board,
+    // which cannot lend one suit's space to another.
+    expect(spaceCountForPlayers(6)).toBe(24);
+    expect(spaceCountForPlayers(7)).toBe(28);
+    expect(spaceCountForPlayers(8)).toBe(32);
+    expect(MAX_SPACES).toBe(32); // = 4 x MAX_PLAYERS: a backstop, no longer a cap
   });
   it('never returns zero for a degenerate room', () => {
     expect(spaceCountForPlayers(0)).toBe(4);
   });
-  it('rounds the one orderly size that will not divide into columns up to 24', () => {
-    // 20 spaces is 8 x 2.5 - four holes in the bottom row - and 4 x 5 is a row
-    // taller than the board has to give. Every other size already divides.
+  it('rounds an orderly board up to a whole number of rows', () => {
+    // 20 is 8 x 2.5 and 28 is 8 x 3.5: both leave holes in the bottom row.
     expect(spaceCountForPlayers(5, true)).toBe(24);
+    expect(spaceCountForPlayers(7, true)).toBe(32);
     for (const n of [2, 3, 4, 6, 8]) {
-      expect(spaceCountForPlayers(n, true)).toBe(spaceCountForPlayers(n));
+      expect(spaceCountForPlayers(n, true)).toBe(spaceCountForPlayers(n)); // already divide
+    }
+    // and rounding is stable: the size it lands on maps to itself, so nothing
+    // downstream can disagree about how big the board is.
+    for (const n of [2, 3, 4, 5, 6, 7, 8]) {
+      const once = spaceCountForPlayers(n, true);
+      expect(Math.ceil(once / orderlyColumns(once)) * orderlyColumns(once)).toBe(once);
     }
   });
 });
@@ -59,7 +70,7 @@ describe('the orderly grid', () => {
     expect(orderlyColumns(8)).toBe(4);
     expect(orderlyColumns(16)).toBe(4);
     expect(orderlyColumns(24)).toBe(8);
-    for (const players of [2, 3, 4, 5, 6, 8]) {
+    for (const players of [2, 3, 4, 5, 6, 7, 8]) {
       const count = spaceCountForPlayers(players, true);
       expect(count % orderlyColumns(count)).toBe(0);            // no holes
       expect(count / orderlyColumns(count)).toBeLessThanOrEqual(4); // and no fifth row
@@ -76,10 +87,12 @@ describe('the orderly grid', () => {
   });
 
   it('gives every suit exactly as many spaces as there are Aces of it, up to the cap', () => {
-    // This is why an orderly board does not starve below the cap: if all of red's
-    // spaces are busy, every red Ace in the game is already down, so nobody can be
-    // holding one. Above the cap it CAN starve - but so can the ordinary board.
-    for (const players of [2, 3, 4, 5, 6]) {
+    // If all of red's spaces are busy, every red Ace in the game is already down,
+    // so nobody can be holding one with nowhere to put it.
+    // Now true at EVERY player count, which is what raising MAX_SPACES to 32 was
+    // for: an orderly board splits its spaces between four suits and cannot lend
+    // one suit's space to another, so a shortfall lands on a single colour.
+    for (const players of [2, 3, 4, 5, 6, 7, 8]) {
       const count = spaceCountForPlayers(players, true);
       const reds = Array.from({ length: count }, (_, i) => suitForSpace(i, count))
         .filter(su => su === 'red').length;

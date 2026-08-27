@@ -10,6 +10,7 @@ import { ScoreList } from './ScoreList';
 import { rankRows } from '../scoreRanks';
 import { raceFlashes } from '../raceFlash';
 import { orderlySpaces } from '../../game/center';
+import { spaceCountForPlayers } from '../../game/rules';
 import { splashVariant } from '../splashVariant';
 import type { Card, CenterSpace, PlayerInfo, RoundScore, Suit, Tableau } from '../../game/types';
 
@@ -145,10 +146,14 @@ describe('CenterGrid', () => {
     expect(html).not.toContain('owned');   // an ordinary board claims nothing
   });
   it('lays the board out in four rows at every game size', () => {
-    // 4 x players spaces in, at most four rows out
-    for (const players of [2, 3, 4, 5, 8]) {
-      const count = 4 * players;
-      expect(Math.ceil(count / gridColumns(count))).toBeLessThanOrEqual(4);
+    // Every real board size, ordinary and orderly, in at most four rows out. Eight
+    // players is 32 spaces now rather than 24, and it is this that has to hold:
+    // the extra spaces go sideways into narrower slots, never into a fifth row.
+    for (const players of [2, 3, 4, 5, 6, 7, 8]) {
+      for (const orderly of [false, true]) {
+        const count = spaceCountForPlayers(players, orderly);
+        expect(Math.ceil(count / gridColumns(count, orderly))).toBeLessThanOrEqual(4);
+      }
     }
     expect(gridColumns(8)).toBe(4);   // two players: 4x2
     expect(gridColumns(32)).toBe(8);  // eight players: 8x4

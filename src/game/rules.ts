@@ -9,30 +9,40 @@ export function postCountForPlayers(playerCount: number): number {
   return playerCount === 2 ? 5 : 3;
 }
 
-/** Never more than this many centre spaces - see spaceCountForPlayers. */
-export const MAX_SPACES = 24;
+/**
+ * Never more than this many centre spaces. It is 4 x MAX_PLAYERS, so at the real
+ * player ceiling the cap does not bind at all any more - it is a backstop against
+ * a nonsense player count, not a design choice. It used to be 24, which DID bind
+ * at seven and eight players; see spaceCountForPlayers for why that had to go.
+ */
+export const MAX_SPACES = 32;
 
 /**
- * Centre spaces for a game. 4 x players is the natural size: only an Ace opens
- * a space (canPlayToCenter admits a 1 only onto an empty stack), and each player
- * holds exactly one Ace per suit, so that is one space per Ace in the game.
+ * Centre spaces for a game. 4 x players, and that ratio is load-bearing rather
+ * than cosmetic: only an Ace opens a space, and each player holds exactly one Ace
+ * per suit, so 4 x players is one space per Ace in the game. Keeping it exact is
+ * what guarantees an Ace always has somewhere to go - if every space is occupied,
+ * every Ace is already down and nobody can be holding one.
  *
- * Capped at MAX_SPACES because a completed pile now CLEARS its space again, so
- * the board only ever has to hold the piles that are open at one moment, not
- * every pile the round will ever produce. Past six players the uncapped count
- * would only add clutter and shrink the cards on a phone. A full board is
- * transient - the next pile to finish frees a space - and a genuine deadlock is
- * what the stuck detection is for.
+ * The old cap of 24 broke that at seven and eight players, where 28 and 32 Aces
+ * competed for 24 spaces. On an ordinary board that is survivable (a full board is
+ * transient - the next pile to finish frees a space, and genuine deadlock is what
+ * the stuck detection is for), but an orderly board divides the spaces between
+ * four suits and cannot lend one suit's space to another, so the shortfall lands
+ * on a single colour and starves it. Eight players now get 32 spaces and the
+ * slots shrink to fit; see --slot in game.css, which sizes on the container.
  *
  * Two players get 8 (not the old fixed 16), which is why cards are bigger there.
  */
 export function spaceCountForPlayers(playerCount: number, orderly = false): number {
   const natural = Math.min(MAX_SPACES, 4 * Math.max(1, playerCount));
-  // One colour per column means the column count has to be a multiple of 4, and
-  // 20 is the one natural size that divides into neither 4 nor 8 columns evenly
-  // (8 x 2.5 leaves four holes in the bottom row). Round the 5-player orderly
-  // board up to a clean 8 x 3 rather than shipping a gap-toothed grid.
-  return orderly && natural === 20 ? 24 : natural;
+  if (!orderly) return natural;
+  // One colour per column means the columns come in fours, so an orderly board
+  // has to be a whole number of rows deep: 20 is 8 x 2.5 and 28 is 8 x 3.5, both
+  // of which leave holes in the bottom row. Round up to fill it. Stable under its
+  // own output - 20 -> 24 and 28 -> 32 both land on a size that maps to itself.
+  const cols = orderlyColumns(natural);
+  return Math.ceil(natural / cols) * cols;
 }
 
 /**

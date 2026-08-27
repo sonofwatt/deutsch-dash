@@ -41,8 +41,13 @@ export function OpponentStrip(props: {
         const t = props.tableaus[uid];
         const woodTop = t && t.woodIndex > 0 ? t.wood[t.woodIndex - 1] ?? null : null;
         const blitzTop = t ? t.blitz[t.blitz.length - 1] ?? null : null;
+        // Dimmed for either kind of absence - a dropped socket and a phone lying
+        // face-up on the table both mean "do not wait for them", and at this size
+        // two shades of grey would be indistinguishable anyway. The class is
+        // `absent` rather than `away` precisely because it is now the pair of
+        // them, not just the disconnect it started as.
         return (
-          <div key={uid} className={`opp${p.connected ? '' : ' away'}`}
+          <div key={uid} className={`opp${p.connected && p.awayAt == null ? '' : ' absent'}`}
             style={{ ['--badge' as string]: b.color }}>
             <div className="opp-head">
               <span>{b.glyph}</span>

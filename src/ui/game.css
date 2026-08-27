@@ -45,15 +45,18 @@
 /* The helper hint: a slow violet breath around the space a card could go into.
    Violet and not green, because green on this board means one specific thing -
    "the card in your hand lands here" - and a second green would erode it. */
-.pile-space.hint { border-radius: var(--radius); animation: hint-pulse 1.6s ease-in-out infinite;
-  outline: 2px solid var(--hint); outline-offset: 1px; }
+/* Twice in a second and then away - the element itself is removed after
+   HINT_SHOW_MS (see Game.tsx), so this only has to cover the second it is here.
+   Two iterations of half a second each, starting and ending invisible. */
+.pile-space.hint { border-radius: var(--radius); outline: 2px solid transparent; outline-offset: 1px;
+  animation: hint-pulse .5s ease-in-out 2; }
 @keyframes hint-pulse {
-  0%, 100% { outline-color: color-mix(in srgb, var(--hint) 25%, transparent); }
+  0%, 100% { outline-color: transparent; }
   50%      { outline-color: var(--hint); }
 }
 /* MotionConfig reducedMotion="user" does not reach CSS keyframes, so this is the
-   only thing standing between a pulsing board and somebody who asked for stillness.
-   The outline stays: the hint still shows, it just stops breathing. */
+   only thing standing between a flashing board and somebody who asked for
+   stillness. They get the same one-second mark, held steady instead of pulsed. */
 @media (prefers-reduced-motion: reduce) {
   .pile-space.hint { animation: none; outline-color: var(--hint); }
 }
@@ -152,7 +155,7 @@
   border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line);
   font-size: 12px; white-space: nowrap; }
 .opp-head { display: flex; align-items: center; gap: 6px; }
-.opp.away { opacity: .5; }
+.opp.absent { opacity: .5; }
 .opp-blitz { font-weight: 800; color: var(--badge); }
 .opp-ai { font-size: 9px; font-weight: 800; letter-spacing: .06em; color: var(--ink-soft);
   border: 1px solid var(--line); border-radius: 999px; padding: 0 5px; }
