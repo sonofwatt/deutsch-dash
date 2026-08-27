@@ -2,8 +2,8 @@ import { increment, ref, runTransaction, serverTimestamp, set, update } from 'fi
 import { db } from './firebase';
 import type { Card, CenterSpace, PlayerInfo, Room, Tableau } from '../game/types';
 import { buildDeck, deal, shuffle, type Rng } from '../game/deck';
-import { postCountForPlayers } from '../game/rules';
-import { centerPlayTxn, reconcileTableau, spaceOwner } from '../game/center';
+import { postCountForPlayers, spaceCountForPlayers } from '../game/rules';
+import { centerPlayTxn, orderlySpaces, reconcileTableau, spaceOwner } from '../game/center';
 import { scoreRound, winnerIds } from '../game/scoring';
 import { nextStats } from '../game/stats';
 
@@ -35,9 +35,16 @@ export async function startRound(code: string, room: Room, rng?: Rng): Promise<v
   const postCount = postCountForPlayers(uids.length);
   const tableaus: Record<string, Tableau> = {};
   for (const uid of uids) tableaus[uid] = deal(shuffle(buildDeck(uid), rng), postCount);
+  // An ordinary round leaves `spaces` absent and lets every client normalize the
+  // same empty board into being. An orderly one has to be WRITTEN, because the
+  // suit constraint is only enforceable if centerPlayTxn can read it off the node
+  // it is running against - the transaction never learns its own index.
+  const orderly = room.meta.orderlyGrid ?? false;
+  const spaces = orderly ? orderlySpaces(spaceCountForPlayers(uids.length, true)) : null;
   const patch: Record<string, unknown> = {
     round: {
       tableaus, stuckRounds: 0, blitzedBy: null, scores: null, startedAt: serverTimestamp(),
+      ...(spaces ? { spaces } : {}),
     },
     'meta/phase': 'playing',
     'meta/roundNumber': room.meta.roundNumber + 1,

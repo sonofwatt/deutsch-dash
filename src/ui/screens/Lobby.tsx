@@ -13,6 +13,8 @@ export function Lobby({ code }: { code: string }) {
   const uid = useGameStore(s => s.uid);
   const host = isHost({ uid, room });
   const setTarget = useGameStore(s => s.setTarget);
+  const setHints = useGameStore(s => s.setHints);
+  const setOrderly = useGameStore(s => s.setOrderly);
   const start = useGameStore(s => s.start);
   const addBot = useGameStore(s => s.addBot);
   const removeBot = useGameStore(s => s.removeBot);
@@ -67,6 +69,22 @@ export function Lobby({ code }: { code: string }) {
           onChange={e => setTarget(Number(e.target.value))}>
           {[25, 50, 75, 100].map(n => <option key={n} value={n}>{n} points</option>)}
         </select>
+      </div>
+      <div className="row">
+        {/* Room-wide, not a device preference: hints are an advantage, and bot
+            difficulty was tuned against a human without them. */}
+        <label className="muted" htmlFor="hints">Helper hints</label>
+        <span className="spacer" />
+        <input id="hints" type="checkbox" className="toggle" disabled={!host}
+          checked={room.meta.hintsOn ?? false} onChange={e => setHints(e.target.checked)} />
+      </div>
+      <div className="row">
+        {/* Read at startRound, so it settles for a whole round at a time and the
+            board cannot change shape under a hand somebody is holding. */}
+        <label className="muted" htmlFor="orderly">Orderly grid</label>
+        <span className="spacer" />
+        <input id="orderly" type="checkbox" className="toggle" disabled={!host}
+          checked={room.meta.orderlyGrid ?? false} onChange={e => setOrderly(e.target.checked)} />
       </div>
       {actionError && <p className="error">{actionError}</p>}
       {host

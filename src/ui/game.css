@@ -42,6 +42,28 @@
   transition: opacity .15s ease, border-color .15s ease, background-color .15s ease; }
 .snap-band.on { opacity: 1; border-color: #22c55e; color: var(--ink);
   background: rgb(34 197 94 / .07); }
+/* The helper hint: a slow violet breath around the space a card could go into.
+   Violet and not green, because green on this board means one specific thing -
+   "the card in your hand lands here" - and a second green would erode it. */
+.pile-space.hint { border-radius: var(--radius); animation: hint-pulse 1.6s ease-in-out infinite;
+  outline: 2px solid var(--hint); outline-offset: 1px; }
+@keyframes hint-pulse {
+  0%, 100% { outline-color: color-mix(in srgb, var(--hint) 25%, transparent); }
+  50%      { outline-color: var(--hint); }
+}
+/* MotionConfig reducedMotion="user" does not reach CSS keyframes, so this is the
+   only thing standing between a pulsing board and somebody who asked for stillness.
+   The outline stays: the hint still shows, it just stops breathing. */
+@media (prefers-reduced-motion: reduce) {
+  .pile-space.hint { animation: none; outline-color: var(--hint); }
+}
+
+/* Stuck: the band is the one element on the board that is always present and
+   already the largest, so saying it here costs no layout at all. min-height is
+   kept a MINIMUM - longer copy must be able to reflow rather than clip. */
+.snap-band.stuck { opacity: 1; border-style: solid; border-color: var(--warn);
+  color: var(--warn-ink); font-weight: 700; font-size: 12px;
+  background: color-mix(in srgb, var(--warn) 9%, transparent); }
 
 /* Completed piles, stacked down each side of the board. */
 .done-rail { --rail-w: clamp(16px, 4.5vw, 26px); width: var(--rail-w);
@@ -57,6 +79,11 @@
    a custom property containing var() is substituted where it is DECLARED and
    inherited already-resolved, so a --card-h on :root would stay pinned to the root
    --card-w and ignore every local override (tight tableau, opponent strip, slots). */
+/* Orderly board: the space is spoken for by one suit, and that has to be legible
+   while it is EMPTY - a card that has landed already says its own colour. Solid
+   rather than dashed, because "reserved" is a different thing from "free". */
+.pile-space.owned { border-style: solid; border-color: color-mix(in srgb, var(--suit) 65%, var(--pile-line));
+  background: color-mix(in srgb, var(--suit) 7%, transparent); }
 .pile-space { --slot-border: 2px;
   width: var(--card-w); aspect-ratio: 2.5 / 3.5; border-radius: var(--radius);
   border: var(--slot-border) dashed var(--pile-line);
@@ -177,7 +204,6 @@
 .drag-ghost { position: fixed; left: 0; top: 0; z-index: 50; pointer-events: none;
   will-change: transform; }
 .stuck-btn { min-height: 44px; }
-.stuck-note { margin: 6px 0 0; text-align: center; font-size: 12px; color: var(--ink-soft); }
 /* Sits in the stuck note's slot and is deliberately louder than it: it is read on
    return, by someone whose board may have moved while the phone lay on the table. */
 .away-note { width: 100%; min-height: 44px; margin-top: 6px; border-radius: var(--radius);

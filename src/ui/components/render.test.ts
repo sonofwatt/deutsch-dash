@@ -9,6 +9,7 @@ import { BlitzSplash } from './BlitzSplash';
 import { ScoreList } from './ScoreList';
 import { rankRows } from '../scoreRanks';
 import { raceFlashes } from '../raceFlash';
+import { orderlySpaces } from '../../game/center';
 import { splashVariant } from '../splashVariant';
 import type { Card, CenterSpace, PlayerInfo, RoundScore, Suit, Tableau } from '../../game/types';
 
@@ -98,6 +99,51 @@ describe('CenterGrid', () => {
     expect(html).toContain('data-drop="space:2"');
     expect(html).toContain('data-drop="nearest"');
   });
+  it('says "no moves left" inside the drop band, not under the tableau', () => {
+    // It used to be a <p> below the tableau, which shoved the whole board up the
+    // screen the moment it appeared. The band is always there, so this costs
+    // nothing; and a stuck player has no legal targets, so the band is never lit
+    // and hinting "drop here" at the same time.
+    const stuck = renderToStaticMarkup(createElement(CenterGrid, {
+      spaces, highlight: [], badgeOf: () => 'star' as const, onTap: noop, onSnapTap: noop, stuck: true,
+    }));
+    expect(stuck).toContain('snap-band stuck');
+    expect(stuck).toContain('No moves left');
+    expect(stuck).not.toContain('drop here');
+    expect(stuck).not.toContain('stuck-note');
+    expect(html).toContain('drop here');       // and the ordinary board still says its piece
+    expect(html).not.toContain('No moves left');
+  });
+  it('marks only the hinted space, and in its own colour', () => {
+    const hinted = renderToStaticMarkup(createElement(CenterGrid, {
+      spaces, highlight: [0], badgeOf: () => 'star' as const, onTap: noop, onSnapTap: noop, hint: 2,
+    }));
+    // The hint and the drop-target glow are different cues on different spaces and
+    // must not be confused for one another - see the --hint token's comment.
+    expect(hinted).toContain('pile-space glow');
+    expect(hinted).toContain('pile-space hint');
+    expect(hinted.split('hint').length - 1).toBe(1);
+    expect(html).not.toContain('hint');   // no hint prop, no marks at all
+  });
+  it('paints an orderly board in whole columns of one colour, and says so on empty slots', () => {
+    // The tint has to read while the space is EMPTY: once a card is down its own
+    // face carries the colour, and an empty slot is exactly where a player is
+    // deciding whether their Ace can go there.
+    // The real seeding function, not a hand-written pattern: this pins the board a
+    // 6-player orderly round actually starts from, pairing and all.
+    const out = renderToStaticMarkup(createElement(CenterGrid, {
+      spaces: orderlySpaces(24), highlight: [], badgeOf: () => 'star' as const,
+      onTap: noop, onSnapTap: noop, orderly: true,
+    }));
+    expect(out).toContain('--cols:8');
+    expect(out.split('pile-space owned').length - 1).toBe(24);
+    // Columns 0 and 1 are one colour, 2 and 3 the next: four bands, not stripes.
+    const suits = [...out.matchAll(/--suit:var\(--suit-(\w+)\)/g)].map(m => m[1]);
+    expect(suits.slice(0, 4)).toEqual(['red', 'red', 'blue', 'blue']);
+    expect(out).toContain('--suit:var(--suit-red)');
+    expect(out).toContain('--suit:var(--suit-yellow)');
+    expect(html).not.toContain('owned');   // an ordinary board claims nothing
+  });
   it('lays the board out in four rows at every game size', () => {
     // 4 x players spaces in, at most four rows out
     for (const players of [2, 3, 4, 5, 8]) {
@@ -106,6 +152,10 @@ describe('CenterGrid', () => {
     }
     expect(gridColumns(8)).toBe(4);   // two players: 4x2
     expect(gridColumns(32)).toBe(8);  // eight players: 8x4
+    // An orderly board takes its columns from its suits instead - and still never
+    // goes past four rows, because 20 spaces round up to 24 (spaceCountForPlayers).
+    expect(gridColumns(16, true)).toBe(4);
+    expect(gridColumns(24, true)).toBe(8);
   });
 });
 

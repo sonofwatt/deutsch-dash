@@ -1,4 +1,5 @@
 import type { Card, CenterSpace, FaceGroup, PlaySource, Suit, Tableau } from './types';
+import { SUITS } from './deck';
 
 export function faceGroup(suit: Suit): FaceGroup {
   return suit === 'red' || suit === 'blue' ? 'boy' : 'girl';
@@ -25,8 +26,33 @@ export const MAX_SPACES = 24;
  *
  * Two players get 8 (not the old fixed 16), which is why cards are bigger there.
  */
-export function spaceCountForPlayers(playerCount: number): number {
-  return Math.min(MAX_SPACES, 4 * Math.max(1, playerCount));
+export function spaceCountForPlayers(playerCount: number, orderly = false): number {
+  const natural = Math.min(MAX_SPACES, 4 * Math.max(1, playerCount));
+  // One colour per column means the column count has to be a multiple of 4, and
+  // 20 is the one natural size that divides into neither 4 nor 8 columns evenly
+  // (8 x 2.5 leaves four holes in the bottom row). Round the 5-player orderly
+  // board up to a clean 8 x 3 rather than shipping a gap-toothed grid.
+  return orderly && natural === 20 ? 24 : natural;
+}
+
+/**
+ * Columns on an orderly board: four (a column per suit) while the board is small
+ * enough, eight (a pair per suit) above that. Height is the scarce axis on a
+ * phone - four columns at 24 spaces would be six rows deep, which does not fit
+ * under the opponent strip with a tableau below it.
+ */
+export function orderlyColumns(count: number): number {
+  return count > 16 ? 8 : 4;
+}
+
+/**
+ * Which suit owns a space. Adjacent columns are grouped per suit rather than
+ * interleaved, so eight columns read as four wide bands of colour instead of a
+ * stripe pattern nobody can parse at a glance.
+ */
+export function suitForSpace(index: number, count: number): Suit {
+  const cols = orderlyColumns(count);
+  return SUITS[Math.floor((index % cols) / (cols / 4))];
 }
 
 export function canPlayToCenter(card: Card, stack: Card[]): boolean {
@@ -42,6 +68,11 @@ export function canPlayToCenter(card: Card, stack: Card[]): boolean {
  * centre transaction) must agree on one definition of "can this land here".
  */
 export function canPlayToSpace(card: Card, space: CenterSpace): boolean {
+  // The orderly-grid constraint is enforced HERE, in the one definition every
+  // caller shares, so highlighting, hasLegalMove, isStuck, the bots, the hint and
+  // the centre transaction cannot disagree about it. Getting this wrong would let
+  // a player be declared stuck with a move they can see.
+  if (space.suit && card.suit !== space.suit) return false;
   return canPlayToCenter(card, space.stack);
 }
 

@@ -3,6 +3,7 @@ import {
   faceGroup, postCountForPlayers, canPlayToCenter, canBuildOnPost,
   refillPosts, sourceTop, takeCard, placeOnPost, hasLegalMove,
   canPlayToSpace, spaceCountForPlayers, isStuck, MAX_SPACES,
+  orderlyColumns, suitForSpace,
 } from './rules';
 import type { Card, Suit, Tableau, CenterSpace } from './types';
 
@@ -42,6 +43,48 @@ describe('spaceCountForPlayers', () => {
   });
   it('never returns zero for a degenerate room', () => {
     expect(spaceCountForPlayers(0)).toBe(4);
+  });
+  it('rounds the one orderly size that will not divide into columns up to 24', () => {
+    // 20 spaces is 8 x 2.5 - four holes in the bottom row - and 4 x 5 is a row
+    // taller than the board has to give. Every other size already divides.
+    expect(spaceCountForPlayers(5, true)).toBe(24);
+    for (const n of [2, 3, 4, 6, 8]) {
+      expect(spaceCountForPlayers(n, true)).toBe(spaceCountForPlayers(n));
+    }
+  });
+});
+
+describe('the orderly grid', () => {
+  it('is four columns while it fits, eight above that, and never more than 4 deep', () => {
+    expect(orderlyColumns(8)).toBe(4);
+    expect(orderlyColumns(16)).toBe(4);
+    expect(orderlyColumns(24)).toBe(8);
+    for (const players of [2, 3, 4, 5, 6, 8]) {
+      const count = spaceCountForPlayers(players, true);
+      expect(count % orderlyColumns(count)).toBe(0);            // no holes
+      expect(count / orderlyColumns(count)).toBeLessThanOrEqual(4); // and no fifth row
+    }
+  });
+
+  it('gives each suit whole adjacent columns, not a stripe pattern', () => {
+    // Four columns: one each, left to right.
+    expect([0, 1, 2, 3].map(i => suitForSpace(i, 16))).toEqual(['red', 'blue', 'green', 'yellow']);
+    expect(suitForSpace(4, 16)).toBe('red');  // second row, back to the first column
+    // Eight columns: a PAIR each, so the board reads as four bands of colour.
+    expect([0, 1, 2, 3, 4, 5, 6, 7].map(i => suitForSpace(i, 24)))
+      .toEqual(['red', 'red', 'blue', 'blue', 'green', 'green', 'yellow', 'yellow']);
+  });
+
+  it('gives every suit exactly as many spaces as there are Aces of it, up to the cap', () => {
+    // This is why an orderly board does not starve below the cap: if all of red's
+    // spaces are busy, every red Ace in the game is already down, so nobody can be
+    // holding one. Above the cap it CAN starve - but so can the ordinary board.
+    for (const players of [2, 3, 4, 5, 6]) {
+      const count = spaceCountForPlayers(players, true);
+      const reds = Array.from({ length: count }, (_, i) => suitForSpace(i, count))
+        .filter(su => su === 'red').length;
+      expect(reds).toBeGreaterThanOrEqual(players);
+    }
   });
 });
 
@@ -86,6 +129,17 @@ describe('canPlayToSpace', () => {
   it('lets a new Ace start on a space whose last pile was cleared away', () => {
     expect(canPlayToSpace(c(1, 'red'), cleared())).toBe(true);
     expect(canPlayToSpace(c(2, 'red'), cleared())).toBe(false); // still needs an Ace
+  });
+  it('turns away the wrong colour on an orderly space, empty or not', () => {
+    // One definition, shared by highlighting, hasLegalMove, isStuck, the bots, the
+    // hint and centerPlayTxn - so none of them can offer a move another refuses.
+    const red = (stack: Card[] = []): CenterSpace => ({ stack, history: [], suit: 'red' });
+    expect(canPlayToSpace(c(1, 'red'), red())).toBe(true);
+    expect(canPlayToSpace(c(1, 'blue'), red())).toBe(false);
+    expect(canPlayToSpace(c(2, 'red'), red([c(1, 'red')]))).toBe(true);
+  });
+  it('leaves an ordinary space open to any suit', () => {
+    expect(canPlayToSpace(c(1, 'blue'), space())).toBe(true);
   });
 });
 

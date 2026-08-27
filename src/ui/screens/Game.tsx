@@ -1,6 +1,8 @@
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useGameStore, legalTargets, gameStore } from '../../state/store';
 import { hasLegalMove } from '../../game/rules';
+import { HINT_DELAY_MS, hintSpace } from '../../game/hint';
 import type { BadgeId } from '../../game/badges';
 import { CardView } from '../components/CardView';
 import { CenterGrid } from '../components/CenterGrid';
@@ -32,6 +34,20 @@ export function Game() {
   const online = useGameStore(s => s.online);
   const noteActivity = useGameStore(s => s.noteActivity);
   const [woodSide, swapSides] = useWoodSide();
+
+  // The helper hint waits for the player to go quiet, so it never fires under
+  // somebody playing at speed. `activity` counts MY input only - deliberately not
+  // board changes, or a fast table would keep resetting the clock of the one
+  // player who has actually stalled. Comparing the two counters (rather than
+  // setting a flag from inside the effect) is what keeps the timer out of render.
+  const hintsOn = room.meta.hintsOn ?? false;
+  const [activity, setActivity] = useState(0);
+  const [idleAt, setIdleAt] = useState(-1);
+  useEffect(() => {
+    if (!hintsOn) return;
+    const t = setTimeout(() => setIdleAt(activity), HINT_DELAY_MS);
+    return () => clearTimeout(t);
+  }, [hintsOn, activity]);
 
   const round = room.round;
   const me = room.players[uid];
@@ -65,12 +81,16 @@ export function Game() {
   const active = drag ? drag.source : selection;
   const targets = active ? legalTargets(hand, active, round.spaces) : { spaces: [], posts: [] };
   const stuckAvailable = !hasLegalMove(hand, round.spaces);
+  // Recomputed every render rather than stored, so it can never point at a space
+  // somebody else has since filled.
+  const hint = hintsOn && idleAt === activity ? hintSpace(hand, round.spaces) : null;
 
   return (
     // Every tap and every drag on this screen is a sign of life, which is a wider
     // net than "made a legal move" on purpose: a player weighing up the board is
     // present, and marking them away would be wrong even though it is harmless.
-    <div className="game" style={{ opacity: online ? 1 : 0.6 }} onPointerDown={noteActivity}>
+    <div className="game" style={{ opacity: online ? 1 : 0.6 }}
+      onPointerDown={() => { noteActivity(); setActivity(n => n + 1); }}>
       <div className="game-head">
         <strong>Round {room.meta.roundNumber}</strong>
         <span className="muted">{me.name} · {me.score} pts · to {room.meta.targetScore}</span>
@@ -84,7 +104,7 @@ export function Game() {
       <OpponentStrip me={uid} players={room.players} tableaus={round.tableaus} woodSide={woodSide} />
       <CenterGrid spaces={round.spaces} highlight={targets.spaces} badgeOf={badgeOf}
         onTap={i => void playTo({ space: i })} races={races}
-        snapping={targets.spaces.length > 0}
+        snapping={targets.spaces.length > 0} stuck={me.stuckAt != null} hint={hint}
         onSnapTap={() => { if (targets.spaces.length) void playTo({ space: targets.spaces[0] }); }} />
       <div>
         <motion.div key={lastRejected?.at ?? 0}
@@ -94,19 +114,15 @@ export function Game() {
             postHighlight={targets.posts} onSelect={select} onFlip={flip}
             onTapPost={i => void playTo({ post: i })} startDrag={startDrag} />
         </motion.div>
+        {/* The automatic "no moves left" note is in the drop band now (CenterGrid),
+            where it costs no layout. This slot carries the away note instead. */}
         {me.awayAt != null
-          // Takes precedence over the stuck note, which is moot while nobody is
-          // playing this hand: the table may have rotated without them, and this
-          // is what explains the board they have come back to.
           ? <button className="away-note" onClick={noteActivity}>Away — tap to rejoin the round</button>
-          : ENABLE_STUCK_BUTTON
-          ? <button className="btn stuck-btn" disabled={!stuckAvailable || me.stuckAt != null}
-              onClick={markStuck} style={{ width: '100%', marginTop: 6 }}>
-              {me.stuckAt != null ? 'Waiting for others…' : "I'm stuck"}
-            </button>
-          : me.stuckAt != null && (
-              // Declared automatically (see syncStuck): say so, or the wait looks broken
-              <p className="stuck-note">No moves left — waiting for the others…</p>
+          : ENABLE_STUCK_BUTTON && (
+              <button className="btn stuck-btn" disabled={!stuckAvailable || me.stuckAt != null}
+                onClick={markStuck} style={{ width: '100%', marginTop: 6 }}>
+                {me.stuckAt != null ? 'Waiting for others…' : "I'm stuck"}
+              </button>
             )}
       </div>
       {drag && (

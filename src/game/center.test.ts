@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeSpace, normalizeSpaces, normalizeTableau, centerPlayTxn, reconcileTableau } from './center';
+import {
+  normalizeSpace, normalizeSpaces, normalizeTableau, centerPlayTxn, orderlySpaces, reconcileTableau,
+} from './center';
 import type { Card, Suit, CenterSpace } from './types';
 
 const c = (v: number, suit: Suit, owner = 'me'): Card => ({ v, suit, owner });
@@ -15,6 +17,27 @@ describe('normalize', () => {
     const arr = normalizeSpaces({ 3: { stack: [c(1, 'red')] } }, 16);
     expect(arr[3].stack).toEqual([c(1, 'red')]);
     expect(arr[0]).toEqual({ stack: [], history: [] });
+  });
+  it('never puts an undefined suit on an ordinary space', () => {
+    // centerPlayTxn spreads this object straight back into RTDB, and an undefined
+    // value is rejected outright - so the key has to be ABSENT, not empty.
+    expect('suit' in normalizeSpace(null)).toBe(false);
+    expect('suit' in normalizeSpace({ stack: [c(1, 'red')] })).toBe(false);
+    expect(normalizeSpace({ suit: 'blue' }).suit).toBe('blue'); // and kept when it is there
+  });
+  it('fills in the orderly suits a client has not been sent yet', () => {
+    // startRound writes them, which is what makes them enforceable server-side.
+    // Filling them in here too means a client is never briefly playing looser
+    // rules than the ones the transaction will hold it to.
+    const arr = normalizeSpaces(null, 16, true);
+    expect(arr.map(sp => sp.suit).slice(0, 4)).toEqual(['red', 'blue', 'green', 'yellow']);
+    expect(normalizeSpaces(null, 16).every(sp => sp.suit === undefined)).toBe(true);
+  });
+  it('seeds an orderly round with every space already spoken for', () => {
+    const seeded = orderlySpaces(24);
+    expect(seeded).toHaveLength(24);
+    expect(seeded[0]).toEqual({ stack: [], history: [], suit: 'red' });
+    expect(new Set(seeded.map(sp => sp.suit)).size).toBe(4);
   });
   it('restores tableau shape with fixed post count', () => {
     const t = normalizeTableau({ blitz: [c(2, 'red')], woodIndex: 0 }, 3);
@@ -36,6 +59,26 @@ describe('centerPlayTxn', () => {
     const space: CenterSpace = { stack: [c(1, 'red'), c(2, 'red')], history: [] };
     expect(centerPlayTxn(c(2, 'red'))(space)).toBeUndefined();
     expect(centerPlayTxn(c(1, 'blue'))(space)).toBeUndefined();
+  });
+  it('refuses the wrong colour on an orderly space - the server-side half of it', () => {
+    // The client will not offer the move, but the client is not what is trusted:
+    // this is the transaction that actually decides, running against the server's
+    // own copy of the space, suit and all.
+    const red: CenterSpace = { stack: [], history: [], suit: 'red' };
+    expect(centerPlayTxn(c(1, 'blue'))(red)).toBeUndefined();
+    expect(centerPlayTxn(c(1, 'red'))(red)!.stack).toEqual([c(1, 'red')]);
+    // and the constraint survives the write, rather than being spread away
+    expect(centerPlayTxn(c(1, 'red'))(red)!.suit).toBe('red');
+  });
+  it('keeps an orderly space spoken for after its pile completes', () => {
+    // The archive branch used to rebuild the space from scratch, which dropped the
+    // suit - so an orderly board came apart one finished pile at a time.
+    const nine = Array.from({ length: 9 }, (_, i) => c(i + 1, 'red'));
+    const done = centerPlayTxn(c(10, 'red'))({ stack: nine, history: [], suit: 'red' })!;
+    expect(done.stack).toEqual([]);
+    expect(done.history).toHaveLength(1);
+    expect(done.suit).toBe('red');
+    expect(centerPlayTxn(c(1, 'blue'))(done)).toBeUndefined();
   });
   it('archives a completed 1..10 stack atomically, freeing the space', () => {
     const stack = Array.from({ length: 9 }, (_, i) => c(i + 1, 'green'));

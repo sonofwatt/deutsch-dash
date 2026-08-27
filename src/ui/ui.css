@@ -8,6 +8,10 @@
 .stack { display: flex; flex-direction: column; gap: 12px; max-width: 420px; width: 100%; margin: 0 auto; }
 .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .spacer { flex: 1; }
+/* Host options in the lobby. 28px so the switch itself clears the 44px touch
+   target once the label beside it is part of the hit area. */
+.toggle { width: 44px; height: 28px; accent-color: var(--accent); }
+.toggle:disabled { opacity: .4; }
 .title { font-weight: 800; font-size: 28px; margin: 0; }
 .muted { color: var(--ink-soft); }
 .player-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px;

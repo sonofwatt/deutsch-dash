@@ -1,12 +1,13 @@
 # Project Handoff — Deutsch Dash
 
-_Last updated: 2026-08-27, with the away-presence fix (this commit). Working tree
+_Last updated: 2026-08-27, with the away-presence fix and the last three playtest
+requests (#3, #5, #6). Working tree
 clean, CI green including the emulator suite. Note that `92f57d0` sat unpushed
 for a day, so anything it changed - the keeper's round timer, the wood/Blitz side
 picker - was "built" but not live; check `git status -sb` before trusting a
 playtest._
 
-_**226 tests green** (207 unit + 19 emulator). This is the only place in the repo
+_**245 tests green** (225 unit + 20 emulator). This is the only place in the repo
 that quotes a count — it drifted three separate ways when it lived in four
 places, so keep it here and nowhere else._
 
@@ -277,6 +278,15 @@ deliberate.
   `flipsSinceProgress >= ceil(wood.length / 3)`.
 - That flip counter is a closure-scoped `Map` in `createGameStore`, never
   persisted — **it resets to zero on any page reload**.
+- **`canPlayToSpace` is the single definition of "can this land here"**, and the
+  orderly-grid suit constraint lives inside it for that reason. Anything that adds
+  a rule about the centre goes there, or highlighting, `hasLegalMove`, `isStuck`,
+  the bots, the hint and `centerPlayTxn` start disagreeing - and a player gets
+  declared stuck holding a move they can see.
+- **`centerPlayTxn` spreads the space it was given straight back into RTDB.** Two
+  consequences: never put an `undefined` on a `CenterSpace` (RTDB rejects the whole
+  write), and never rebuild the space from scratch in the archive branch or its
+  suit goes with it.
 - Tableau order is Blitz | posts | wood. Wood sits under the right thumb because
   it's the pile touched most. `render.test.ts` pins this order in both the
   tableau and the opponent strip.
@@ -285,13 +295,13 @@ deliberate.
 
 ## Pending work
 
-**No known bugs.** The idle-table hang below is fixed; everything after it is a
-feature request.
+**Nothing is pending.** The idle-table hang is fixed and all seven playtest
+requests are settled: **#1 retired**, **#4 deferred**, and **#2, #3, #5, #6, #7
+built**. Numbering is kept as-is so earlier notes still point at the right item.
 
-Of the seven requests from the 2026-08-25/26 playtests, **#1, #2 and #7 are
-built** and **#4 is deferred**; #3, #5 and #6 are unstarted. Each was specced
-against the real code; the open questions are decisions only the product owner
-can make. Numbering is kept as-is so earlier notes still point at the right item.
+What is left is not work in here - it is playing the thing. See "What still needs
+testing"; the honest summary is that three or more humans have never played a
+round, and iPhone Safari has never been opened.
 
 ### The idle-table hang — _fixed 2026-08-27_
 
@@ -392,20 +402,28 @@ alongside `bz.name` / `bz.badge`. Thread a `woodSide` prop into `TableauView` an
 **Watch:** invalidates the two order-pinning tests in `render.test.ts` — they must
 become parameterised rather than deleted. Required prop ⇒ build break (see traps).
 
-### 3. Move the "no moves" alert into the drop band — _small_
+### 3. Move the "no moves" alert into the drop band — _built 2026-08-27_
 
-Delete the `.stuck-note` `<p>` under the tableau, pass `stuck={me.stuckAt != null}`
-into `CenterGrid`, and render the text inside `.snap-band` — brighter and bolder
-than the band's existing hint. Fixes the board shifting when the alert appears.
+`CenterGrid` takes an optional `stuck` and renders the text inside `.snap-band`;
+the `<p class="stuck-note">` under the tableau is gone, and with it the board
+shifting up the screen the moment somebody got stuck.
 
-**Decide first:** does the stuck band take an alert colour (`--danger`, amber) or
-stay neutral? Is the copy fixed, or can it shorten to guarantee one line in a
-~260px band on a 360px phone? And while the note shows, is the faint "drop here"
-hint hidden or still visible alongside it?
+Decisions taken, so they don't get re-litigated:
 
-**Watch:** pinning `.snap-band` to a fixed height removes its growth escape hatch
-— longer copy clips rather than reflows. That's the intended trade, but it
-constrains future wording.
+- **Amber, not red.** Two new tokens, `--warn` (fill) and `--warn-ink` (text),
+  split for exactly the reason `--danger` is: dark mode needs the text to lift off
+  the surface while the fill stays dark enough to carry white. Being stuck is a
+  state, not an error, and red is spoken for - a scoring penalty, and the fill
+  behind the disconnected pill.
+- **The band keeps `min-height`, not a fixed height.** The Watch note below warned
+  that pinning it removes the growth escape hatch, so the copy shortened instead:
+  "No moves left — waiting for the others", which fits one line at 360px in both
+  themes with room to spare. Longer copy still reflows rather than clipping.
+- **The two messages can never collide**, so nothing had to be hidden: a stuck
+  player has no legal targets, which is precisely when the band is unlit and its
+  "drop here" hint is not being offered.
+
+Rendered in the real app at 393px in both themes.
 
 ### 4. Move a run of cards between post piles — _deferred 2026-08-26_
 
@@ -446,53 +464,89 @@ ghost card on pointerdown. And `movePostRun` must not assume a post stack is a
 clean run: `reconcileTableau` filters post stacks by centre membership and
 `normalizeTableau` returns whatever RTDB holds.
 
-### 5. Host option: orderly grid, one colour per column — _medium_
+### 5. Host option: orderly grid, one colour per column — _built 2026-08-27_
 
-`CenterSpace` gains a `suit` constraint, `RoomMeta` gains `orderlyGrid`, and
-`centerPlayTxn` enforces it server-side. Lobby toggle next to "Play to".
+`RoomMeta.orderlyGrid`, a lobby toggle under "Play to", and `CenterSpace.suit`
+enforced in `canPlayToSpace` - which is the one definition highlighting,
+`hasLegalMove`, `isStuck`, the bots, the hint and `centerPlayTxn` all share, so
+none of them can offer a move another refuses.
 
-**Decide first:**
-- At 5+ players an orderly board needs **8 columns** to stay within 4 rows, which
-  drops the slot to ~34px on a 360px phone — at or below the card floor that is
-  already flagged as having about 3px of slack. Accept smaller cards in orderly
-  mode, cap orderly boards at 16 spaces, or allow more rows?
-- A 5-player board is 20 spaces = 5 per suit, which does not split evenly into two
-  columns — four visible holes in the bottom row. Accept, or bump orderly
-  5-player boards to 24?
-- Orderly mode **strictly narrows where an Ace can go**, so a suit whose columns
-  are full starves while others sit empty: more stuck declarations, more
-  rotations, a more reachable "three fruitless rotations ends the round". Is that
-  the intended texture?
+**The starvation worry in the original spec does not survive the arithmetic.**
+`spaceCountForPlayers` is `4 x players`, so spaces-per-suit exactly equals
+Aces-per-suit: if all four red spaces are busy at four players, all four red Aces
+are already down and nobody can be holding a fifth. It only bites above the
+24-space cap, at **7-8 players**, where the ordinary board is over-subscribed
+anyway. `rules.test.ts` pins that property rather than the reasoning.
 
-**Watch:** `store.test.ts` asserts `playToCenter` was called with exactly three
-arguments, and `toHaveBeenCalledWith` is arity-exact — adding a fourth breaks two
-tests. Adding to `Deps` breaks `fakeDeps()` at typecheck time, so it's a build
-break.
+What actually constrained the design was the column count, not card size:
+`gridColumns` is `max(4, ceil(count/4))`, so a 20-space board is **5 columns** -
+which cannot be one colour per column with four suits. Hence:
 
-### 6. Helper hint that flashes a playable card — _small_
+- **Four columns up to 16 spaces, eight above** (`orderlyColumns`), with adjacent
+  columns paired per suit so eight columns read as four wide bands rather than a
+  stripe pattern. 2-4 players get exactly the layout they get today.
+- **A 5-player orderly board rounds 20 up to 24**, the one natural size that
+  divides into neither. Everything else already divides, and no orderly board
+  goes past four rows.
+- Cards land ~42px on a 360px phone at eight columns, which is about what they
+  are now - the spec's "~34px, at the floor" was pessimistic in the same way the
+  six-column estimate was.
 
-New `src/game/hint.ts` reusing the bot's own `botMoves` / `rankMove`, a `hint`
-prop through `TableauView`, and a CSS pulse. No Firebase write needed if it's a
-local preference.
+**Why the suit lives on the space rather than being derived from its index:**
+`centerPlayTxn` is a transaction against `round/spaces/$i` and sees only that one
+node - it never learns which index it is. So the constraint has to be *in* the
+node, which is why `startRound` now writes the spaces for an orderly round (an
+ordinary one still leaves them absent for each client to normalize into being).
+`normalizeSpaces` fills the suits in client-side as well, so a client is never
+briefly playing looser rules than the transaction will hold it to.
 
-**Decide first:**
-- Local per-player, or host-controlled for the room (fairness in a competitive
-  game)? Local is far cheaper.
-- Flash **only the single best move**, or every playable source? Flashing
-  everything is often three or four cards at once and comes close to playing the
-  round for them.
-- Immediate, or only after a few seconds of no input? A delay needs an idle timer
-  and a decision on what resets it.
-- When nothing is playable, should it point at the wood pile to suggest a flip?
-  That overlaps with the automatic stuck detection.
+Two traps that came out of building it, both now pinned by tests:
 
-**Watch:** the hint hands a human the exact move a Hard bot would pick — it is
-literally the branch `chooseBotAction` takes when not being sloppy. Bot difficulty
-was tuned against a human *without* hints, so "is Easy beatable" reopens for
-players with hints on. Also: `.glow` green currently means exactly one thing
-("the held card can land here") — a second green would erode it, so use a
-different colour. Reduced motion is unhandled today; `MotionConfig
-reducedMotion="user"` does not cover CSS keyframes.
+- **`normalizeSpace` must not set `suit: undefined`.** `centerPlayTxn` spreads
+  that object straight back into RTDB, which rejects an undefined value outright.
+  The key has to be absent, not empty.
+- **The archive branch dropped the suit.** Completing a pile returned a freshly
+  built `{ stack: [], history }` rather than spreading the space, so an orderly
+  board came apart one finished pile at a time. Caught by a test written for the
+  claim, not by playing it.
+
+Verified against the emulator and the real rules: a wrong-colour play is refused
+by the transaction, and the constraint survives the write.
+
+### 6. Helper hint that flashes a playable card — _built 2026-08-27, inverted_
+
+**It flashes the destination, not the card.** That is the opposite of the original
+request and is the product owner's call: the hint marks the space on the grid
+where *something* of yours could go, and the player still has to work out which
+card that is, find it in their own tableau and drag it there. A nudge towards the
+board rather than the move played for them.
+
+`src/game/hint.ts` reuses the bot's own `botMoves` / `rankMove`, so "best" means
+the same thing to the hint as it does to a Hard bot - one definition, not two that
+drift. Ties settle on the first space generated, deliberately: an Ace fits every
+empty space at the same rank and the hint must not wander between renders.
+
+Decisions taken:
+
+- **Host-controlled for the whole room** (`RoomMeta.hintsOn`, lobby toggle), not a
+  device preference. Hints are an advantage and bot difficulty was tuned against a
+  human without them, so everyone plays the same game.
+- **After `HINT_DELAY_MS` (5s) of no input**, so it never fires under somebody
+  playing at speed. The idle counter watches *your* input only, not board changes -
+  a fast table would otherwise keep resetting the clock of the one player who has
+  actually stalled.
+- **Violet** (`--hint`), never green: green on this board means exactly one thing,
+  "the card you are holding lands here", and a second green would erode it.
+- **Reduced motion is handled**, which it was not anywhere else: `MotionConfig
+  reducedMotion="user"` does not reach CSS keyframes, so the pulse has its own
+  `prefers-reduced-motion` rule. The outline stays; it just stops breathing.
+
+**Known and intended:** a post-to-post move has no square on the grid to point at,
+so nothing flashes for it. Early in a round, before anyone has an Ace down, a
+player with no centre move at all gets no hint - which is correct (there is
+nothing on the grid to point at) but does mean the feature looks inert for the
+first few seconds of about half of all deals. Worth knowing before calling it
+broken.
 
 ### 7. Score screen: round arithmetic — _landed in `b38da9b`_
 
@@ -646,7 +700,19 @@ Still unrendered:
 
 ### Verified in the real app on 2026-08-27
 
-Two browser clients against the emulator, under the real rules:
+Two browser clients against the emulator, under the real rules. The three new
+features, at 393px in **both themes**:
+
+- The orderly board in four tinted columns, and the tint reading on an *empty*
+  slot - which is the only place it matters, since a card that has landed carries
+  its own colour.
+- The hint appearing after five quiet seconds on the space the best move lands in,
+  clearing on the next tap, and coming back five seconds later.
+- The amber "no moves left" band, with nothing left under the tableau and no board
+  shift when it appears. `--warn-ink` at #fbbf24 reads well on the dark surface -
+  the check that `--danger` originally failed.
+
+And the away fix, from earlier the same day:
 
 - A player's own client marking itself away after 45s of nothing, and the away
   note on that player's own screen.
@@ -741,6 +807,11 @@ game is frozen, including the bot. That is inherent to a serverless design.
   the loser being human in `driveBot`.
 - **The board's dead space** (see above) is unchanged: cards stay at 12vw even
   when a four-column board has room for far more.
+- **The opponent strip does not show that somebody is away.** `.opp.away` dims a
+  *disconnected* player and predates `awayAt`; a player who is present but has
+  wandered off looks entirely normal to everyone else. One condition would fix it,
+  but the class name would then mean two things - worth renaming in the same
+  breath.
 - An opponent's empty slots are gone, but **your own wood still shows an empty
   slot** under the face-down pile before the first flip. That one is arguably a
   target rather than a gap - it is where the turned-over card lands.

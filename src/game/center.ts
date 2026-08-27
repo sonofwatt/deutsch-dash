@@ -1,22 +1,37 @@
-import type { Card, CenterSpace, Tableau } from './types';
+import type { Card, CenterSpace, Suit, Tableau } from './types';
 import { cardId } from './types';
-import { canPlayToSpace } from './rules';
+import { canPlayToSpace, suitForSpace } from './rules';
 
 function asCards(raw: unknown): Card[] {
   return Array.isArray(raw) ? (raw as Card[]) : raw ? (Object.values(raw) as Card[]) : [];
 }
 
 export function normalizeSpace(raw: unknown): CenterSpace {
-  const r = (raw ?? {}) as { stack?: unknown; history?: unknown };
+  const r = (raw ?? {}) as { stack?: unknown; history?: unknown; suit?: Suit };
   const history = r.history
     ? (Array.isArray(r.history) ? r.history : Object.values(r.history)).map(asCards)
     : [];
-  return { stack: asCards(r.stack), history };
+  const space: CenterSpace = { stack: asCards(r.stack), history };
+  // Set only when it exists, never as `suit: undefined`: centerPlayTxn spreads
+  // this object straight back into RTDB, which rejects an undefined value.
+  if (r.suit) space.suit = r.suit;
+  return space;
 }
 
-export function normalizeSpaces(raw: unknown, count: number): CenterSpace[] {
+export function normalizeSpaces(raw: unknown, count: number, orderly = false): CenterSpace[] {
   const r = (raw ?? {}) as Record<number, unknown>;
-  return Array.from({ length: count }, (_, i) => normalizeSpace(r[i]));
+  return Array.from({ length: count }, (_, i) => {
+    const space = normalizeSpace(r[i]);
+    // startRound writes the suits, which is what makes them enforceable in the
+    // transaction. Filling them in here as well means a client is never briefly
+    // playing by looser rules than the ones the server will hold it to.
+    return orderly && !space.suit ? { ...space, suit: suitForSpace(i, count) } : space;
+  });
+}
+
+/** The board an orderly round starts from: empty, and already spoken for. */
+export function orderlySpaces(count: number): CenterSpace[] {
+  return Array.from({ length: count }, (_, i) => ({ stack: [], history: [], suit: suitForSpace(i, count) }));
 }
 
 export function normalizeTableau(raw: unknown, postCount: number): Tableau {
@@ -52,7 +67,9 @@ export function centerPlayTxn(card: Card) {
     const stack = [...space.stack, card];
     // Completed: archive the run and clear the stack, which frees the space for
     // a new Ace. history is what the finished-pile rails count and colour.
-    if (stack.length === 10) return { stack: [], history: [...space.history, stack] };
+    // Spread the space, don't rebuild it: an orderly space keeps its suit when its
+    // pile completes, or the board quietly stops being orderly one pile at a time.
+    if (stack.length === 10) return { ...space, stack: [], history: [...space.history, stack] };
     return { ...space, stack };
   };
 }

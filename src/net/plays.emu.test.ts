@@ -1,6 +1,6 @@
 /// <reference types="node" />
 import { describe, it, expect } from 'vitest';
-import { createRoom, normalizeRoom } from './rooms';
+import { createRoom, normalizeRoom, setOrderly } from './rooms';
 import { commitScores, nextRound, playToCenter, startRound } from './plays';
 import { get, ref, update } from 'firebase/database';
 import type { Card, CenterSpace, Room, Suit } from '../game/types';
@@ -28,6 +28,34 @@ emu('center transactions against emulator', () => {
     expect(results.find(r => !r.committed)!.winner).toBe(uid);
     const snap = await get(ref(db, `rooms/${code}/round/spaces/0/stack`));
     expect(snap.val()).toHaveLength(1);
+  });
+});
+
+emu('orderly grid against emulator', () => {
+  it('the centre transaction refuses a wrong-colour card on a suit-locked space', async () => {
+    // The client already declines to offer the move (canPlayToSpace), but the
+    // client is not what is trusted. This is the write actually reaching the
+    // database and being turned away by the space's own suit.
+    const code = await createRoom('Host', 'tulip');
+    const { db, ensureSignedIn } = await import('./firebase');
+    const uid = await ensureSignedIn();
+    await setOrderly(code, true);
+    const room: Room = {
+      meta: { createdAt: Date.now(), hostId: uid, creatorId: uid, targetScore: 75,
+              phase: 'lobby', roundNumber: 0, orderlyGrid: true },
+      players: { [uid]: { name: 'Host', badgeId: 'tulip', joinedAt: 1, connected: true,
+                          stuckAt: null, awayAt: null, score: 0 } },
+      round: null,
+    };
+    await startRound(code, room);
+    // One player: 4 spaces, 4 columns, so space 0 belongs to red and space 1 to blue.
+    const snap = await get(ref(db, `rooms/${code}/round/spaces/0`));
+    expect(snap.val().suit).toBe('red');
+
+    expect((await playToCenter(code, 0, { v: 1, suit: 'blue', owner: uid })).committed).toBe(false);
+    expect((await playToCenter(code, 0, { v: 1, suit: 'red', owner: uid })).committed).toBe(true);
+    // and the constraint is still there afterwards, rather than spread away by the write
+    expect((await get(ref(db, `rooms/${code}/round/spaces/0`))).val().suit).toBe('red');
   });
 });
 

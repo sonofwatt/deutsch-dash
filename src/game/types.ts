@@ -13,7 +13,13 @@ export type PlaySource =
 /** Last array element = top, everywhere. */
 export interface Tableau { blitz: Card[]; post: Card[][]; wood: Card[]; woodIndex: number }
 
-export interface CenterSpace { stack: Card[]; history: Card[][] }
+/**
+ * `suit` is the orderly-grid constraint: only that colour may ever start or build
+ * here. It lives ON the space, not derived from its index, because centerPlayTxn
+ * is a transaction against `round/spaces/$i` and sees only that one node - it has
+ * no idea which index it is. Absent on an ordinary board, and absent means "any".
+ */
+export interface CenterSpace { stack: Card[]; history: Card[][]; suit?: Suit }
 
 export type Phase = 'lobby' | 'playing' | 'roundEnd' | 'gameOver';
 
@@ -27,6 +33,12 @@ export interface RoomMeta {
   // Optional: rooms created before this field existed (and ad-hoc test fixtures) omit it.
   // rooms.ts keeps it in sync with the actual player count - see MAX_PLAYERS in net/rooms.ts.
   playerCount?: number;
+  // Host options, both optional for the same reason as playerCount, and both
+  // absent meaning off. hintsOn is room-wide rather than a device preference so
+  // that everybody is playing the same game - bot difficulty was tuned against a
+  // human without hints. See game/hint.ts.
+  hintsOn?: boolean;
+  orderlyGrid?: boolean;
 }
 
 import type { BadgeId } from './badges';

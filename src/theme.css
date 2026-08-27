@@ -5,6 +5,14 @@
      the same idea as text. They part company in dark mode, where the fill has to
      stay dark enough for white text while the text has to lift off the surface. */
   --danger-ink: var(--danger);
+  /* Amber: a state the player needs to notice, not an error. Being stuck is
+     nobody's mistake, and red is spoken for - a scoring penalty, and the fill
+     behind the disconnected pill. Same fill/ink split as --danger for the same
+     reason: the fill has to stay dark enough to carry white text. */
+  --warn: #d97706; --warn-ink: #b45309;
+  /* The helper hint's pulse. Deliberately NOT green: green already means exactly
+     one thing on this board - "the card you are holding can land here". */
+  --hint: #7c3aed;
   /* Scoreboard movement: a row's background while it climbs or falls a place. */
   --rise: #dcf5e3; --fall: #fbe0dd;
   /* Empty-slot outlines on the play surface. Deliberately far darker than --line:
@@ -23,6 +31,7 @@
 @media (prefers-color-scheme: dark) {
   :root { --bg: #171613; --surface: #23211c; --ink: #f2f0ea; --ink-soft: #a29d92;
           --line: #37342d; --accent: #f2f0ea; --danger-ink: #ff8a7d;
+          --warn-ink: #fbbf24; --hint: #a78bfa;
           --rise: #1d3527; --fall: #3d2420;
           --pile-line: #8b8577; --pile-fill: #1f1e19; }
 }

@@ -33,6 +33,8 @@ export interface Deps {
   joinRoom(code: string, name: string, badgeId: BadgeId): Promise<JoinResult>;
   createRoom(name: string, badgeId: BadgeId): Promise<string>;
   setTargetScore(code: string, n: number): Promise<void>;
+  setHints(code: string, on: boolean): Promise<void>;
+  setOrderly(code: string, on: boolean): Promise<void>;
   startRound(code: string, room: Room): Promise<void>;
   playToCenter(code: string, space: number, card: Card): Promise<PlayResult>;
   reportRace(code: string, space: number, loser: string, winner: string | null): Promise<void>;
@@ -81,6 +83,8 @@ export interface GameStore {
   /** Any sign of life from the player: clears the away flag and restarts its timer. */
   noteActivity(): void;
   setTarget(n: number): void;
+  setHints(on: boolean): void;
+  setOrderly(on: boolean): void;
   start(): void;
   next(): void;
   again(): void;
@@ -541,6 +545,8 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
       noteActivity,
 
       setTarget(n) { const c = get().code; if (c) void deps.setTargetScore(c, n); },
+      setHints(on) { const c = get().code; if (c) void deps.setHints(c, on); },
+      setOrderly(on) { const c = get().code; if (c) void deps.setOrderly(c, on); },
       start() {
         const { code, room } = get();
         if (code && room) hostAction(deps.startRound(code, room), 'start the game');
@@ -573,6 +579,8 @@ const realDeps: Deps = {
   joinRoom: netRooms.joinRoom,
   createRoom: netRooms.createRoom,
   setTargetScore: netRooms.setTargetScore,
+  setHints: netRooms.setHints,
+  setOrderly: netRooms.setOrderly,
   startRound: netPlays.startRound,
   playToCenter: netPlays.playToCenter,
   reportRace: netPlays.reportRace,

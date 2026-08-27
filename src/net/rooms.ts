@@ -35,11 +35,12 @@ export function normalizeRoom(raw: unknown): Room | null {
   const meta: RoomMeta = { ...r.meta, creatorId: r.meta.creatorId ?? r.meta.hostId };
   const playerCount = Object.keys(players).length;
   const postCount = postCountForPlayers(playerCount);
+  const orderly = meta.orderlyGrid ?? false;
   let round: RoundState | null = null;
   if (r.round && typeof r.round === 'object') {
     const rr = r.round as Partial<RoundState> & { tableaus?: Record<string, unknown> };
     round = {
-      spaces: normalizeSpaces(rr.spaces, spaceCountForPlayers(playerCount)),
+      spaces: normalizeSpaces(rr.spaces, spaceCountForPlayers(playerCount, orderly), orderly),
       tableaus: Object.fromEntries(
         Object.entries(rr.tableaus ?? {}).map(([uid, t]) => [uid, normalizeTableau(t, postCount)]),
       ),
@@ -170,6 +171,16 @@ export function removeBot(code: string, id: string, badgeId: BadgeId): Promise<v
 
 export function setTargetScore(code: string, target: number): Promise<void> {
   return set(ref(db, `rooms/${code}/meta/targetScore`), target);
+}
+
+// Host options. Host-by-convention like the other lobby controls: meta is
+// writable by any authed client (see database.rules.json and the trust model).
+export function setHints(code: string, on: boolean): Promise<void> {
+  return set(ref(db, `rooms/${code}/meta/hintsOn`), on);
+}
+
+export function setOrderly(code: string, on: boolean): Promise<void> {
+  return set(ref(db, `rooms/${code}/meta/orderlyGrid`), on);
 }
 
 let stopPresence: (() => void) | null = null;
