@@ -1085,7 +1085,7 @@ game is frozen, including the bot. That is inherent to a serverless design.
 | `db81ee0` | Stuck alert into the drop band; orderly grid; helper hint |
 | `8bdc017` | Away in the opponent strip; 32 spaces; the hint stops nagging |
 | `d33f3c4` | Rails off the screen edge at 7-8 players; the hint returns |
-| `9492386` | The first iPhone playtest: six faults, and the rules deploy that was not |
+| `282569b` | The first iPhone playtest: six faults, and the rules deploy that was not |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`. The README carries setup, the security model,
