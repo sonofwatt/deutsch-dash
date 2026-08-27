@@ -59,7 +59,9 @@ export function OpponentStrip(props: {
                   looking for the difference between them. The bubble wins because
                   it is attached to the thing it describes; a bare number beside a
                   name says nothing about which pile it belongs to. */}
-              {p.stuckAt != null && <span title="stuck">⏳</span>}
+              {p.sittingOut
+                ? <span className="opp-out" title="sitting out">out</span>
+                : p.stuckAt != null && <span title="stuck">⏳</span>}
             </div>
             {/* Same left-to-right order as your own tableau, so a glance across
                 the table reads the same way: Blitz, posts, wood. */}

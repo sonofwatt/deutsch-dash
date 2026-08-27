@@ -32,11 +32,10 @@
    text, and those have to mean the same thing on both phones at the table
    regardless of which way either one has its theme set. Black on all three is
    what keeps the yellow legible. */
-/* 2px, where every other button is 1px. In LIGHT mode "Start anyway" is also a
-   white button (it is a plain .btn now, deliberately - see Lobby.tsx), and
-   without this the two read as a matched pair rather than as the thing to press
-   and the escape hatch beneath it. The ready states below keep the width and
-   supply their own colour. */
+/* 2px, where every other button is 1px. The lobby is full of pale buttons in
+   light mode - Add AI player, the wood side, Copy link - and the ready button has
+   to be the one your thumb goes to without reading. The ready states below keep
+   the width and supply their own colour. */
 .ready-btn { background: #ffffff; color: #111111; border: 2px solid #111111; font-weight: 800; }
 .ready-btn.on { background: #22c55e; border-color: #15803d; }
 .ready-btn.away { background: #facc15; border-color: #ca8a04; }
@@ -45,6 +44,16 @@
   white-space: nowrap; background: #ffffff; color: #111111; border: 1px solid #d8d5cc; }
 .ready-tag.on { background: #22c55e; border-color: #16a34a; }
 .ready-tag.away { background: #facc15; border-color: #eab308; }
+.ready-tag.out { background: #d8d5cc; border-color: #b8b4a8; }
+/* The host's escape hatch past a phone that has died. Fixed colours like the
+   ready button beside it, and for the same reason: these two are read together,
+   and they must not swap relative weight when one player's phone is in dark mode
+   and another's is not. Dark slab, pale text, in both themes. */
+/* Stepping away is the rarer thing to want and must not be the button a thumb
+   finds by accident, so it is slim and quiet and sits below the ready button. */
+.sit-out { width: 100%; color: var(--ink-soft); }
+.start-anyway { background: #23211c; color: #f2f0ea; border-color: #37342d; }
+.start-anyway:disabled { opacity: .45; }
 
 /* Editing your own row. Both look like the text they replace until touched, so
    the lobby does not read as a form. */
@@ -68,6 +77,16 @@
 .dot.off { background: var(--line); }
 .chip { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center;
   background: color-mix(in srgb, var(--badge) 18%, transparent); }
+/* Fixed to the corner rather than placed in each screen's header: there is no
+   header shared by the home page, the lobby, the board and the scorepad, and the
+   control belongs to the phone rather than to any of them. Small and quiet - it
+   is set once and then never touched again, like the wood-side swap. */
+.theme-toggle { position: fixed; z-index: 60;
+  top: max(8px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right));
+  width: 34px; height: 34px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--ink-soft); font-size: 15px; line-height: 1;
+  display: grid; place-items: center; cursor: pointer; box-shadow: var(--shadow); }
+
 .code-pill { font-family: ui-monospace, monospace; letter-spacing: .2em; font-weight: 800;
   background: var(--surface); border: 1px dashed var(--line); border-radius: var(--radius);
   padding: 8px 14px; }

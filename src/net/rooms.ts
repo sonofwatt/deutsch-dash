@@ -180,6 +180,17 @@ export function setReady(code: string, uid: string, on: boolean): Promise<void> 
 }
 
 /**
+ * "Deal me out" / "deal me back in." Own record, own uid, same grant as `ready`.
+ * Readying is cleared on the way out: a player who is not in the round cannot
+ * meaningfully be ready for it, and leaving the flag set would have them counted
+ * by `tableReady` on the way back in without their having said so.
+ */
+export function setSittingOut(code: string, uid: string, on: boolean): Promise<void> {
+  return update(ref(db, `rooms/${code}/players/${uid}`),
+    on ? { sittingOut: true, ready: null } : { sittingOut: null });
+}
+
+/**
  * The lobby countdown digit. Host-by-convention like the other lobby controls -
  * meta is writable by any authed client (see database.rules.json and the trust
  * model), and only the host's client ever drives it. See RoomMeta.countdown.
@@ -225,6 +236,10 @@ export function setHints(code: string, on: boolean): Promise<void> {
 
 export function setOrderly(code: string, on: boolean): Promise<void> {
   return set(ref(db, `rooms/${code}/meta/orderlyGrid`), on);
+}
+
+export function setPaleCards(code: string, on: boolean): Promise<void> {
+  return set(ref(db, `rooms/${code}/meta/paleCards`), on);
 }
 
 let stopPresence: (() => void) | null = null;

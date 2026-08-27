@@ -28,13 +28,37 @@
      --card-w and ignore every local override. */
   --radius: 10px; --shadow: 0 1px 2px rgb(0 0 0 / .08), 0 4px 12px rgb(0 0 0 / .06);
 }
+/* Dark is one set of overrides applied from two places, because the theme has
+   THREE states, not two: follow the device (the default, and what every build
+   before 2026-08-27 did), or an explicit choice the player has made on this
+   phone. `data-theme` is written on <html> by ui/theme.ts.
+
+   The media query is guarded with :not([data-theme="light"]) so a player on a
+   dark phone can force light; the attribute rule is what lets a player on a
+   light phone force dark. Neither can be expressed by the media query alone,
+   which is why this is not simply a second selector on the same block. */
 @media (prefers-color-scheme: dark) {
-  :root { --bg: #171613; --surface: #23211c; --ink: #f2f0ea; --ink-soft: #a29d92;
+  :root:not([data-theme="light"]) { --bg: #171613; --surface: #23211c; --ink: #f2f0ea; --ink-soft: #a29d92;
           --line: #37342d; --accent: #f2f0ea; --danger-ink: #ff8a7d;
           --warn-ink: #fbbf24; --hint: #a78bfa;
           --rise: #1d3527; --fall: #3d2420;
           --pile-line: #8b8577; --pile-fill: #1f1e19; }
 }
+:root[data-theme="dark"] { --bg: #171613; --surface: #23211c; --ink: #f2f0ea; --ink-soft: #a29d92;
+        --line: #37342d; --accent: #f2f0ea; --danger-ink: #ff8a7d;
+        --warn-ink: #fbbf24; --hint: #a78bfa;
+        --rise: #1d3527; --fall: #3d2420;
+        --pile-line: #8b8577; --pile-fill: #1f1e19; }
+
+/* Host option: card faces stay on a light ground whatever the theme is doing.
+   Written as the LIGHT values rather than as literals so the two can never drift,
+   and applied unconditionally - in a light theme it is already what they are, so
+   this is a no-op there and needs no knowledge of the active theme. Scoped to
+   card faces on purpose: the slots, rails and chrome stay dark, which is the
+   whole point of asking for it. */
+.pale-cards .card { background: #ffffff; border-color: #e3e0d7; color: #23211c; }
+.pale-cards .card-back { background: color-mix(in srgb, var(--badge) 22%, #ffffff); }
+.pale-cards .slot-layer { background: #ebe8e0; }
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; }
 body {
@@ -43,6 +67,8 @@ body {
   overscroll-behavior: none; -webkit-tap-highlight-color: transparent;
 }
 button { font: inherit; }
+/* padding-right on the first line reserves the fixed theme toggle's corner, the
+   same way .game-head does, so a long title never runs under it. */
 .screen { min-height: 100dvh; display: flex; flex-direction: column; gap: 16px;
   padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
            max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }

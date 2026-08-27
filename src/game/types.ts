@@ -40,6 +40,14 @@ export interface RoomMeta {
   hintsOn?: boolean;
   orderlyGrid?: boolean;
   /**
+   * Card faces on a light ground whatever each player's theme is doing. A host
+   * option and not a device preference because it changes how the CARDS read,
+   * and two players describing the same board to each other should be looking at
+   * the same thing. In a light theme it is already true, so the switch only does
+   * anything for the players who are in dark mode. See `.pale-cards`.
+   */
+  paleCards?: boolean;
+  /**
    * The lobby countdown: 3, 2, 1, then 0 which reads "GO!", then absent again.
    *
    * A NUMBER the host writes, not a deadline every client races its own clock
@@ -75,6 +83,18 @@ export interface PlayerInfo {
    * `startRound` clears every flag, so the lobby a rematch returns to is blank.
    */
   ready?: boolean;
+  /**
+   * "Deal me out." Written only by the player's own client for its own uid, like
+   * `ready` and `awayAt`. Absent means playing.
+   *
+   * It takes effect at the next DEAL, never mid-round: a hand already on the
+   * table cannot be withdrawn without stranding its cards in the middle, so the
+   * button says "from the next round" and means it. While it is set the player
+   * is skipped by `startRound` (no tableau at all), is not required to be ready,
+   * and cannot hold up the all-stuck rotation. With no tableau they score no
+   * delta, so their total simply stands still - see commitScores.
+   */
+  sittingOut?: boolean;
   // AI players. Absent on humans. A bot has no auth identity of its own: the
   // host owns its record and plays its hand (see the bot driver in store.ts).
   isBot?: boolean; botLevel?: BotLevel;

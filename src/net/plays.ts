@@ -24,17 +24,31 @@ export function pickNextHost(players: Record<string, PlayerInfo>): string | null
  * round forever otherwise, because an idle player usually has a legal move and so
  * is quite correctly never marked stuck. If everyone is away this is false and
  * nothing happens, which is right - an empty table has nothing to rotate for.
+ *
+ * A player sitting out is skipped for a harder reason than the others: they have
+ * no tableau, so `syncStuck` never writes a `stuckAt` for them and they would sit
+ * here forever as the one player the table is still waiting on.
  */
 export function allConnectedStuck(players: Record<string, PlayerInfo>): boolean {
-  const present = Object.values(players).filter(p => p.connected && p.awayAt == null);
+  const present = Object.values(players)
+    .filter(p => p.connected && p.awayAt == null && !p.sittingOut);
   return present.length > 0 && present.every(p => p.stuckAt != null);
 }
 
 export async function startRound(code: string, room: Room, rng?: Rng): Promise<void> {
   const uids = Object.keys(room.players);
+  // Who is actually dealt in. A player sitting out gets no tableau at all, which
+  // is what makes the rest of it fall out for free: nothing to play, nothing to
+  // be stuck with, and no RoundScore, so commitScores leaves their total alone.
+  const dealt = uids.filter(uid => !room.players[uid].sittingOut);
+  // Sized on the WHOLE room, not on who is dealt in. The board's shape is read
+  // from the player count by every client independently (normalizeRoom), and
+  // somebody sitting down mid-round would otherwise resize the grid under a hand
+  // already being held. A couple of spare spaces costs nothing; a board that
+  // changes shape mid-round costs the round.
   const postCount = postCountForPlayers(uids.length);
   const tableaus: Record<string, Tableau> = {};
-  for (const uid of uids) tableaus[uid] = deal(shuffle(buildDeck(uid), rng), postCount);
+  for (const uid of dealt) tableaus[uid] = deal(shuffle(buildDeck(uid), rng), postCount);
   // An ordinary round leaves `spaces` absent and lets every client normalize the
   // same empty board into being. An orderly one has to be WRITTEN, because the
   // suit constraint is only enforceable if centerPlayTxn can read it off the node

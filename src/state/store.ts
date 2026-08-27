@@ -34,6 +34,8 @@ export interface Deps {
   createRoom(name: string, badgeId: BadgeId): Promise<string>;
   setTargetScore(code: string, n: number): Promise<void>;
   setReady(code: string, uid: string, on: boolean): Promise<void>;
+  setSittingOut(code: string, uid: string, on: boolean): Promise<void>;
+  setPaleCards(code: string, on: boolean): Promise<void>;
   setCountdown(code: string, n: number | null): Promise<void>;
   setIdentity(code: string, uid: string, name: string, badgeId: BadgeId, wasBadgeId: BadgeId): Promise<void>;
   setHints(code: string, on: boolean): Promise<void>;
@@ -89,7 +91,9 @@ export interface GameStore {
   noteVisible(visible: boolean): void;
   setTarget(n: number): void;
   setReady(on: boolean): void;
+  setSittingOut(on: boolean): void;
   setIdentity(name: string, badgeId: BadgeId): void;
+  setPaleCards(on: boolean): void;
   setHints(on: boolean): void;
   setOrderly(on: boolean): void;
   start(): void;
@@ -133,9 +137,11 @@ export const GO_MS = 700;
  * anyway" is the way past a player whose phone has died for good.
  */
 export function tableReady(room: Room): boolean {
-  const players = Object.values(room.players);
-  if (players.length < 2) return false;
-  return players.every(p => p.isBot || (p.ready === true && p.awayAt == null && p.connected));
+  const playing = Object.values(room.players).filter(p => !p.sittingOut);
+  // Two players who are actually going to be dealt in. A table of one plus three
+  // spectators is not a game.
+  if (playing.length < 2) return false;
+  return playing.every(p => p.isBot || (p.ready === true && p.awayAt == null && p.connected));
 }
 
 export function createGameStore(deps: Deps): StoreApi<GameStore> {
@@ -671,6 +677,11 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         const { code, uid } = get();
         if (code && uid) hostAction(deps.setReady(code, uid, on), 'change your ready state');
       },
+      setSittingOut(on) {
+        const { code, uid } = get();
+        if (code && uid) hostAction(deps.setSittingOut(code, uid, on), 'change whether you are sitting out');
+      },
+      setPaleCards(on) { const c = get().code; if (c) void deps.setPaleCards(c, on); },
       setIdentity(name, badgeId) {
         const { code, uid, room } = get();
         const me = uid ? room?.players[uid] : null;
@@ -719,6 +730,8 @@ const realDeps: Deps = {
   createRoom: netRooms.createRoom,
   setTargetScore: netRooms.setTargetScore,
   setReady: netRooms.setReady,
+  setSittingOut: netRooms.setSittingOut,
+  setPaleCards: netRooms.setPaleCards,
   setCountdown: netRooms.setCountdown,
   setIdentity: netRooms.setIdentity,
   setHints: netRooms.setHints,

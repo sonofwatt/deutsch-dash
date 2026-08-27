@@ -14,6 +14,8 @@ function fakeDeps(over: Partial<Deps> = {}): Deps {
     createRoom: vi.fn(async () => 'ABCDEF'),
     setTargetScore: vi.fn(async () => {}),
     setReady: vi.fn(async () => {}),
+    setSittingOut: vi.fn(async () => {}),
+    setPaleCards: vi.fn(async () => {}),
     setCountdown: vi.fn(async () => {}),
     setIdentity: vi.fn(async () => {}),
     setHints: vi.fn(async () => {}),
@@ -251,6 +253,16 @@ describe('the lobby ready gate', () => {
     });
     it('is false while a ready player is disconnected', () => {
       const players = { me: human({ ready: true }), you: human({ ready: true, connected: false }) };
+      expect(tableReady(lobby(players))).toBe(false);
+    });
+    it('ignores a player sitting out entirely', () => {
+      // Not ready, away and unreachable all at once - and none of it counts,
+      // because they are not going to be dealt in.
+      const out = human({ awayAt: 5, connected: false, sittingOut: true });
+      expect(tableReady(lobby({ me: human({ ready: true }), b: bot(), out }))).toBe(true);
+    });
+    it('will not start a table of one plus spectators', () => {
+      const players = { me: human({ ready: true }), out: human({ sittingOut: true }) };
       expect(tableReady(lobby(players))).toBe(false);
     });
   });

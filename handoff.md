@@ -8,7 +8,7 @@ for a day, so anything it changed - the keeper's round timer, the wood/Blitz sid
 picker - was "built" but not live; check `git status -sb` before trusting a
 playtest._
 
-_**285 tests green** (263 unit + 22 emulator). This is the only place in the repo
+_**289 tests green** (267 unit + 22 emulator). This is the only place in the repo
 that quotes a count — it drifted three separate ways when it lived in four
 places, so keep it here and nowhere else._
 
@@ -533,6 +533,65 @@ buttons around a value do not fit in that without breaking the touch floor.
 lobby reads it as easily as the game does. Deliberately not disabled for
 non-hosts and not a room option: it is about the phone in your hand. The board's
 `⇄` stays exactly as it was.
+
+### Requested 2026-08-27, second pass — all built
+
+Four more, from looking at the first batch on a screen.
+
+**#17. "Start anyway" the same in both themes.** — _built 2026-08-27._ It is a
+fixed dark slab with pale text now (`.start-anyway`), not `.btn-primary` whose
+`--accent` flips. Same reasoning as the ready button's fixed white: the two are
+read together and must not swap relative weight because one player's phone is in
+dark mode and another's is not.
+
+**#18. A manual theme toggle.** — _built 2026-08-27._ `ui/theme.ts`, fixed to the
+top-right corner of every screen. **THREE states, not two:** `system` (the
+default, and what the app did before this existed) follows the phone including
+its own switch at sunset; `light` and `dark` are a choice the device may not
+override. That is why `theme.css` grew from one media query to a media query
+guarded with `:not([data-theme="light"])` PLUS an attribute rule - neither state
+can be expressed by the other alone.
+
+`system` writes no attribute at all rather than `data-theme="system"`, so the
+media query is left to keep working while the app is open. The `theme-color`
+metas are rewritten in JS because a media query cannot see an override, and left
+to themselves Safari paints its bars for the device's theme while the page paints
+the player's. `.game-head` and `.screen` reserve the corner so nothing sits under
+the button.
+
+**#19. Sitting out.** — _built 2026-08-27._ `players/$uid/sittingOut`, owner-written
+like `ready` and `awayAt`, so no rules change.
+
+**It takes effect at the next DEAL, never mid-round, and the button says so.** A
+hand already on the table cannot be withdrawn without stranding its cards in the
+middle. What it does is make `startRound` skip them - no tableau at all - and
+almost everything else falls out of that for free: nothing to play, and no
+`RoundScore`, so `commitScores` leaves their total exactly where it was.
+
+Two things did NOT fall out and had to be written:
+
+- **`allConnectedStuck` must skip them.** With no tableau, `syncStuck` never
+  writes them a `stuckAt`, so counted as present they are the one player the
+  table waits on forever. This is the same trap the idle-table hang was.
+- **`tableReady` must skip them**, and then check that at least two players are
+  actually left. A table of one plus three spectators is not a game.
+
+The board is still sized on the WHOLE room, deliberately. Every client derives
+the grid shape from the player count independently (`normalizeRoom`), so sizing
+it on who is dealt in would resize the grid under a hand somebody is holding the
+moment anyone sat down. A couple of spare spaces costs nothing.
+
+**#20. White cards in dark mode.** — _built 2026-08-27._ `meta.paleCards`, a host
+option, applied as a `.pale-cards` class on the board. Written as the LIGHT
+values rather than as literals so the two cannot drift, and applied
+unconditionally - in a light theme it is already what they are, so it is a no-op
+there and needs no knowledge of which theme is active. Scoped to card faces,
+backs and slot layers: the slots, rails and chrome stay dark, which is the point
+of asking for it.
+
+A host option and not a device preference because it changes how the CARDS read,
+and two players describing the same board to each other should be looking at the
+same thing.
 
 ### The idle-table hang — _fixed 2026-08-27_
 

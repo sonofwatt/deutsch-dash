@@ -9,7 +9,10 @@
      laptop, a phone in landscape) push the bottom row under overflow:hidden. */
   --card-w: clamp(34px, min(12vw, 7vh), 96px);
   user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; overflow: hidden; }
-.game-head { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+/* padding-right reserves the corner the fixed .theme-toggle sits in, so the
+   connection pill and the side swap are never underneath it. */
+.game-head { display: flex; align-items: center; gap: 8px; font-size: 13px;
+  padding-right: 40px; }
 /* Small on purpose: it is set once per player and then never touched again. */
 .side-swap { margin-left: auto; width: 34px; height: 34px; border-radius: 999px;
   border: 1px solid var(--line); background: var(--surface); color: var(--ink-soft);
@@ -188,6 +191,10 @@
 .opp-head { display: flex; align-items: center; gap: 6px; }
 .opp.absent { opacity: .5; }
 .opp-ai { font-size: 9px; font-weight: 800; letter-spacing: .06em; color: var(--ink-soft);
+  border: 1px solid var(--line); border-radius: 999px; padding: 0 5px; }
+/* Same shape as the AI tag, because it answers the same question at a glance:
+   what kind of player is this, and should I be waiting for them. */
+.opp-out { font-size: 9px; font-weight: 800; letter-spacing: .06em; color: var(--ink-soft);
   border: 1px solid var(--line); border-radius: 999px; padding: 0 5px; }
 .opp-cards { display: flex; gap: 3px; align-items: flex-end;
   --card-w: clamp(22px, min(7vw, 3.4vh), 32px); }

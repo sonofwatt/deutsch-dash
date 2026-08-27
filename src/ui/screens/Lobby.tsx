@@ -17,6 +17,9 @@ const BOT_NAMES = ['Ada', 'Bram', 'Cleo', 'Dirk', 'Elke', 'Fritz', 'Greta', 'Han
  */
 function ReadyTag({ p }: { p: PlayerInfo }) {
   if (p.isBot) return null;
+  // Sitting out outranks the rest: it is a decision, where away is a symptom,
+  // and the table is not waiting on them either way.
+  if (p.sittingOut) return <span className="ready-tag out">Sitting out</span>;
   const away = p.awayAt != null || !p.connected;
   const cls = away ? 'away' : p.ready ? 'on' : '';
   return <span className={`ready-tag ${cls}`}>{away ? 'Away' : p.ready ? 'Ready' : 'Not ready'}</span>;
@@ -30,6 +33,8 @@ export function Lobby({ code }: { code: string }) {
   const setHints = useGameStore(s => s.setHints);
   const setOrderly = useGameStore(s => s.setOrderly);
   const setReady = useGameStore(s => s.setReady);
+  const setSittingOut = useGameStore(s => s.setSittingOut);
+  const setPaleCards = useGameStore(s => s.setPaleCards);
   const setIdentity = useGameStore(s => s.setIdentity);
   const start = useGameStore(s => s.start);
   const addBot = useGameStore(s => s.addBot);
@@ -50,6 +55,7 @@ export function Lobby({ code }: { code: string }) {
 
   const me = uid ? room.players[uid] : null;
   const iAmReady = me?.ready === true;
+  const iAmOut = me?.sittingOut === true;
   const iAmAway = me != null && me.awayAt != null;
   // Everything about me is fixed once I say I am ready. Un-readying is the way
   // back, which is the whole reason the ready flag is a toggle and not a latch.
@@ -57,7 +63,8 @@ export function Lobby({ code }: { code: string }) {
   // Mine is excluded, so my own badge never greys itself out in my own picker.
   const takenByOthers = players.filter(([id]) => id !== uid).map(([, p]) => p.badgeId);
   const countdown = room.meta.countdown;
-  const readyCount = players.filter(([, p]) => p.isBot || p.ready).length;
+  const inPlay = players.filter(([, p]) => !p.sittingOut);
+  const readyCount = inPlay.filter(([, p]) => p.isBot || p.ready).length;
 
   function add() {
     if (!freeBadge) return;
@@ -163,6 +170,16 @@ export function Lobby({ code }: { code: string }) {
         <input id="orderly" type="checkbox" className="toggle" disabled={!host}
           checked={room.meta.orderlyGrid ?? false} onChange={e => setOrderly(e.target.checked)} />
       </div>
+      <div className="row">
+        {/* Host-wide rather than per-device, unlike the theme toggle in the
+            corner: it changes how the CARDS read, and two players describing the
+            same board to each other should be looking at the same thing. Does
+            nothing for a player already in a light theme. */}
+        <label className="muted" htmlFor="pale">White cards in dark mode</label>
+        <span className="spacer" />
+        <input id="pale" type="checkbox" className="toggle" disabled={!host}
+          checked={room.meta.paleCards ?? false} onChange={e => setPaleCards(e.target.checked)} />
+      </div>
       {/* Not a host option and not disabled for anybody: this one is about the
           phone in your hand, so every player sets their own (see prefs.ts). The
           same ⇄ is on the board mid-game; this is only the chance to get it
@@ -180,22 +197,33 @@ export function Lobby({ code }: { code: string }) {
       {/* Mine, and the only place my own state is shown. Three states, three
           fixed colours - white, green and yellow with black ink in both themes,
           which is why they are literals and not theme tokens. */}
-      <button className={`btn ready-btn${iAmAway ? ' away' : iAmReady ? ' on' : ''}`}
-        onClick={toggleReady}>
-        {iAmAway ? 'Away' : iAmReady ? 'Ready' : "I'm Ready"}
-      </button>
+      {iAmOut
+        ? <button className="btn ready-btn" onClick={() => setSittingOut(false)}>
+            I'm back — deal me in
+          </button>
+        : <button className={`btn ready-btn${iAmAway ? ' away' : iAmReady ? ' on' : ''}`}
+            onClick={toggleReady}>
+            {iAmAway ? 'Away' : iAmReady ? 'Ready' : "I'm Ready"}
+          </button>}
+      {/* Quiet, and below the ready button: stepping away is the rarer thing to
+          want, and it must not be the button a thumb finds by accident. */}
+      {!iAmOut && (
+        <button className="btn btn-slim sit-out" onClick={() => setSittingOut(true)}>
+          Sit out the next rounds
+        </button>
+      )}
 
       {/* The host keeps a way past a phone that has died: the ready gate must not
           be able to strand a table. It is gone entirely once everyone is ready,
           because the countdown has it from there.
 
-          Deliberately NOT btn-primary. It is an escape hatch, not the thing to
-          reach for - the obvious move is to ready up and wait - and in dark mode
-          --accent is near-white, so a primary here sat directly under the white
-          ready button as a second pale slab with no way to tell which was which. */}
+          Deliberately NOT btn-primary, whose --accent flips with the theme. This
+          one is a fixed dark slab in both themes, like the ready button above it
+          is a fixed white one: the two are read together, and they must not swap
+          relative weight because one player's phone is in dark mode. */}
       {host && !tableReady(room) && (
-        <button className="btn" disabled={players.length < 2} onClick={start}>
-          {players.length < 2 ? 'Waiting for players…' : `Start anyway (${readyCount}/${players.length} ready)`}
+        <button className="btn start-anyway" disabled={inPlay.length < 2} onClick={start}>
+          {inPlay.length < 2 ? 'Waiting for players…' : `Start anyway (${readyCount}/${inPlay.length} ready)`}
         </button>
       )}
       {!host && !tableReady(room) && (

@@ -35,6 +35,7 @@ export function Game() {
   const online = useGameStore(s => s.online);
   const actionError = useGameStore(s => s.actionError);
   const noteActivity = useGameStore(s => s.noteActivity);
+  const setSittingOut = useGameStore(s => s.setSittingOut);
   const [woodSide, swapSides] = useWoodSide();
 
   // The helper hint waits for the player to go quiet, so it never fires under
@@ -91,6 +92,27 @@ export function Game() {
   // word "dealing…" flashing up behind the moment someone won. Nothing can be
   // played from it - playTo refuses outside 'playing'.
   const hand = tableau ?? round?.tableaus[uid] ?? null;
+  // Sitting out is the ONLY reason to have no hand in a live round, and it is not
+  // a transient one - "dealing…" would sit there for the whole round. Give them
+  // the board to watch and the one button that gets them back in.
+  if (round && !hand && me?.sittingOut) {
+    return (
+      <div className="screen stack">
+        <h1 className="title">Sitting out</h1>
+        <p className="muted">
+          Round {room.meta.roundNumber} is being played without you. You are not
+          being scored and nobody is waiting on you.
+        </p>
+        <button className="btn ready-btn" onClick={() => setSittingOut(false)}>
+          I'm back — deal me in
+        </button>
+        <p className="muted" style={{ fontSize: 13 }}>
+          You will be dealt into the next round.
+        </p>
+        <a className="muted keep-back" href="#/">Home</a>
+      </div>
+    );
+  }
   if (!round || !hand) return <div className="screen"><p className="muted">dealing…</p></div>;
 
   const races = raceFlashes({ races: round.races, spaces: round.spaces, uid, lastRejected });
@@ -116,7 +138,8 @@ export function Game() {
     // Every tap and every drag on this screen is a sign of life, which is a wider
     // net than "made a legal move" on purpose: a player weighing up the board is
     // present, and marking them away would be wrong even though it is harmless.
-    <div className="game" style={{ opacity: online ? 1 : 0.6 }}
+    <div className={`game${room.meta.paleCards ? ' pale-cards' : ''}`}
+      style={{ opacity: online ? 1 : 0.6 }}
       onPointerDown={() => { noteActivity(); setActivity(n => n + 1); }}>
       <div className="game-head">
         <strong>Round {room.meta.roundNumber}</strong>
@@ -149,7 +172,11 @@ export function Game() {
         {actionError && <p className="error" style={{ margin: '6px 0 0', fontSize: 13 }}>{actionError}</p>}
         {/* The automatic "no moves left" note is in the drop band now (CenterGrid),
             where it costs no layout. This slot carries the away note instead. */}
-        {me.awayAt != null
+        {me.sittingOut
+          ? <button className="btn btn-slim sit-out" onClick={() => setSittingOut(false)}>
+              Sitting out from the next round — tap to stay in
+            </button>
+          : me.awayAt != null
           ? <button className="away-note" onClick={noteActivity}>Away — tap to rejoin the round</button>
           : ENABLE_STUCK_BUTTON && (
               <button className="btn stuck-btn" disabled={!stuckAvailable || me.stuckAt != null}

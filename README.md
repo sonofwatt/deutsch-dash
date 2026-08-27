@@ -104,9 +104,26 @@ that rule would lock out the entire game.
 3. Push to `main` (or run the workflow manually). The site lands at
    `https://<user>.github.io/<repo>/`.
 
+## Theme
+
+The board follows your phone: light or dark, switching by itself when the device
+does. The **◐ button in the top-right corner** overrides that for this phone only
+— tap it to cycle *follow the phone → light → dark*. It is a per-device setting
+like the wood-pile side, so two people at one table can disagree about it
+harmlessly.
+
+## Sitting out
+
+**Sit out the next rounds**, in the lobby or under the board, deals you out from
+the next round on. You are not scored, nobody waits on you, and the round can end
+without you. Tap **I'm back — deal me in** and you are in the next one.
+
+It takes effect at the next deal rather than immediately, because a hand already
+on the table cannot be taken back without stranding its cards in the middle.
+
 ## Host options
 
-Three controls in the lobby, all set by the host and all applying to the whole
+Four controls in the lobby, all set by the host and all applying to the whole
 room rather than to one device — everybody should be playing the same game.
 
 **Play to** 25, 50, 75 or 100 points.
@@ -132,6 +149,12 @@ on the board to point at, so nothing flashes for it — which early in a round,
 before anyone has an Ace down, can mean no hint at all. And a player who is
 genuinely stuck has no move to be shown, so the amber "no moves left" note in the
 drop zone speaks for them instead.
+
+**White cards in dark mode** (off by default). Card faces sit on a white ground
+whatever theme each player is in, while the board around them stays dark. It does
+nothing for anyone already playing in a light theme. A room option rather than a
+per-device one because it changes how the cards read, and two players describing
+the same board to each other should be looking at the same thing.
 
 **Orderly grid** (off by default). Every center space belongs to one colour for
 the whole round, so the board reads as blocks of colour rather than a jumble, and

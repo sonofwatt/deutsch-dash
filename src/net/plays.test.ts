@@ -51,3 +51,22 @@ describe('allConnectedStuck', () => {
     expect(allConnectedStuck({ a: p(1, true, 5), b: p(2, true), c: p(3, true, 9, 7000) })).toBe(false);
   });
 });
+
+describe('sitting out', () => {
+  const who = (over: Partial<PlayerInfo> = {}): PlayerInfo => ({
+    name: 'P', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null,
+    awayAt: null, score: 0, ...over,
+  });
+
+  it('does not hold up the all-stuck rotation', () => {
+    // The hard case: a player sitting out has NO tableau, so syncStuck never
+    // writes a stuckAt for them. Counted as present, they would be the one
+    // player the table waits on forever.
+    const players = { a: who({ stuckAt: 1 }), b: who({ stuckAt: 2 }), c: who({ sittingOut: true }) };
+    expect(allConnectedStuck(players)).toBe(true);
+  });
+
+  it('still needs somebody actually playing to be stuck', () => {
+    expect(allConnectedStuck({ c: who({ sittingOut: true }) })).toBe(false);
+  });
+});
