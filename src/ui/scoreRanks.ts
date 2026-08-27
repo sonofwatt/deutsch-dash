@@ -2,6 +2,9 @@ import type { PlayerInfo, RoundScore } from '../game/types';
 
 export type Move = 'up' | 'down' | null;
 
+/** "+6" / "-4" / "0" - a signed zero in the middle of arithmetic reads as a typo. */
+export const signed = (n: number) => (n > 0 ? `+${n}` : `${n}`);
+
 /**
  * Where every player sat before this round and where they sit now.
  *

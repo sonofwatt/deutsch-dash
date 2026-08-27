@@ -59,6 +59,31 @@
   0%, 55% { background: var(--fall); border-color: var(--fall); }
   100% { background: var(--surface); border-color: var(--line); }
 }
+/* Score keeper: a phone-shaped scorepad for a real deck. */
+.keep-link { display: grid; place-items: center; text-decoration: none; }
+.keep-setup-row { display: grid; grid-template-columns: 40px minmax(0, 1fr) 44px; gap: 8px;
+  align-items: center; }
+.keep-setup-row .chip { width: 40px; height: 40px; font-size: 20px; cursor: pointer;
+  border: 1px solid var(--line); }
+.keep-toggle { align-items: center; gap: 10px; }
+.keep-toggle input { width: 22px; height: 22px; }
+.keep-back { text-align: center; font-size: 13px; }
+.keep-card { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface);
+  padding: 10px 12px; display: grid; gap: 8px; }
+.keep-card-head { display: flex; align-items: center; gap: 8px; }
+.keep-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-weight: 600; }
+.keep-delta { font-weight: 800; font-variant-numeric: tabular-nums; }
+.keep-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.keep-field { display: grid; gap: 4px; font-size: 12px; }
+/* Steppers, not a keyboard: the Blitz pile is ten cards, so this is at most ten
+   taps and never a wrong number. The middle count can be forty, which is why
+   that one is a real numeric field. */
+.keep-step { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; gap: 4px; }
+.keep-step .btn { min-height: 44px; padding: 0; }
+.keep-step-value { text-align: center; font-size: 18px; font-weight: 800;
+  font-variant-numeric: tabular-nums; }
+
 /* Commentary carousel under the scores. The floor is two lines' worth, so the
    sheet does not jump as remarks of different lengths rotate through; a rare
    three-liner grows the box rather than being clipped, because a cut-off joke is

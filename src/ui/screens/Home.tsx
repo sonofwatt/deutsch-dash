@@ -49,6 +49,7 @@ export function Home() {
       <button className="btn btn-primary" disabled={!ready || joinPhase === 'joining'} onClick={create}>
         Create room
       </button>
+      <a className="btn keep-link" href="#/keeper">Keep score for real cards</a>
       <div className="row">
         <input className="field" placeholder="Room code" maxLength={6}
           value={code} onChange={e => setCode(e.target.value.toUpperCase())} />

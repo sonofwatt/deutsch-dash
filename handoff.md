@@ -1,10 +1,10 @@
 # Project Handoff — Deutsch Dash
 
-_Last updated: 2026-08-26 at `05516a8`. Working tree clean, `main` ==
+_Last updated: 2026-08-26 at `cdd986e`. Working tree clean, `main` ==
 `origin/main`, CI green including the emulator suite, and the live site matches
 `HEAD`._
 
-_**195 tests green** (177 unit + 18 emulator). This is the only place in the repo
+_**212 tests green** (194 unit + 18 emulator). This is the only place in the repo
 that quotes a count — it drifted three separate ways when it lived in four
 places, so keep it here and nowhere else._
 
@@ -63,6 +63,32 @@ test at once. Hydrate preferences inside a component (as `Home.tsx` and
 `Join.tsx` already do) or guard with `typeof localStorage !== 'undefined'`.
 Also: `include` is `src/**/*.test.ts`, so a test file named `.test.tsx` is
 silently never collected.
+
+### There is a second, offline app inside this one
+
+`#/keeper` is a scorepad for people playing Dutch Blitz with a real deck. No
+room, no account, no network: `src/keeper/` is the model and its localStorage,
+and `Keeper.tsx` is the whole interface. It is routed **before** the
+`configMissing` gate in `App.tsx` on purpose, so it works in a deployment with no
+Firebase config at all.
+
+It reuses the online game rather than copying it. A round is the same
+`RoundScore`, which is what lets `ScoreList`, the ranking animation, `nextStats`
+and the commentary all work without a card being dealt. Two things are inferred
+rather than asked for: the blitzer is whoever is entered with an empty Blitz pile
+(nobody, if two people are), and there is no round duration, so the speed rules
+never fire.
+
+**The badge is the player's identity**, because badges are unique per table and
+that avoids inventing ids. It also means changing somebody's badge after a round
+is entered would orphan their scores, which is why that is only offered during
+setup.
+
+Every localStorage read is guarded twice - `typeof localStorage` for the test
+environment, try/catch for Safari in a private window, which throws on write
+rather than failing quietly. Losing forty minutes of scores to a screen lock
+would be the end of anybody using this, so the game is saved on every change and
+resumed on open.
 
 ### The score sheets talk, and the rules live in one file
 

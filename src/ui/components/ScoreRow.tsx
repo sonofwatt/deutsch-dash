@@ -1,12 +1,7 @@
 import { motion } from 'framer-motion';
 import { BADGES } from '../../game/badges';
-import type { Move } from '../scoreRanks';
+import { signed, type Move } from '../scoreRanks';
 import type { PlayerInfo, RoundScore } from '../../game/types';
-
-/** "+6" / "-4" / "0" — a signed zero in the middle of the arithmetic reads as a typo.
-    Kept module-private: exporting a non-component from a component file costs an
-    oxlint react(only-export-components) warning, and the baseline is zero new ones. */
-const signed = (n: number) => (n > 0 ? `+${n}` : `${n}`);
 
 /**
  * One player's line on the round-end and game-over sheets: the round's arithmetic
