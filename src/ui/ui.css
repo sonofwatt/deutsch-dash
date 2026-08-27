@@ -77,15 +77,35 @@
 .dot.off { background: var(--line); }
 .chip { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center;
   background: color-mix(in srgb, var(--badge) 18%, transparent); }
-/* Fixed to the corner rather than placed in each screen's header: there is no
-   header shared by the home page, the lobby, the board and the scorepad, and the
-   control belongs to the phone rather than to any of them. Small and quiet - it
-   is set once and then never touched again, like the wood-side swap. */
-.theme-toggle { position: fixed; z-index: 60;
-  top: max(8px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right));
-  width: 34px; height: 34px; border-radius: 999px; border: 1px solid var(--line);
-  background: var(--surface); color: var(--ink-soft); font-size: 15px; line-height: 1;
-  display: grid; place-items: center; cursor: pointer; box-shadow: var(--shadow); }
+/* One island, not three loose dots. These are the controls that are NOT game
+   actions - which side the wood sits on, sitting out, and the theme - and none of
+   them is touched during a round, so they read better as a single group parked in
+   the corner than as three things competing with the board.
+   .corner-btns is the same pill on every screen that has no head to hang it in.
+   Grouping only: each button is still one tap. */
+.head-btns { margin-left: auto; }
+.head-btns, .corner-btns {
+  display: flex; align-items: center; gap: 2px; padding: 3px;
+  border: 1px solid var(--line); border-radius: 999px;
+  background: var(--surface); box-shadow: var(--shadow); }
+/* Borderless inside the pill: the pill carries the edge, so three of these in a
+   row read as one control strip rather than three buttons in a box. */
+.side-swap { width: 30px; height: 30px; border-radius: 999px; border: none;
+  background: none; box-shadow: none; color: var(--ink-soft);
+  font-size: 15px; line-height: 1; display: grid; place-items: center; cursor: pointer;
+  flex: 0 0 auto; }
+.side-swap:active { background: color-mix(in srgb, var(--ink) 10%, transparent); }
+/* Armed: the second tap ends the round for this player, so it stops looking like
+   the quiet siblings beside it and says what it is about to do. */
+.side-swap.arming { width: auto; padding: 0 10px; font-size: 12px; font-weight: 800;
+  border-color: var(--warn); color: var(--warn-ink);
+  background: color-mix(in srgb, var(--warn) 14%, transparent); }
+
+/* Lives HERE and not in game.css: the corner pill is on the home page, the join
+   form, the lobby and the scorepad, none of which import the board's stylesheet.
+   One definition for both, so the corner can never drift away from the board's. */
+.corner-btns { position: fixed; z-index: 60;
+  top: max(8px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right)); }
 
 .code-pill { font-family: ui-monospace, monospace; letter-spacing: .2em; font-weight: 800;
   background: var(--surface); border: 1px dashed var(--line); border-radius: var(--radius);

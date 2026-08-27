@@ -9,23 +9,9 @@
      laptop, a phone in landscape) push the bottom row under overflow:hidden. */
   --card-w: clamp(34px, min(12vw, 7vh), 96px);
   user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; overflow: hidden; }
-/* padding-right reserves the corner the fixed .theme-toggle sits in, so the
-   connection pill and the side swap are never underneath it. */
-.game-head { display: flex; align-items: center; gap: 8px; font-size: 13px;
-  padding-right: 40px; }
-/* The head's controls, gathered so the row has one thing to push right rather
-   than each button carrying its own margin-left:auto and spacing them apart. */
-.head-btns { margin-left: auto; display: flex; align-items: center; gap: 6px; }
-/* Small on purpose: set once per player and then never touched again. */
-.side-swap { width: 34px; height: 34px; border-radius: 999px;
-  border: 1px solid var(--line); background: var(--surface); color: var(--ink-soft);
-  font-size: 15px; line-height: 1; display: grid; place-items: center; cursor: pointer;
-  flex: 0 0 auto; }
-/* Armed: the second tap ends the round for this player, so it stops looking like
-   the quiet siblings beside it and says what it is about to do. */
-.side-swap.arming { width: auto; padding: 0 10px; font-size: 12px; font-weight: 800;
-  border-color: var(--warn); color: var(--warn-ink);
-  background: color-mix(in srgb, var(--warn) 14%, transparent); }
+/* The theme toggle is inside the head's pill on this screen, so nothing is
+   floating over the row and no corner needs reserving. */
+.game-head { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 
 /* Board = finished-pile rail | centre grid + snap band | finished-pile rail */
 .board { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px;

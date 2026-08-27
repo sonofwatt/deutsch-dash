@@ -544,7 +544,7 @@ fixed dark slab with pale text now (`.start-anyway`), not `.btn-primary` whose
 read together and must not swap relative weight because one player's phone is in
 dark mode and another's is not.
 
-**#18. A manual theme toggle.** — _built 2026-08-27._ `ui/theme.ts`, fixed to the
+**#18. A manual theme toggle.** — _built 2026-08-27._ `ui/theme.ts`, in the
 top-right corner of every screen. **THREE states, not two:** `system` (the
 default, and what the app did before this existed) follows the phone including
 its own switch at sunset; `light` and `dark` are a choice the device may not
@@ -556,8 +556,19 @@ can be expressed by the other alone.
 media query is left to keep working while the app is open. The `theme-color`
 metas are rewritten in JS because a media query cannot see an override, and left
 to themselves Safari paints its bars for the device's theme while the page paints
-the player's. `.game-head` and `.screen` reserve the corner so nothing sits under
-the button.
+the player's.
+
+**Where it renders is decided in `App.tsx`, and it must be one place or the
+other.** On the board it sits in the head's pill beside the wood swap and the
+sit-out button - three controls, one island - and everywhere else it is the only
+control on screen, so it gets an identical pill fixed to the corner. `boardUp`
+picks between them off `joinPhase` and `meta.phase`; render both and the player
+gets two toggles.
+
+`.head-btns`, `.corner-btns` and `.side-swap` are defined in **ui.css, not
+game.css**, precisely because the corner pill appears on the home page, the join
+form, the lobby and the scorepad - none of which import the board's stylesheet.
+One definition for both, so the corner cannot drift away from the board's.
 
 **#19. Sitting out.** — _built 2026-08-27._ `players/$uid/sittingOut`, owner-written
 like `ready` and `awayAt`, so no rules change.

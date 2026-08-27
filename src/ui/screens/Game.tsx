@@ -9,6 +9,7 @@ import { CenterGrid } from '../components/CenterGrid';
 import { TableauView } from '../components/TableauView';
 import { OpponentStrip } from '../components/OpponentStrip';
 import { ConnectionPill } from '../components/ConnectionPill';
+import { ThemeToggle } from '../components/ThemeToggle';
 import { nearestSpace, useDrag, type DropTarget, type Point } from '../useDrag';
 import { raceFlashes } from '../raceFlash';
 import { useOpenings } from '../openings';
@@ -163,8 +164,12 @@ export function Game() {
         <span className="muted">{me.name} · {me.score} pts · to {room.meta.targetScore}</span>
         {/* Which thumb the wood pile sits under, changeable mid-game on purpose:
             a player who was auto-rejoined never sees a form again. */}
+        <ConnectionPill />
+        {/* One island rather than three loose dots: the three controls that are
+            not game actions, on a single pill. They stay one tap each - grouping
+            is all this is. The theme toggle lives HERE on the board and in the
+            fixed corner pill everywhere else (App.tsx), never in both. */}
         <span className="head-btns">
-          <ConnectionPill />
           <button className="side-swap" onClick={swapSides}
             aria-label={`Move the wood pile to the ${woodSide === 'right' ? 'left' : 'right'}`}
             title="Swap Blitz and wood">⇄</button>
@@ -177,6 +182,7 @@ export function Game() {
                 aria-label="Confirm sitting out of this round">out?</button>
             : <button className="side-swap" onClick={() => setArming(true)}
                 aria-label="Sit out" title="Sit out of the round">‖</button>}
+          <ThemeToggle />
         </span>
       </div>
       <OpponentStrip me={uid} players={room.players} tableaus={round.tableaus} woodSide={woodSide} />

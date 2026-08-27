@@ -5,7 +5,7 @@ import { RoomScreen } from './ui/screens/RoomScreen';
 import { Keeper } from './ui/screens/Keeper';
 import { ThemeToggle } from './ui/components/ThemeToggle';
 import { configMissing } from './net/firebase';
-import { gameStore } from './state/store';
+import { gameStore, useGameStore } from './state/store';
 import './theme.css';
 import './ui/ui.css';
 
@@ -29,6 +29,13 @@ export function useRoute(): Route {
 
 export default function App() {
   const route = useRoute();
+  // The board carries the theme toggle in its own head pill, alongside the wood
+  // swap and the sit-out button - three controls, one island. Everywhere else it
+  // is the only control on screen, so it gets a corner pill of its own. Rendered
+  // in one place or the other, never both.
+  const joinPhase = useGameStore(s => s.joinPhase);
+  const phase = useGameStore(s => s.room?.meta.phase);
+  const boardUp = route.screen === 'room' && joinPhase === 'in-room' && phase != null && phase !== 'lobby';
   useEffect(() => {
     const s = gameStore.getState();
     if (route.screen === 'home' && s.joinPhase !== 'idle') s.leave();
@@ -37,7 +44,12 @@ export default function App() {
   // Before the config gate on purpose: the scorepad is pure local arithmetic and
   // works in a deployment with no Firebase at all.
   if (route.screen === 'keeper') {
-    return <MotionConfig reducedMotion="user"><Keeper /><ThemeToggle /></MotionConfig>;
+    return (
+      <MotionConfig reducedMotion="user">
+        <Keeper />
+        <span className="corner-btns"><ThemeToggle /></span>
+      </MotionConfig>
+    );
   }
   if (configMissing) {
     return (
@@ -53,10 +65,7 @@ export default function App() {
   return (
     <MotionConfig reducedMotion="user">
       {route.screen === 'room' ? <RoomScreen code={route.code} /> : <Home />}
-      {/* Outside the screen switch: it is a property of the phone, not of where
-          the player happens to be in the app, and it has to be reachable from
-          the board as much as from the lobby. */}
-      <ThemeToggle />
+      {!boardUp && <span className="corner-btns"><ThemeToggle /></span>}
     </MotionConfig>
   );
 }
