@@ -1,7 +1,8 @@
 # Project Handoff — Deutsch Dash
 
 _Last updated: 2026-08-27, with the away-presence fix, the last three playtest
-requests (#3, #5, #6), and the round of tweaks that followed them. Working tree
+requests (#3, #5, #6), the round of tweaks that followed them, and the README
+caught up to the host options. Working tree
 clean, CI green including the emulator suite. Note that `92f57d0` sat unpushed
 for a day, so anything it changed - the keeper's round timer, the wood/Blitz side
 picker - was "built" but not live; check `git status -sb` before trusting a
@@ -908,7 +909,21 @@ game is frozen, including the bot. That is inherent to a serverless design.
 | `d1c85b4` | Swapped wood and Blitz — wood to the right thumb |
 | `26ff306` | This handoff, rewritten around pending work and the landmines |
 | `6abe8bd` | CI runs the rules tests; guard so that cannot silently regress |
+| `7803a44` | Race flashes — who won a contested space, told by the loser |
+| `18d57d1` | The score sheet plays the change in standings out |
+| `4fdd258` | Blitz splash: glitter for the winner, worse for the worst round |
+| `58ebb3f` | How to drive the real app, and what doing it proved |
+| `77bafc1` | The board rendered at last; most of the never-rendered list closed |
+| `05516a8` → `cdd986e` | The score sheets talk: commentary, per-game stats, no repeats |
+| `b38da9b` | Round arithmetic on the score rows; `--danger-ink` for dark mode |
+| `5d7039d` | `#/keeper` — a scorepad for a game played with a real deck |
+| `92f57d0` | The keeper's round timer; the wood/Blitz side picker |
+| `034e313` | The idle-table hang, fixed as presence: `awayAt` |
+| `db81ee0` | Stuck alert into the drop band; orderly grid; helper hint |
+| `8bdc017` | Away in the opponent strip; 32 spaces; the hint stops nagging |
+| `d33f3c4` | Rails off the screen edge at 7-8 players; the hint returns |
 
 Earlier history, the approved design spec and the original 15-task execution
-ledger are in `docs/superpowers/`. The README carries setup, the security model
-and the house rules.
+ledger are in `docs/superpowers/`. The README carries setup, the security model,
+the **host options** (`b853ccf`) and the house rules — it is the player-facing
+half of this document, so a change to what a lobby toggle *does* belongs in both.
