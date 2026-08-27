@@ -1,10 +1,10 @@
 # Project Handoff — Deutsch Dash
 
-_Last updated: 2026-08-26 at `cdd986e`. Working tree clean, `main` ==
+_Last updated: 2026-08-26 at `5d7039d`. Working tree clean, `main` ==
 `origin/main`, CI green including the emulator suite, and the live site matches
 `HEAD`._
 
-_**212 tests green** (194 unit + 18 emulator). This is the only place in the repo
+_**211 tests green** (193 unit + 18 emulator). This is the only place in the repo
 that quotes a count — it drifted three separate ways when it lived in four
 places, so keep it here and nowhere else._
 
