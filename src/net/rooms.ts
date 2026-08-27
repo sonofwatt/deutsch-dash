@@ -29,7 +29,8 @@ export function normalizeRoom(raw: unknown): Room | null {
   if (!r.meta || !r.players) return null;
   const players: Record<string, PlayerInfo> = {};
   for (const [uid, p] of Object.entries(r.players)) {
-    players[uid] = { ...p, stuckAt: p.stuckAt ?? null, connected: p.connected ?? false, score: p.score ?? 0 };
+    players[uid] = { ...p, stuckAt: p.stuckAt ?? null, awayAt: p.awayAt ?? null,
+                     connected: p.connected ?? false, score: p.score ?? 0 };
   }
   const meta: RoomMeta = { ...r.meta, creatorId: r.meta.creatorId ?? r.meta.hostId };
   const playerCount = Object.keys(players).length;
@@ -55,7 +56,7 @@ export function normalizeRoom(raw: unknown): Room | null {
 }
 
 function playerRecord(name: string, badgeId: BadgeId): Omit<PlayerInfo, 'joinedAt'> & { joinedAt: object } {
-  return { name, badgeId, joinedAt: serverTimestamp(), connected: true, stuckAt: null, score: 0 };
+  return { name, badgeId, joinedAt: serverTimestamp(), connected: true, stuckAt: null, awayAt: null, score: 0 };
 }
 
 export async function createRoom(name: string, badgeId: BadgeId): Promise<string> {
@@ -154,7 +155,9 @@ export async function addBot(code: string, badgeId: BadgeId, level: BotLevel, na
   await update(roomRef(code), {
     [`players/${id}`]: {
       name, badgeId, joinedAt: serverTimestamp(), connected: true,
-      stuckAt: null, score: 0, isBot: true, botLevel: level,
+      // awayAt stays null for the life of a bot: it has no client to notice it has
+    // wandered off, and the host either plays its hand or marks it stuck.
+    stuckAt: null, awayAt: null, score: 0, isBot: true, botLevel: level,
     },
     [`badges/${badgeId}`]: uid,
   });

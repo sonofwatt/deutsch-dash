@@ -1,10 +1,12 @@
 # Project Handoff — Deutsch Dash
 
-_Last updated: 2026-08-26 at `92f57d0`. Working tree clean, `main` ==
-`origin/main`, CI green including the emulator suite, and the live site matches
-`HEAD`._
+_Last updated: 2026-08-27, with the away-presence fix (this commit). Working tree
+clean, CI green including the emulator suite. Note that `92f57d0` sat unpushed
+for a day, so anything it changed - the keeper's round timer, the wood/Blitz side
+picker - was "built" but not live; check `git status -sb` before trusting a
+playtest._
 
-_**213 tests green** (195 unit + 18 emulator). This is the only place in the repo
+_**226 tests green** (207 unit + 19 emulator). This is the only place in the repo
 that quotes a count — it drifted three separate ways when it lived in four
 places, so keep it here and nowhere else._
 
@@ -230,6 +232,16 @@ deliberate.
   `HOST_AWAY_MS` (30s) stand-in watchdog handing host to the longest-present
   connected non-bot. `claimHost` is a transaction returning `undefined` when
   already host, so reclaim cannot loop.
+- **Three separate things write `players/$uid`, from three places.** `startPresence`
+  owns `connected` through `onDisconnect`, `syncStuck` owns `stuckAt`, and the away
+  timer owns `awayAt`. Keep them apart: expressing "away" by writing
+  `connected: false` in particular would fight the `onDisconnect` handler and make
+  a present player look gone to the host watchdog.
+- **`allConnectedStuck` being true no longer implies *you* are stuck.** It skips
+  away players, so an away client can see it true while having moves of its own.
+  Anything gated on it needs to say what it wants about the caller explicitly —
+  that implication going unnoticed is what would have left the original hang
+  unfixed (see the idle-table hang under Pending work).
 - Tests must build a store with `createGameStore(fakeDeps)` and never touch the
   exported `gameStore` singleton — importing it executes Firebase module side
   effects.
@@ -273,106 +285,63 @@ deliberate.
 
 ## Pending work
 
-**Start with the hang below.** It is the only known bug in here; everything after
-it is a feature request.
+**No known bugs.** The idle-table hang below is fixed; everything after it is a
+feature request.
 
 Of the seven requests from the 2026-08-25/26 playtests, **#1, #2 and #7 are
 built** and **#4 is deferred**; #3, #5 and #6 are unstarted. Each was specced
 against the real code; the open questions are decisions only the product owner
 can make. Numbering is kept as-is so earlier notes still point at the right item.
 
-### FIRST: two bots and an idle human hang the round — _a real bug_
+### The idle-table hang — _fixed 2026-08-27_
 
-**Reproduced 2026-08-26**, by accident, while trying to watch a round end on its
-own: one human client, two medium bots, and the human doing nothing at all. Five
-minutes later the round had not ended, no score sheet, no stuck note. A second
-run where the human *did* play finished a round in about two minutes, so the
-bots are not the problem on their own.
+**Was:** one human client, two medium bots, the human doing nothing. Five minutes
+later the round had not ended, no score sheet, no stuck note. An idle player is
+never marked stuck - correctly, because their wood is untouched and their Blitz
+top will land somewhere - so `allConnectedStuck` never came true, the rotation
+never fired, and the three-fruitless-rotations round end was unreachable.
 
-**The leading hypothesis, read off the code rather than instrumented.** The
-all-stuck rotation needs `allConnectedStuck`, which needs *every* connected
-player marked stuck. An idle player is never marked stuck, by either of
-`isStuck`'s two gates:
+**Fixed as presence, not as stuckness.** A player with legal moves who is not
+playing is not stuck, and the game waiting for them is right up until they have
+gone; so what is detected is that they have gone. `PlayerInfo.awayAt` is written
+by the player's **own** client off its own clock after `AWAY_MS` (45s, in
+`store.ts`) of touching nothing, and `allConnectedStuck` skips away players
+exactly as it skips disconnected ones. No rules change - `players/$uid` was
+already writable by its owner, and there is now an emulator test pinning that,
+plus that nobody else can write your `awayAt`.
 
-- `isStuck` returns false the moment `hasLegalMove` is true, and an idle player
-  usually has one - their wood is untouched and their Blitz top will land
-  somewhere. They are **correctly** not stuck. The table is waiting for a player
-  who can move and is not moving, which is the right behaviour right up until
-  they have left the room.
-- And in the case where they genuinely have nothing, the second gate wants
-  `flipsSinceProgress >= ceil(wood.length / 3)` - proof they have been all the
-  way round their own wood pile. A player who never flips never gets there.
+The reset is `noteActivity`, wired to plays, flips, and a pointerdown anywhere on
+the game screen - a wider net than "made a legal move" on purpose, because a
+player weighing up the board is present. Bots are never away: they have no client
+to notice, and the host either plays their hand or marks them stuck.
 
-Either way the rotation never fires, so the three-fruitless-rotations round end
-is unreachable, and the bots sit there having correctly concluded they have
-nothing to do.
+**The thing the spec missed, found by tracing the repro rather than by reasoning
+about it.** The rotation's guard is `meP.stuckAt != null && allConnectedStuck(…)`,
+and that first clause used to be *free*: if everyone connected was stuck and I am
+connected, I was stuck too. Skipping away players broke that implication, and
+broke it in precisely the shape that hangs a table - in the reported repro the
+away human is the host and the only client still running, so it would have seen
+`allConnectedStuck` come back true and then declined to act on it. An away client
+now rotates on the table's behalf, and its own wood rotates with everybody
+else's, a rotation being a table-wide event. `store.test.ts` has that exact
+shape ("an away host rotates on behalf of a table of stuck bots").
 
-Note what is *not* broken: a player who closes the tab stops blocking, because
-`allConnectedStuck` filters on `connected`. It takes a player who is present and
-idle - a phone face-up on the table - which is exactly what happens when someone
-goes to make tea.
+**Verified in the real app**, two browser clients against the emulator and the
+real rules (`/tmp/pw/stallpath.mjs`, gone with `/tmp` - the recipe is the
+reusable part): Ann rigged stuck, Bo present with moves and idle. Bo's own client
+marked Bo away at t+44s, Bo's screen showed the away note, three rotations fired
+in the same second, and the round ended `blitzedBy: null` - "Round over (all
+stuck)". The same script with the `awayAt` filter removed from
+`allConnectedStuck` hangs for the full 100s of its deadline with no sheet, which
+is the negative control for all of it.
 
-**Decided: fix it as presence, not as stuckness.** A player with legal moves who
-is not playing is not stuck, and the game waiting for them is correct right up
-until they have gone - so the thing to detect is that they have gone, and
-`allConnectedStuck` already knows how to ignore a player who is not there. It
-filters on `connected`; it will filter on away as well.
-
-The two alternatives were rejected: marking an idle player *stuck* would put a
-"no moves left" note on the screen of somebody who has plenty, and having the
-host force a rotation on everyone else's behalf puts one client in charge of a
-judgement about another.
-
-**The shape of it.**
-
-- **A player's own client marks it.** It is the only one that knows when it last
-  acted, and using its own clock for its own timer means there is no cross-device
-  timestamp comparison anywhere in this - which is exactly why the existing
-  `HOST_AWAY_MS` watchdog uses a local `setTimeout` and not a stored time.
-- `PlayerInfo` gains `awayAt: number | null`, written to `players/$uid/awayAt`.
-  **No rules change**: a player may already write their own record, and the
-  `.validate` there only gates *new* players joining. `normalizeRoom` defaults it,
-  like `stuckAt`.
-- Reset it on any real sign of life, not just a successful play: plays, flips,
-  post moves and a pointerdown anywhere on the board. A player thinking hard for
-  a minute is present, and marking them away would be wrong even if harmless.
-- `allConnectedStuck` skips away players the way it skips disconnected ones. If
-  everybody is away it returns false and nothing happens, which is right.
-- **Never mark a bot away.** Bots are driven by the host and either act or are
-  stuck; an away bot would be a bug in the host, not a player who wandered off.
-- Suggested timeout: **45 seconds**, tunable. A played round takes about two
-  minutes, so three quarters of a minute of nothing is already unusual. A flat
-  timer is fine - being away is a fact about you, not about the table - because
-  it has no effect at all unless everyone else is stuck.
-
-**Why this also fixes a case the other two options miss:** a player who
-backgrounds the tab without the socket dropping is present, silent, and blocking.
-Note the flip side, and why this is not a complete answer: a phone that locks
-hard freezes its timers, so that client cannot mark itself away either. In
-practice that one usually drops the socket and `connected` catches it - but if
-the hang ever shows up again with a locked phone at the table, that is the gap.
-
-**Say so on the away player's own screen.** If the table rotated without them,
-"Away - tap to rejoin the round" explains the board they come back to. Cheap, and
-without it the return is confusing.
-
-**Watch:** `flips` is a closure-scoped `Map` in `createGameStore`, never
-persisted, so it resets to zero on any reload - a player who reloads mid-round
-starts again from "has not been round their wood". A reload must not count as
-activity either: the away timer should start from the reload, not be cleared by
-it, or a player whose tab reloads itself every so often is never away.
-
-Also: `syncStuck` writes stuck claims automatically and `startPresence` owns
-`players/$uid/connected` through `onDisconnect`. The away flag is a third thing
-written to the same player record from a third place - keep it out of both, and
-do not try to express it by writing `connected: false`, which would fight the
-`onDisconnect` handler and make a present player look gone to the host watchdog.
-
-**Repro:** it is four lines of the live-app harness under "What still needs
-testing" - create a room, add two bots, click Start, then
-`page.waitForSelector('.sheet', { timeout: 300_000 })` and watch it time out.
-Touch nothing. (The script that found it lived in `/tmp` and is gone; it was not
-worth keeping, because the recipe is the reusable part.)
+**Still open, and known:** a phone that locks hard freezes its timers, so that
+client cannot mark itself away either. In practice it drops the socket and
+`connected` catches it - but if the hang reappears with a locked phone on the
+table, that is the gap. Also unproven: the stall path with *bots* in the room
+specifically. The natural two-bot repro now runs to a normal bot blitz (t+109s,
+away flag written at t+45s on the way), so it stopped being a way to reach the
+stall path at all.
 
 ### 1. Move the recycle button to the bottom right — _retired 2026-08-26_
 
@@ -675,6 +644,17 @@ Still unrendered:
   `translate(-50%, -55%)` lift that keeps the card out from under the thumb. The
   `left: 0; top: 0` fix holds.
 
+### Verified in the real app on 2026-08-27
+
+Two browser clients against the emulator, under the real rules:
+
+- A player's own client marking itself away after 45s of nothing, and the away
+  note on that player's own screen.
+- The all-stuck rotation and the three-rotations round end - the path that had
+  never once run outside a unit test.
+- The negative control: the same script with the away filter removed hangs
+  exactly as reported.
+
 ### Verified in the real app on 2026-08-26
 
 Driven end to end through the emulator, in a room with two bots:
@@ -715,8 +695,11 @@ snap band is already the largest single element on the board.
   hands bots over cleanly are both unknown. Difficulty was retuned on 2026-08-25
   after Easy beat a casual human; whether Easy is now beatable *without being
   inert* is unverified.
-- Automatic stuck detection firing in a real game, and the all-stuck rotation with
-  bots in the room.
+- ~~Automatic stuck detection firing in a real game, and the all-stuck rotation~~ —
+  **both driven for real on 2026-08-27**, with two human clients: a stuck player,
+  an away one, three rotations and a `blitzedBy: null` round end. With **bots** in
+  the room it is still unproven; a two-bot table now reaches a normal blitz rather
+  than the stall path.
 - The snap band by touch drag, and by tap.
 - Wood recycle: both the `↻` button and the `↻` empty draw slot.
 - One-tap join from the home page, including the badge-taken fallback.

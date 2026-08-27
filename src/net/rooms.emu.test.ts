@@ -122,7 +122,7 @@ emu('server-side player cap and badge uniqueness (database.rules.json)', () => {
       createdAt: Date.now(), hostId: HOST, targetScore: 75, phase: 'lobby', roundNumber: 0, playerCount: 1,
     }));
     await assertSucceeds(db.ref(`rooms/${code}`).update({
-      [`players/${HOST}`]: { name: 'Host', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, score: 0 },
+      [`players/${HOST}`]: { name: 'Host', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, awayAt: null, score: 0 },
       'badges/tulip': HOST,
     }));
     for (let i = 0; i < extraPlayers; i++) {
@@ -225,7 +225,7 @@ emu('server-side player cap and badge uniqueness (database.rules.json)', () => {
       createdAt: Date.now(), hostId: HOST, targetScore: 75, phase: 'lobby', roundNumber: 0, playerCount: 1,
     }));
     await assertSucceeds(db.ref(`rooms/${code}`).update({
-      [`players/${HOST}`]: { name: 'Host', badgeId: 'kite', joinedAt: 1, connected: true, stuckAt: null, score: 0 },
+      [`players/${HOST}`]: { name: 'Host', badgeId: 'kite', joinedAt: 1, connected: true, stuckAt: null, awayAt: null, score: 0 },
       'badges/kite': HOST,
     }));
 
@@ -349,7 +349,7 @@ emu('app writes under real security rules (regular client SDK, correct namespace
         await update(ref(database, `rooms/${code}/players/${uid}`), { connected: true });
       } else {
         await update(ref(database, `rooms/${code}`), {
-          [`players/${uid}`]: { name, badgeId, joinedAt: Date.now(), connected: true, stuckAt: null, score: 0 },
+          [`players/${uid}`]: { name, badgeId, joinedAt: Date.now(), connected: true, stuckAt: null, awayAt: null, score: 0 },
           [`badges/${badgeId}`]: uid,
           'meta/playerCount': increment(1),
         });
@@ -375,11 +375,32 @@ emu('app writes under real security rules (regular client SDK, correct namespace
       createdAt: Date.now(), hostId: uid, targetScore: 75, phase: 'lobby', roundNumber: 0, playerCount: 1,
     });
     await update(ref(database, `rooms/${code}`), {
-      [`players/${uid}`]: { name, badgeId, joinedAt: Date.now(), connected: true, stuckAt: null, score: 0 },
+      [`players/${uid}`]: { name, badgeId, joinedAt: Date.now(), connected: true, stuckAt: null, awayAt: null, score: 0 },
       [`badges/${badgeId}`]: uid,
     });
     return code;
   }
+
+  it('a player can mark themselves away, and cannot mark anybody else away', async () => {
+    // The away fix claims it needs no rules change, on the strength of
+    // players/$uid already being writable by its owner. That is a claim about
+    // database.rules.json, so it is checked against the real rules here.
+    const code = await createRoom('Host', 'tulip');
+    const hostUid = (await peekRoom(code))!.meta.hostId;
+
+    const p2 = await secondaryIdentity('away-p2');
+    createdApps.push(p2.app);
+    expect(await joinAs(p2.db, code, p2.uid, 'P2', 'bicycle')).toBe('ok');
+
+    await set(ref(p2.db, `rooms/${code}/players/${p2.uid}/awayAt`), Date.now());
+    expect((await peekRoom(code))!.players[p2.uid].awayAt).not.toBeNull();
+
+    let rejected = false;
+    try {
+      await set(ref(p2.db, `rooms/${code}/players/${hostUid}/awayAt`), Date.now());
+    } catch { rejected = true; }
+    expect(rejected, 'a non-host wrote another player\'s awayAt').toBe(true);
+  });
 
   it('CANARY: a non-host cannot write another player\'s round/tableaus - proves rules are ON in this namespace', async () => {
     const code = await createRoom('Host', 'tulip');

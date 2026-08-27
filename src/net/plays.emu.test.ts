@@ -14,7 +14,7 @@ emu('center transactions against emulator', () => {
     const uid = await ensureSignedIn();
     const room: Room = {
       meta: { createdAt: Date.now(), hostId: uid, creatorId: uid, targetScore: 75, phase: 'lobby', roundNumber: 0 },
-      players: { [uid]: { name: 'Host', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, score: 0 } },
+      players: { [uid]: { name: 'Host', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, awayAt: null, score: 0 } },
       round: null,
     };
     await startRound(code, room);
@@ -42,7 +42,7 @@ emu('game-over threshold against emulator', () => {
     const meta = { createdAt: Date.now(), hostId: uid, creatorId: uid, targetScore: 25,
                    phase: 'roundEnd' as const, roundNumber: 1 };
     const players = { [uid]: { name: 'Host', badgeId: 'tulip' as const, joinedAt: 1,
-                               connected: true, stuckAt: null, score: 0 } };
+                               connected: true, stuckAt: null, awayAt: null, score: 0 } };
     await startRound(code, { meta: { ...meta, phase: 'lobby' }, players, round: null });
     await update(ref(db, `rooms/${code}/meta`), { phase: 'roundEnd' }); // the blitz landed
 
@@ -84,13 +84,13 @@ emu('the round shown in the 2026-08-25 playtest screenshot', () => {
     const other = 'other-player-uid';
     await update(ref(db, `rooms/${code}`), {
       [`players/${other}`]: { name: 'sonofwatt', badgeId: 'anchor', joinedAt: 2,
-                              connected: true, stuckAt: null, score: 0 },
+                              connected: true, stuckAt: null, awayAt: null, score: 0 },
       'meta/targetScore': 25,
     });
 
     const players = {
-      [dave]: { name: 'Dave', badgeId: 'boat' as const, joinedAt: 1, connected: true, stuckAt: null, score: 0 },
-      [other]: { name: 'sonofwatt', badgeId: 'anchor' as const, joinedAt: 2, connected: true, stuckAt: null, score: 0 },
+      [dave]: { name: 'Dave', badgeId: 'boat' as const, joinedAt: 1, connected: true, stuckAt: null, awayAt: null, score: 0 },
+      [other]: { name: 'sonofwatt', badgeId: 'anchor' as const, joinedAt: 2, connected: true, stuckAt: null, awayAt: null, score: 0 },
     };
     const meta = { createdAt: Date.now(), hostId: dave, creatorId: dave, targetScore: 25,
                    phase: 'roundEnd' as const, roundNumber: 1 };

@@ -19,6 +19,14 @@ import type { JoinResult } from '../net/rooms';
 // creator reclaims host immediately on return (see onSnapshot) rather than waiting this out.
 export const HOST_AWAY_MS = 30000;
 
+// How long a player may touch nothing before their own client marks them away, so
+// the rest of the table stops waiting on them (see allConnectedStuck). A played
+// round runs about two minutes, so three quarters of a minute of nothing is
+// already unusual - and being away costs the player nothing unless everybody else
+// is stuck, which is why a flat timer is enough. Being away is a fact about you,
+// not about the table.
+export const AWAY_MS = 45000;
+
 export interface Deps {
   ensureSignedIn(): Promise<string>;
   watchRoom(code: string, cb: (room: Room | null) => void): () => void;
@@ -31,6 +39,8 @@ export interface Deps {
   persistTableau(code: string, uid: string, t: Tableau): Promise<void>;
   declareStuck(code: string, uid: string): Promise<void>;
   clearStuck(code: string, uid: string): Promise<void>;
+  markAway(code: string, uid: string): Promise<void>;
+  clearAway(code: string, uid: string): Promise<void>;
   announceBlitz(code: string, uid: string): Promise<void>;
   endRoundStalled(code: string): Promise<void>;
   incrementStuckRounds(code: string): Promise<number>;
@@ -68,6 +78,8 @@ export interface GameStore {
   playTo(target: { space: number } | { post: number }): Promise<void>;
   flip(): void;
   markStuck(): void;
+  /** Any sign of life from the player: clears the away flag and restarts its timer. */
+  noteActivity(): void;
   setTarget(n: number): void;
   start(): void;
   next(): void;
@@ -99,6 +111,7 @@ export function myPlayer(s: { uid: string | null; room: Room | null }): PlayerIn
 export function createGameStore(deps: Deps): StoreApi<GameStore> {
   let unwatch: (() => void) | null = null;
   let hostTimer: ReturnType<typeof setTimeout> | null = null;
+  let awayTimer: ReturnType<typeof setTimeout> | null = null;
   let inSnapshot = false;
   // One pending turn per bot. botBusy covers the gap between a timer firing and
   // its follow-up being scheduled, so a snapshot arriving mid-turn cannot start
@@ -143,6 +156,49 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
       for (const [id, p] of Object.entries(s.room.players)) {
         if (p.isBot) syncStuck(id, s.botTableaus[id]);
       }
+    }
+
+    /**
+     * The away flag, in three parts.
+     *
+     * `armAway` only ever STARTS a clock that is not already running - it must not
+     * restart one. Snapshots are the only thing that calls it, and a snapshot is
+     * somebody else's activity, not mine; a table full of busy players would
+     * otherwise keep an idle one looking present forever. It also means a reload
+     * starts the clock rather than clearing it, which is the point: a tab that
+     * reloads itself every so often must still be able to go away.
+     *
+     * `noteActivity` is the other half - the reset - and is wired to plays, flips
+     * and a pointerdown anywhere on the game screen. Thinking hard for a minute is
+     * being present, so it takes real input rather than a successful play.
+     */
+    function armAway() {
+      if (awayTimer) return;
+      const { uid, room } = get();
+      if (uid && room?.players[uid]?.awayAt != null) return; // already away: nothing left to time
+      awayTimer = setTimeout(() => {
+        awayTimer = null;
+        const { code, uid, room, online } = get();
+        if (!code || !uid || !online) return;
+        if (room?.meta.phase !== 'playing') return;
+        if (room.players[uid]?.awayAt != null) return; // already marked - a reload re-armed this
+        void deps.markAway(code, uid);
+      }, AWAY_MS);
+    }
+
+    function disarmAway() {
+      if (awayTimer) clearTimeout(awayTimer);
+      awayTimer = null;
+    }
+
+    function noteActivity() {
+      disarmAway();
+      const { code, uid, room } = get();
+      if (!code || !uid || !room) return;
+      // Withdrawn on any activity in any phase - somebody tapping "next round" is
+      // plainly back - but only a live round has anything to be away from.
+      if (room.players[uid]?.awayAt != null) void deps.clearAway(code, uid);
+      if (room.meta.phase === 'playing') armAway();
     }
 
     /** Run a host action, surfacing a rejected write instead of dropping it. */
@@ -273,12 +329,24 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         if (phase !== 'playing') { if (Object.keys(get().botTableaus).length) set({ botTableaus: {} }); flips.clear(); }
         syncBots(room);
         syncAllStuck(); // the centre moved: someone may have just been freed, or trapped
+        if (phase === 'playing') armAway(); else disarmAway();
 
-        // (3) all-stuck rotation
+        // (3) all-stuck rotation.
+        //
+        // The `me` half of this guard used to be free: if every connected player
+        // was stuck and I am connected, then I was stuck too. Skipping away
+        // players broke that implication, and it broke it in exactly the shape
+        // that hangs a table - one away human hosting two stuck bots would see
+        // allConnectedStuck() come back true and then decline to act on it,
+        // because the away player is the one client still running and it is not
+        // itself stuck. So an away player rotates on the table's behalf, and its
+        // own wood rotates with everyone else's: a rotation is a table-wide
+        // event, and the away note is there to explain the board on return.
         const meP = room.players[me];
-        if (phase === 'playing' && meP?.stuckAt != null && allConnectedStuck(room.players)) {
+        const partOfIt = meP != null && (meP.stuckAt != null || meP.awayAt != null);
+        if (phase === 'playing' && partOfIt && allConnectedStuck(room.players)) {
           // clear first: a snapshot raised synchronously by the writes below must not see me still stuck
-          void deps.clearStuck(get().code!, me);
+          if (meP.stuckAt != null) void deps.clearStuck(get().code!, me);
           flips.set(me, 0); // a rotation changes which third of the pile is reachable
           const t = get().tableau;
           if (t) {
@@ -396,6 +464,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         unwatch?.();
         unwatch = null;
         if (hostTimer) { clearTimeout(hostTimer); hostTimer = null; }
+        disarmAway();
         stopBots();
         flips.clear();
         deps.stopPresence();
@@ -415,6 +484,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         if (get().room?.meta.phase !== 'playing') return;
         const { tableau, selection, code, uid, room } = get();
         if (!tableau || !selection || !code || !uid) return;
+        noteActivity();
         set({ selection: null });
 
         if ('post' in target) {
@@ -451,6 +521,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         if (!get().online) return;
         const { tableau: t, uid } = get();
         if (!t || !uid) return;
+        noteActivity();
         const next = flipWood(t);
         set({ tableau: next, selection: null });
         void persist(next);
@@ -466,6 +537,8 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         if (!isStuck(tableau, room.round.spaces, flips.get(uid) ?? 0)) return;
         void deps.declareStuck(code, uid);
       },
+
+      noteActivity,
 
       setTarget(n) { const c = get().code; if (c) void deps.setTargetScore(c, n); },
       start() {
@@ -506,6 +579,8 @@ const realDeps: Deps = {
   persistTableau: netPlays.persistTableau,
   declareStuck: netPlays.declareStuck,
   clearStuck: netPlays.clearStuck,
+  markAway: netPlays.markAway,
+  clearAway: netPlays.clearAway,
   announceBlitz: netPlays.announceBlitz,
   endRoundStalled: netPlays.endRoundStalled,
   incrementStuckRounds: netPlays.incrementStuckRounds,

@@ -114,8 +114,8 @@ describe('OpponentStrip', () => {
     const html = renderToStaticMarkup(createElement(OpponentStrip, {
       me: 'me',
       players: {
-        me: { name: 'Me', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, score: 0 },
-        you: { name: 'You', badgeId: 'star', joinedAt: 2, connected: true, stuckAt: null, score: 3 },
+        me: { name: 'Me', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, awayAt: null, score: 0 },
+        you: { name: 'You', badgeId: 'star', joinedAt: 2, connected: true, stuckAt: null, awayAt: null, score: 3 },
       },
       tableaus: { you: tableau() },
     }));
@@ -134,7 +134,7 @@ describe('OpponentStrip', () => {
 
 describe('ScoreRow', () => {
   const player = (p: Partial<PlayerInfo> = {}): PlayerInfo => ({
-    name: 'Dave', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, score: 47, ...p,
+    name: 'Dave', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, awayAt: null, score: 47, ...p,
   });
   // Tag boundaries become spaces, so the assertions below read as the row reads.
   const renderRow = (player: PlayerInfo, score?: RoundScore) =>
@@ -166,7 +166,7 @@ describe('ScoreRow', () => {
 
 describe('BlitzSplash', () => {
   const player = (score: number): PlayerInfo => ({
-    name: 'P', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, score,
+    name: 'P', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, awayAt: null, score,
   });
   const table = (...scores: number[]) =>
     Object.fromEntries(scores.map((s, i) => [`p${i}`, player(s)]));
@@ -212,7 +212,7 @@ describe('BlitzSplash', () => {
 
 describe('rankRows', () => {
   const p = (score: number): PlayerInfo => ({
-    name: 'P', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, score,
+    name: 'P', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, awayAt: null, score,
   });
   const sc = (delta: number): RoundScore => ({ centerCount: 0, blitzLeft: 0, delta });
 
@@ -246,7 +246,7 @@ describe('rankRows', () => {
 
 describe('ScoreList', () => {
   const p = (name: string, score: number): PlayerInfo => ({
-    name, badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, score,
+    name, badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, awayAt: null, score,
   });
   it('is the still frame of the animation: old order, no tint', () => {
     // No effects run in a static render, so this is the sheet as it lands - the

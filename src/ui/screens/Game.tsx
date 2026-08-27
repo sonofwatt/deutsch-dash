@@ -30,6 +30,7 @@ export function Game() {
   const markStuck = useGameStore(s => s.markStuck);
   const lastRejected = useGameStore(s => s.lastRejected);
   const online = useGameStore(s => s.online);
+  const noteActivity = useGameStore(s => s.noteActivity);
   const [woodSide, swapSides] = useWoodSide();
 
   const round = room.round;
@@ -66,7 +67,10 @@ export function Game() {
   const stuckAvailable = !hasLegalMove(hand, round.spaces);
 
   return (
-    <div className="game" style={{ opacity: online ? 1 : 0.6 }}>
+    // Every tap and every drag on this screen is a sign of life, which is a wider
+    // net than "made a legal move" on purpose: a player weighing up the board is
+    // present, and marking them away would be wrong even though it is harmless.
+    <div className="game" style={{ opacity: online ? 1 : 0.6 }} onPointerDown={noteActivity}>
       <div className="game-head">
         <strong>Round {room.meta.roundNumber}</strong>
         <span className="muted">{me.name} · {me.score} pts · to {room.meta.targetScore}</span>
@@ -90,7 +94,12 @@ export function Game() {
             postHighlight={targets.posts} onSelect={select} onFlip={flip}
             onTapPost={i => void playTo({ post: i })} startDrag={startDrag} />
         </motion.div>
-        {ENABLE_STUCK_BUTTON
+        {me.awayAt != null
+          // Takes precedence over the stuck note, which is moot while nobody is
+          // playing this hand: the table may have rotated without them, and this
+          // is what explains the board they have come back to.
+          ? <button className="away-note" onClick={noteActivity}>Away — tap to rejoin the round</button>
+          : ENABLE_STUCK_BUTTON
           ? <button className="btn stuck-btn" disabled={!stuckAvailable || me.stuckAt != null}
               onClick={markStuck} style={{ width: '100%', marginTop: 6 }}>
               {me.stuckAt != null ? 'Waiting for others…' : "I'm stuck"}

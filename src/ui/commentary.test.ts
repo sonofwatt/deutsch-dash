@@ -4,7 +4,7 @@ import type { GameStats } from '../game/stats';
 import type { CenterSpace, PlayerInfo, RoundScore, Suit } from '../game/types';
 
 const player = (name: string, score: number, extra: Partial<PlayerInfo> = {}): PlayerInfo => ({
-  name, badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, score, ...extra,
+  name, badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, awayAt: null, score, ...extra,
 });
 const sc = (centerCount: number, blitzLeft: number): RoundScore =>
   ({ centerCount, blitzLeft, delta: centerCount - 2 * blitzLeft });

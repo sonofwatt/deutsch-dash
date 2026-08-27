@@ -34,6 +34,14 @@ import type { BotLevel } from './bot';
 export interface PlayerInfo {
   name: string; badgeId: BadgeId; joinedAt: number; connected: boolean;
   stuckAt: number | null; score: number;
+  /**
+   * "Present on the network, but not at the table." Written by the player's own
+   * client off its own clock (see AWAY_MS in state/store.ts), never by anybody
+   * else's, so no two devices' clocks are ever compared here - the value is a
+   * marker, and only ever tested against null. Bots are never away: they are
+   * driven by the host and either act or are stuck.
+   */
+  awayAt: number | null;
   // AI players. Absent on humans. A bot has no auth identity of its own: the
   // host owns its record and plays its hand (see the bot driver in store.ts).
   isBot?: boolean; botLevel?: BotLevel;

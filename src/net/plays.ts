@@ -18,9 +18,16 @@ export function pickNextHost(players: Record<string, PlayerInfo>): string | null
   return connected[0][0];
 }
 
+/**
+ * Is the table waiting on nobody? Away players are skipped exactly the way
+ * disconnected ones are: a player who is present but not at the table blocks the
+ * round forever otherwise, because an idle player usually has a legal move and so
+ * is quite correctly never marked stuck. If everyone is away this is false and
+ * nothing happens, which is right - an empty table has nothing to rotate for.
+ */
 export function allConnectedStuck(players: Record<string, PlayerInfo>): boolean {
-  const connected = Object.values(players).filter(p => p.connected);
-  return connected.length > 0 && connected.every(p => p.stuckAt != null);
+  const present = Object.values(players).filter(p => p.connected && p.awayAt == null);
+  return present.length > 0 && present.every(p => p.stuckAt != null);
 }
 
 export async function startRound(code: string, room: Room, rng?: Rng): Promise<void> {
@@ -87,6 +94,19 @@ export function declareStuck(code: string, uid: string): Promise<void> {
 
 export function clearStuck(code: string, uid: string): Promise<void> {
   return set(r(code, `players/${uid}/stuckAt`), null);
+}
+
+/**
+ * The away flag. Only ever written by the player's own client for its own uid -
+ * `players/$uid` is already writable by its owner, so this needs no rules change.
+ * The timestamp is a marker, never compared: see PlayerInfo.awayAt.
+ */
+export function markAway(code: string, uid: string): Promise<void> {
+  return set(r(code, `players/${uid}/awayAt`), serverTimestamp());
+}
+
+export function clearAway(code: string, uid: string): Promise<void> {
+  return set(r(code, `players/${uid}/awayAt`), null);
 }
 
 export function announceBlitz(code: string, uid: string): Promise<void> {

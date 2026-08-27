@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { createGameStore, legalTargets, HOST_AWAY_MS, type Deps } from './store';
+import { createGameStore, legalTargets, HOST_AWAY_MS, AWAY_MS, type Deps } from './store';
 import type { PlayResult } from '../net/plays';
 import { deal, buildDeck } from '../game/deck';
 import type { Card, CenterSpace, PlayerInfo, RoomMeta, Suit, Room, Tableau } from '../game/types';
@@ -19,6 +19,8 @@ function fakeDeps(over: Partial<Deps> = {}): Deps {
     persistTableau: vi.fn(async () => {}),
     declareStuck: vi.fn(async () => {}),
     clearStuck: vi.fn(async () => {}),
+    markAway: vi.fn(async () => {}),
+    clearAway: vi.fn(async () => {}),
     announceBlitz: vi.fn(async () => {}),
     endRoundStalled: vi.fn(async () => {}),
     incrementStuckRounds: vi.fn(async () => 1),
@@ -38,7 +40,7 @@ const seededTableau = (): Tableau => deal(buildDeck('me'), 3);
 function playingRoom(tableau: Tableau): Room {
   return {
     meta: { createdAt: 1, hostId: 'me', creatorId: 'me', targetScore: 75, phase: 'playing', roundNumber: 1 },
-    players: { me: { name: 'D', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, score: 0 } },
+    players: { me: { name: 'D', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, awayAt: null, score: 0 } },
     round: { spaces: Array.from({ length: 16 }, () => ({ stack: [], history: [] })),
              tableaus: { me: tableau }, blitzedBy: null, scores: null, races: null, duels: null, endedAt: null, stuckRounds: 0, startedAt: 1 },
   };
@@ -221,8 +223,8 @@ describe('stale-session guards', () => {
   // host, and is disconnected. Pass metaOverrides for phase/creatorId, and
   // hConnected=true to model the host reconnecting.
   const mkPlayers = (hConnected = false): Record<string, PlayerInfo> => ({
-    h:  { name: 'H', badgeId: 'star',  joinedAt: 0, connected: hConnected, stuckAt: null, score: 0 },
-    me: { name: 'D', badgeId: 'tulip', joinedAt: 1, connected: true,       stuckAt: null, score: 0 },
+    h:  { name: 'H', badgeId: 'star',  joinedAt: 0, connected: hConnected, stuckAt: null, awayAt: null, score: 0 },
+    me: { name: 'D', badgeId: 'tulip', joinedAt: 1, connected: true,       stuckAt: null, awayAt: null, score: 0 },
   });
   const mkRoom = (metaOverrides: Partial<RoomMeta> = {}, hConnected = false): Room => ({
     meta: { createdAt: 1, hostId: 'h', creatorId: 'h', targetScore: 75, phase: 'playing', roundNumber: 1,
@@ -353,8 +355,8 @@ describe('creator reclaim', () => {
       meta: { createdAt: 1, hostId: 'h', creatorId: 'me', targetScore: 75, phase: 'lobby', roundNumber: 0 },
       // my own presence write may not have landed yet - reclaim must not depend on it
       players: {
-        h:  { name: 'H', badgeId: 'star',  joinedAt: 0, connected: true,  stuckAt: null, score: 0 },
-        me: { name: 'D', badgeId: 'tulip', joinedAt: 1, connected: false, stuckAt: null, score: 0 },
+        h:  { name: 'H', badgeId: 'star',  joinedAt: 0, connected: true,  stuckAt: null, awayAt: null, score: 0 },
+        me: { name: 'D', badgeId: 'tulip', joinedAt: 1, connected: false, stuckAt: null, awayAt: null, score: 0 },
       },
       round: null,
     };
@@ -374,8 +376,8 @@ describe('creator reclaim', () => {
     const room: Room = {
       meta: { createdAt: 1, hostId: 'h', creatorId: 'someone-else', targetScore: 75, phase: 'lobby', roundNumber: 0 },
       players: {
-        h:  { name: 'H', badgeId: 'star',  joinedAt: 0, connected: true,  stuckAt: null, score: 0 },
-        me: { name: 'D', badgeId: 'tulip', joinedAt: 1, connected: false, stuckAt: null, score: 0 },
+        h:  { name: 'H', badgeId: 'star',  joinedAt: 0, connected: true,  stuckAt: null, awayAt: null, score: 0 },
+        me: { name: 'D', badgeId: 'tulip', joinedAt: 1, connected: false, stuckAt: null, awayAt: null, score: 0 },
       },
       round: null,
     };
@@ -389,9 +391,9 @@ describe('AI players', () => {
     return {
       meta: { createdAt: 1, hostId, creatorId: hostId, targetScore: 75, phase: 'playing', roundNumber: 1 },
       players: {
-        me: { name: 'D', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, score: 0 },
-        [hostId]: { name: 'H', badgeId: 'bell', joinedAt: 0, connected: true, stuckAt: null, score: 0 },
-        bot_star: { name: 'Ada', badgeId: 'star', joinedAt: 2, connected: true, stuckAt: null,
+        me: { name: 'D', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, awayAt: null, score: 0 },
+        [hostId]: { name: 'H', badgeId: 'bell', joinedAt: 0, connected: true, stuckAt: null, awayAt: null, score: 0 },
+        bot_star: { name: 'Ada', badgeId: 'star', joinedAt: 2, connected: true, stuckAt: null, awayAt: null,
                     score: 0, isBot: true, botLevel: 'hard' },
       },
       round: {
@@ -448,7 +450,7 @@ describe('automatic stuck detection', () => {
   function room(t: Tableau, stuckAt: number | null = null): Room {
     return {
       meta: { createdAt: 1, hostId: 'me', creatorId: 'me', targetScore: 75, phase: 'playing', roundNumber: 1 },
-      players: { me: { name: 'D', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt, score: 0 } },
+      players: { me: { name: 'D', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt, awayAt: null, score: 0 } },
       round: { spaces: blocked(), tableaus: { me: t }, blitzedBy: null, scores: null, races: null, duels: null, endedAt: null,
                stuckRounds: 0, startedAt: 1 },
     };
@@ -521,5 +523,173 @@ describe('a dead socket must not wedge the join buttons', () => {
     expect(await store.getState().enterRoom('ABCDEF', 'D', 'tulip'))
       .toEqual({ ok: false, reason: 'full' });
     expect(store.getState().joinError).toBe('full');
+  });
+});
+
+
+describe('away players', () => {
+  // A table that is hung exactly the way the 2026-08-26 playtest hung: I am stuck,
+  // and the other human has legal moves - so is correctly never marked stuck - and
+  // is not playing them. Nothing rotates and the round cannot end.
+  const idleTable = (awayAt: number | null): Room => ({
+    meta: { createdAt: 1, hostId: 'me', creatorId: 'me', targetScore: 75, phase: 'playing', roundNumber: 1 },
+    players: {
+      me:   { name: 'D', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: 123, awayAt: null, score: 0 },
+      idle: { name: 'I', badgeId: 'star',  joinedAt: 2, connected: true, stuckAt: null, awayAt, score: 0 },
+    },
+    round: { spaces: Array.from({ length: 16 }, () => ({ stack: [], history: [] })),
+             tableaus: {}, blitzedBy: null, scores: null, races: null, duels: null,
+             endedAt: null, stuckRounds: 0, startedAt: 1 },
+  });
+
+  const solo = (awayAt: number | null = null, phase: Room['meta']['phase'] = 'playing'): Room => ({
+    meta: { createdAt: 1, hostId: 'me', creatorId: 'me', targetScore: 75, phase, roundNumber: 1 },
+    players: { me: { name: 'D', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, awayAt, score: 0 } },
+    round: { spaces: Array.from({ length: 16 }, () => ({ stack: [], history: [] })),
+             tableaus: {}, blitzedBy: null, scores: null, races: null, duels: null,
+             endedAt: null, stuckRounds: 0, startedAt: 1 },
+  });
+
+  async function joined() {
+    let cb!: (r: Room | null) => void;
+    const deps = fakeDeps({
+      watchRoom: vi.fn((_code: string, f: (r: Room | null) => void) => { cb = f; return () => {}; }),
+    });
+    const store = createGameStore(deps);
+    await store.getState().enterRoom('ABCDEF', 'D', 'tulip');
+    return { deps, store, cb };
+  }
+
+  it('marks itself away after AWAY_MS of touching nothing', async () => {
+    const { deps, store, cb } = await joined();
+    vi.useFakeTimers();
+    try {
+      cb(solo());
+      vi.advanceTimersByTime(AWAY_MS - 1);
+      expect(deps.markAway).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(2);
+      expect(deps.markAway).toHaveBeenCalledWith('ABCDEF', 'me');
+    } finally {
+      store.getState().leave();
+      vi.useRealTimers();
+    }
+  });
+
+  it('activity arms a FRESH full timer rather than letting the old one run out', async () => {
+    const { deps, store, cb } = await joined();
+    vi.useFakeTimers();
+    try {
+      cb(solo());
+      vi.advanceTimersByTime(AWAY_MS / 2);
+      store.getState().noteActivity();
+      vi.advanceTimersByTime(AWAY_MS / 2 + 1); // past the FIRST timer's now-stale deadline
+      expect(deps.markAway).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(AWAY_MS / 2);     // the fresh timer's own deadline
+      expect(deps.markAway).toHaveBeenCalledTimes(1);
+    } finally {
+      store.getState().leave();
+      vi.useRealTimers();
+    }
+  });
+
+  it('a snapshot is somebody else\'s activity, not mine, and must not reset the timer', async () => {
+    // Otherwise a busy table keeps an idle player looking present indefinitely -
+    // every play by anyone else raises a snapshot here.
+    const { deps, store, cb } = await joined();
+    vi.useFakeTimers();
+    try {
+      cb(solo());
+      vi.advanceTimersByTime(AWAY_MS / 2);
+      cb(solo()); // someone else played
+      vi.advanceTimersByTime(AWAY_MS / 2 + 1);
+      expect(deps.markAway).toHaveBeenCalledWith('ABCDEF', 'me');
+    } finally {
+      store.getState().leave();
+      vi.useRealTimers();
+    }
+  });
+
+  it('a reload starts the clock rather than clearing an away flag already set', async () => {
+    // `flips` resets on reload too, so a tab that reloads itself every so often
+    // must not be able to launder itself back into being present.
+    const { deps, store, cb } = await joined();
+    vi.useFakeTimers();
+    try {
+      cb(solo(7000)); // fresh store, RTDB already says I am away
+      expect(deps.clearAway).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(AWAY_MS + 1);
+      expect(deps.markAway).not.toHaveBeenCalled(); // already marked: no pointless rewrite
+    } finally {
+      store.getState().leave();
+      vi.useRealTimers();
+    }
+  });
+
+  it('withdraws the flag on the first sign of life', async () => {
+    const { deps, store, cb } = await joined();
+    cb(solo(7000));
+    store.getState().noteActivity();
+    expect(deps.clearAway).toHaveBeenCalledWith('ABCDEF', 'me');
+    store.getState().leave();
+  });
+
+  it('runs no away clock outside a live round', async () => {
+    const { deps, store, cb } = await joined();
+    vi.useFakeTimers();
+    try {
+      cb(solo(null, 'lobby'));
+      vi.advanceTimersByTime(AWAY_MS * 2);
+      expect(deps.markAway).not.toHaveBeenCalled();
+    } finally {
+      store.getState().leave();
+      vi.useRealTimers();
+    }
+  });
+
+  it('never marks a bot away - a bot that stops acting is a bug in the host', async () => {
+    const { deps, store, cb } = await joined();
+    vi.useFakeTimers();
+    try {
+      const room = solo();
+      room.players.bot_star = { name: 'Ada', badgeId: 'star', joinedAt: 2, connected: true,
+                                stuckAt: null, awayAt: null, score: 0, isBot: true, botLevel: 'hard' };
+      cb(room);
+      await vi.advanceTimersByTimeAsync(AWAY_MS + 1);
+      expect(deps.markAway).toHaveBeenCalledWith('ABCDEF', 'me');
+      expect(deps.markAway).not.toHaveBeenCalledWith('ABCDEF', 'bot_star');
+    } finally {
+      store.getState().leave();
+      vi.useRealTimers();
+    }
+  });
+
+  it('an away host rotates on behalf of a table of stuck bots - the reported repro', async () => {
+    // One human doing nothing, two bots: the shape that hung for five minutes on
+    // 2026-08-26. The away client is the ONLY one still running, and it is not
+    // itself stuck, so if it declines to act on allConnectedStuck nobody ever
+    // rotates and the round cannot reach its three-fruitless-rotations end.
+    const { deps, store, cb } = await joined();
+    const room = solo(7000); // me: away, host, and not stuck - I have moves, I am just not there
+    for (const id of ['bot_one', 'bot_two']) {
+      room.players[id] = { name: id, badgeId: 'star', joinedAt: 2, connected: true,
+                           stuckAt: 500, awayAt: null, score: 0, isBot: true, botLevel: 'medium' };
+    }
+    cb(room);
+    expect(deps.incrementStuckRounds).toHaveBeenCalledTimes(1);
+    expect(deps.clearStuck).toHaveBeenCalledWith('ABCDEF', 'bot_one'); // the bots' piles move too
+    expect(deps.clearStuck).not.toHaveBeenCalledWith('ABCDEF', 'me');  // I was never stuck to clear
+    store.getState().leave();
+  });
+
+  it('the hung round rotates once the idle player is away, and not before', async () => {
+    const before = await joined();
+    before.cb(idleTable(null));
+    expect(before.deps.incrementStuckRounds).not.toHaveBeenCalled(); // the bug: waits forever
+    before.store.getState().leave();
+
+    const after = await joined();
+    after.cb(idleTable(7000));
+    expect(after.deps.incrementStuckRounds).toHaveBeenCalledTimes(1);
+    after.store.getState().leave();
   });
 });

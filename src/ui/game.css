@@ -178,5 +178,10 @@
   will-change: transform; }
 .stuck-btn { min-height: 44px; }
 .stuck-note { margin: 6px 0 0; text-align: center; font-size: 12px; color: var(--ink-soft); }
+/* Sits in the stuck note's slot and is deliberately louder than it: it is read on
+   return, by someone whose board may have moved while the phone lay on the table. */
+.away-note { width: 100%; min-height: 44px; margin-top: 6px; border-radius: var(--radius);
+  border: 1px solid var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent);
+  color: var(--danger-ink); font-size: 13px; font-weight: 600; cursor: pointer; }
 .conn-pill { font-size: 11px; padding: 3px 10px; border-radius: 999px;
   background: var(--danger); color: #fff; }

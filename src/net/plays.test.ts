@@ -2,8 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { pickNextHost, allConnectedStuck } from './plays';
 import type { PlayerInfo } from '../game/types';
 
-const p = (joinedAt: number, connected: boolean, stuckAt: number | null = null): PlayerInfo =>
-  ({ name: 'x', badgeId: 'tulip', joinedAt, connected, stuckAt, score: 0 });
+const p = (joinedAt: number, connected: boolean, stuckAt: number | null = null,
+           awayAt: number | null = null): PlayerInfo =>
+  ({ name: 'x', badgeId: 'tulip', joinedAt, connected, stuckAt, awayAt, score: 0 });
 const bot = (joinedAt: number, stuckAt: number | null = null): PlayerInfo =>
   ({ ...p(joinedAt, true, stuckAt), isBot: true, botLevel: 'medium' });
 
@@ -31,5 +32,22 @@ describe('allConnectedStuck', () => {
     expect(allConnectedStuck({ a: p(1, true, 5), b: p(2, true) })).toBe(false);
     expect(allConnectedStuck({ a: p(1, false, null), b: p(2, true, 3) })).toBe(true); // disconnected ignored
     expect(allConnectedStuck({ a: p(1, false) })).toBe(false); // nobody connected
+  });
+
+  it('ignores an away player exactly as it ignores a disconnected one', () => {
+    // The hang this fixes: an idle player has legal moves, so is quite correctly
+    // never stuck, and the table waits on them forever.
+    const away = p(2, true, null, 7000);
+    expect(allConnectedStuck({ a: p(1, true, 5), b: away })).toBe(true);
+    // Away AND stuck is still just away - one flag is enough to skip them.
+    expect(allConnectedStuck({ a: p(1, true, 5), b: p(2, true, 3, 7000) })).toBe(true);
+  });
+
+  it('is false when everybody is away - an empty table has nothing to rotate for', () => {
+    expect(allConnectedStuck({ a: p(1, true, 5, 7000), b: p(2, true, null, 7100) })).toBe(false);
+  });
+
+  it('still waits on a player who is present and not stuck', () => {
+    expect(allConnectedStuck({ a: p(1, true, 5), b: p(2, true), c: p(3, true, 9, 7000) })).toBe(false);
   });
 });

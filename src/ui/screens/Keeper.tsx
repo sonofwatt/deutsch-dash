@@ -22,7 +22,7 @@ const blankEntry = (): Entry => ({ center: '', blitz: MAX_BLITZ_LEFT });
 function asPlayers(game: KeeperGame, tot: Record<string, number>): Record<string, PlayerInfo> {
   return Object.fromEntries(game.players.map((p, i) => [p.id, {
     name: p.name.trim() || 'Player', badgeId: p.badgeId, joinedAt: i,
-    connected: true, stuckAt: null, score: tot[p.id] ?? 0,
+    connected: true, stuckAt: null, awayAt: null, score: tot[p.id] ?? 0,
   }]));
 }
 
