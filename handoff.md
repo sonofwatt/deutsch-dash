@@ -507,6 +507,14 @@ They never run at once, so the field still has exactly one writer per phase. The
 three colours are literals rather than theme tokens: the states have to mean the
 same thing on both phones at the table whichever way each has its theme set.
 
+Two things settled by looking at it in **dark** mode, which is the case the
+literals make awkward. "Start anyway" is a plain `.btn` and not `.btn-primary`,
+because `--accent` is near-white in dark and a primary sat under the white ready
+button as a second pale slab with nothing to tell them apart - and because it is
+an escape hatch, which should not out-shout the thing you are meant to press. The
+ready button then took a **2px** border where everything else has 1px, for the
+mirror-image problem in light mode, where a plain `.btn` is also white.
+
 **#14. Home page: shrink the room-code field so Join fits on its line.** — _built 2026-08-27._ The code field was `input.field`'s `width: 100%` inside a
 wrapping `.row`, which put Join on a line of its own. `.join-row` stops the wrap
 and lets the field take what is left after the button - the code is six

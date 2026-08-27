@@ -32,9 +32,14 @@
    text, and those have to mean the same thing on both phones at the table
    regardless of which way either one has its theme set. Black on all three is
    what keeps the yellow legible. */
-.ready-btn { background: #ffffff; color: #111111; border-color: #d8d5cc; font-weight: 800; }
-.ready-btn.on { background: #22c55e; border-color: #16a34a; }
-.ready-btn.away { background: #facc15; border-color: #eab308; }
+/* 2px, where every other button is 1px. In LIGHT mode "Start anyway" is also a
+   white button (it is a plain .btn now, deliberately - see Lobby.tsx), and
+   without this the two read as a matched pair rather than as the thing to press
+   and the escape hatch beneath it. The ready states below keep the width and
+   supply their own colour. */
+.ready-btn { background: #ffffff; color: #111111; border: 2px solid #111111; font-weight: 800; }
+.ready-btn.on { background: #22c55e; border-color: #15803d; }
+.ready-btn.away { background: #facc15; border-color: #ca8a04; }
 /* Somebody else's state, in the same three colours at tag size. */
 .ready-tag { font-size: 11px; font-weight: 700; border-radius: 999px; padding: 3px 9px;
   white-space: nowrap; background: #ffffff; color: #111111; border: 1px solid #d8d5cc; }

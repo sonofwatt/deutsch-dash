@@ -187,9 +187,14 @@ export function Lobby({ code }: { code: string }) {
 
       {/* The host keeps a way past a phone that has died: the ready gate must not
           be able to strand a table. It is gone entirely once everyone is ready,
-          because the countdown has it from there. */}
+          because the countdown has it from there.
+
+          Deliberately NOT btn-primary. It is an escape hatch, not the thing to
+          reach for - the obvious move is to ready up and wait - and in dark mode
+          --accent is near-white, so a primary here sat directly under the white
+          ready button as a second pale slab with no way to tell which was which. */}
       {host && !tableReady(room) && (
-        <button className="btn btn-primary" disabled={players.length < 2} onClick={start}>
+        <button className="btn" disabled={players.length < 2} onClick={start}>
           {players.length < 2 ? 'Waiting for players…' : `Start anyway (${readyCount}/${players.length} ready)`}
         </button>
       )}
