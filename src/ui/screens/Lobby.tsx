@@ -148,7 +148,8 @@ export function Lobby({ code }: { code: string }) {
       </div>
       <div className="row">
         {/* Room-wide, not a device preference: hints are an advantage, and bot
-            difficulty was tuned against a human without them. */}
+            difficulty was tuned against a human without them. One switch covers
+            both of them - the stalled-player hint and the just-opened glow. */}
         <label className="muted" htmlFor="hints">Helper hints</label>
         <span className="spacer" />
         <input id="hints" type="checkbox" className="toggle" disabled={!host}

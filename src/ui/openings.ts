@@ -22,6 +22,12 @@ function visibleTops(t: Tableau) {
 /**
  * Which spaces became playable for me because somebody else just played there.
  *
+ * Only shown when the host has turned Helper hints on (see `useOpenings`). It is
+ * a smaller advantage than the five-second hint - it points at a change rather
+ * than at your best move - but it is the same KIND of advantage, and the bots
+ * were tuned against a human playing without one. One switch, one answer for the
+ * whole room.
+ *
  * The board is up to 32 slots on a phone. A card landing on one of them is
  * genuinely easy to miss, and the case that matters is the one where that card
  * is the one you were waiting for. This says "that space just moved, and you can
@@ -76,13 +82,17 @@ export function openingsAfter(
 interface Seen { from: CenterSpace[] | null; seq: number; shown: Record<number, Opening> }
 
 export function useOpenings(
-  spaces: CenterSpace[], hand: Tableau | null, uid: string,
+  spaces: CenterSpace[], hand: Tableau | null, uid: string, enabled: boolean,
 ): Record<number, Opening> {
   const [seen, setSeen] = useState<Seen>(() => ({ from: null, seq: 0, shown: {} }));
   if (seen.from !== spaces) {
     // No previous board means this is the first snapshot of the round: there is
     // nothing to have changed against, so it only records where we came in.
-    const found = seen.from && hand
+    //
+    // `enabled` skips the COMPARISON but not the record of where we are, so a
+    // host turning hints on mid-round gets openings from the next play onward
+    // rather than a burst of everything that happened while they were off.
+    const found = seen.from && hand && enabled
       ? openingsAfter(seen.from, spaces, hand, uid, seen.seq + 1)
       : {};
     const any = Object.keys(found).length > 0;

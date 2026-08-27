@@ -97,7 +97,11 @@ export function Game() {
   // Called after the early return above, which is safe only because that return
   // is unconditional for the whole life of a round: no round means no board and
   // no hand, and the screen is the "dealing…" placeholder either way.
-  const openings = useOpenings(round.spaces, hand, uid);
+  //
+  // Behind the same host switch as the five-second hint: it is a smaller
+  // advantage, but the same kind, and the bots were tuned against a human
+  // playing without one.
+  const openings = useOpenings(round.spaces, hand, uid, hintsOn);
   const active = drag ? drag.source : selection;
   const targets = active ? legalTargets(hand, active, round.spaces) : { spaces: [], posts: [] };
   const stuckAvailable = !hasLegalMove(hand, round.spaces);

@@ -66,3 +66,23 @@ describe('openingsAfter', () => {
     expect(openingsAfter(board(null), board(c(5, 'red')), hand(), 'me', 1)).toEqual({});
   });
 });
+
+describe('useOpenings, as a host switch', () => {
+  // The hook itself needs a renderer, so this drives the one decision it makes
+  // that is worth pinning: `enabled` gates the COMPARISON, never the record of
+  // where the board currently is. Mirrors the expression in the hook.
+  const gated = (from: CenterSpace[] | null, to: CenterSpace[], t: Tableau, on: boolean) =>
+    (from && t && on ? openingsAfter(from, to, t, 'me', 1) : {});
+
+  const mine = hand({ blitz: [c(6, 'red', 'me')] });
+
+  it('shows nothing while the host has hints off', () => {
+    expect(gated(board(null), board(c(5, 'red')), mine, false)).toEqual({});
+  });
+  it('shows the opening once hints are on', () => {
+    expect(gated(board(null), board(c(5, 'red')), mine, true)).toEqual({ 0: { suit: 'red', at: 1 } });
+  });
+  it('has nothing to compare against on the first board of a round', () => {
+    expect(gated(null, board(c(5, 'red')), mine, true)).toEqual({});
+  });
+});

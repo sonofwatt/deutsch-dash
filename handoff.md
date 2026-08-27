@@ -8,7 +8,7 @@ for a day, so anything it changed - the keeper's round timer, the wood/Blitz sid
 picker - was "built" but not live; check `git status -sb` before trusting a
 playtest._
 
-_**282 tests green** (260 unit + 22 emulator). This is the only place in the repo
+_**285 tests green** (263 unit + 22 emulator). This is the only place in the repo
 that quotes a count — it drifted three separate ways when it lived in four
 places, so keep it here and nowhere else._
 
@@ -450,10 +450,15 @@ violet hint. `useOpenings` derives it DURING RENDER off the identity of
 `round.spaces` (React's "adjust state when a prop changes" pattern), because a
 snapshot is already causing a render and an effect would only be a second one.
 
-**Open question for the next playtest:** it is NOT gated behind `meta.hintsOn`,
-unlike the helper hint. Bot difficulty was tuned against a human without hints,
-and this is an advantage even if a small and passive one. Gating it is a
-one-line change if it reads as too strong.
+**Gated behind `meta.hintsOn`, the same switch as the helper hint** - it went in
+ungated and was gated on review. It is a smaller advantage than the five-second
+hint (it points at a change rather than at your best move) but it is the same
+KIND of advantage, and the bots were tuned against a human playing without one.
+One switch, one answer for the whole room; see #6.
+
+`enabled` gates the COMPARISON, not the record of where the board is, so a host
+turning hints on mid-round gets openings from the next play onward rather than a
+burst of everything that happened while the switch was off.
 
 **#10. A Home/back button out of every dead end.** — _built 2026-08-27._ The Join
 screen already had one. Added to the lobby, the round-end sheet and the game-over
@@ -520,6 +525,320 @@ buttons around a value do not fit in that without breaking the touch floor.
 lobby reads it as easily as the game does. Deliberately not disabled for
 non-hosts and not a room option: it is about the phone in your hand. The board's
 `⇄` stays exactly as it was.
+
+---
+
+### The idle-table hang — _fixed 2026-08-27_
+
+**Was:** one human client, two medium bots, the human doing nothing. Five minutes
+later the round had not ended, no score sheet, no stuck note. An idle player is
+never marked stuck - correctly, because their wood is untouched and their Blitz
+top will land somewhere - so `allConnectedStuck` never came true, the rotation
+never fired, and the three-fruitless-rotations round end was unreachable.
+
+**Fixed as presence, not as stuckness.** A player with legal moves who is not
+playing is not stuck, and the game waiting for them is right up until they have
+gone; so what is detected is that they have gone. `PlayerInfo.awayAt` is written
+by the player's **own** client off its own clock after `AWAY_MS` (45s, in
+`store.ts`) of touching nothing, and `allConnectedStuck` skips away players
+exactly as it skips disconnected ones. No rules change - `players/$uid` was
+already writable by its owner, and there is now an emulator test pinning that,
+plus that nobody else can write your `awayAt`.
+
+The reset is `noteActivity`, wired to plays, flips, and a pointerdown anywhere on
+the game screen - a wider net than "made a legal move" on purpose, because a
+player weighing up the board is present. Bots are never away: they have no client
+to notice, and the host either plays their hand or marks them stuck.
+
+**The thing the spec missed, found by tracing the repro rather than by reasoning
+about it.** The rotation's guard is `meP.stuckAt != null && allConnectedStuck(…)`,
+and that first clause used to be *free*: if everyone connected was stuck and I am
+connected, I was stuck too. Skipping away players broke that implication, and
+broke it in precisely the shape that hangs a table - in the reported repro the
+away human is the host and the only client still running, so it would have seen
+`allConnectedStuck` come back true and then declined to act on it. An away client
+now rotates on the table's behalf, and its own wood rotates with everybody
+else's, a rotation being a table-wide event. `store.test.ts` has that exact
+shape ("an away host rotates on behalf of a table of stuck bots").
+
+**Verified in the real app**, two browser clients against the emulator and the
+real rules (`/tmp/pw/stallpath.mjs`, gone with `/tmp` - the recipe is the
+reusable part): Ann rigged stuck, Bo present with moves and idle. Bo's own client
+marked Bo away at t+44s, Bo's screen showed the away note, three rotations fired
+in the same second, and the round ended `blitzedBy: null` - "Round over (all
+stuck)". The same script with the `awayAt` filter removed from
+`allConnectedStuck` hangs for the full 100s of its deadline with no sheet, which
+is the negative control for all of it.
+
+**Still open, and known:** a phone that locks hard freezes its timers, so that
+client cannot mark itself away either. In practice it drops the socket and
+`connected` catches it - but if the hang reappears with a locked phone on the
+table, that is the gap. Also unproven: the stall path with *bots* in the room
+specifically. The natural two-bot repro now runs to a normal bot blitz (t+109s,
+away flag written at t+45s on the way), so it stopped being a way to reach the
+stall path at all.
+
+### 1. Move the recycle button to the bottom right — _retired 2026-08-26_
+
+**Removed instead of moved** (`8f66869`). It covered `.card-badge` at every card
+size and took about two thirds of a small phone's card width, and the empty draw
+slot beside it already shows the ↻ and flips on tap. The note below is kept for
+why the move was never the right answer.
+
+The `↻` on the turned-over wood card is `.recycle` in `game.css` (`left: 3px` →
+`right: 3px`). One declaration.
+
+**Decide first:** the 22×22px button **completely covers `.card-badge`** at every
+card size, so one of them has to give. Options: accept the occlusion (the badge
+is decorative on your own tableau), suppress the badge on that one card, or
+shrink the button. Related: `.recycle` is a fixed 22px while `--card-w` floors at
+34px, so on a small phone it covers about two-thirds of the card's width — and
+moving it right puts that dead-to-drag zone on the side the thumb arrives from.
+
+**Watch:** `render.test.ts` asserts `toContain('class="recycle"')` as an exact
+substring including the closing quote, so adding any second class to that button
+breaks it. Nothing pins the button's position, so the move itself is unguarded.
+
+### 2. Choose which side wood and Blitz sit on — _built 2026-08-26_
+
+`src/ui/prefs.ts` holds it: local to the device, not the room, because it is
+about the phone in your hand and two players at one table can want opposite
+answers. The `⇄` in the game head flips it **mid-game on purpose** - a player who
+was auto-rejoined never sees a form again, so pre-join only would have stranded
+them. Only the two ends trade places; the posts stay where they are, because
+moving four positions to fix one costs more muscle memory than it buys. The
+opponent strip mirrors it too, so a glance across the table reads the same way.
+The notes below are what that decision was weighed against.
+
+New `src/ui/prefs.ts` + a `SidePicker` on Home and Join, storing `bz.woodSide`
+alongside `bz.name` / `bz.badge`. Thread a `woodSide` prop into `TableauView` and
+`OpponentStrip` and swap the two end groups.
+
+**Decide first:**
+- Pre-join only, or changeable mid-game? A player resumed by auto-rejoin never
+  sees the Join form again, so pre-join only means they cannot change it without
+  clearing storage.
+- When wood moves left, does the **whole tableau mirror** (posts reversed too), or
+  do only the two end piles swap? A true mirror is what a left-handed player
+  probably pictures; swapping only the ends keeps each post where they last saw it.
+- Label it ergonomically ("Right-handed" / "Left-handed") or literally ("Wood on
+  the right")? That decides whether it reads as an accessibility setting.
+
+**Watch:** invalidates the two order-pinning tests in `render.test.ts` — they must
+become parameterised rather than deleted. Required prop ⇒ build break (see traps).
+
+### 3. Move the "no moves" alert into the drop band — _built 2026-08-27_
+
+**Superseded in part by #8** (2026-08-27): the band itself is gone. The note is
+still where this put it - the bottom of what is now a borderless drop zone
+covering the whole board area - so the reasoning below still holds; only the box
+it used to sit in has been retired.
+
+`CenterGrid` takes an optional `stuck` and renders the text inside `.snap-band`;
+the `<p class="stuck-note">` under the tableau is gone, and with it the board
+shifting up the screen the moment somebody got stuck.
+
+Decisions taken, so they don't get re-litigated:
+
+- **Amber, not red.** Two new tokens, `--warn` (fill) and `--warn-ink` (text),
+  split for exactly the reason `--danger` is: dark mode needs the text to lift off
+  the surface while the fill stays dark enough to carry white. Being stuck is a
+  state, not an error, and red is spoken for - a scoring penalty, and the fill
+  behind the disconnected pill.
+- **The band keeps `min-height`, not a fixed height.** The Watch note below warned
+  that pinning it removes the growth escape hatch, so the copy shortened instead:
+  "No moves left — waiting for the others", which fits one line at 360px in both
+  themes with room to spare. Longer copy still reflows rather than clipping.
+- **The two messages can never collide**, so nothing had to be hidden: a stuck
+  player has no legal targets, which is precisely when the band is unlit and its
+  "drop here" hint is not being offered.
+
+Rendered in the real app at 393px in both themes.
+
+### 4. Move a run of cards between post piles — _deferred 2026-08-26_
+
+Not being built for now. The spec below stands if it comes back.
+
+**It is a house rule, confirmed at the source.** Dutch Blitz's own FAQ says of the
+post piles: "You can move one card at a time - you cannot shift entire piles."
+(https://dutchblitz.com/pages/policies-faq). The design spec's one-card-at-a-time
+wording is therefore correct as written, and shipping this would need the lobby
+toggle below rather than being a silent change to everyone's game.
+
+Today only the top card of a post pile can move (`placeOnPost`). The request:
+tap-and-hold a pile, see its cards in a row, tap which to move, tap a destination.
+
+**This is the one that needs the most thought before any code.**
+
+- **The wording says "wood piles" but the example describes post piles.** In this
+  codebase `wood` is a single face-down draw pile flipped three at a time, with
+  only `wood[woodIndex-1]` playable — it cannot hold a run and there is only one
+  of it. The descending alternating runs in the example (9,8 and 10,9,8,7,6,5) are
+  post piles. **Confirm this reading before starting.**
+- **Everyone or nobody.** House rule for every game, or a lobby toggle so a purist
+  table can play by the book? It cannot be per-player — it's a shared rule.
+- **What does "tap which cards to move" mean?** Taking the card at depth k plus
+  everything above it (a contiguous suffix) is the only reading that leaves both
+  piles legal runs, and it is the reading under which the given example works.
+  Arbitrary multi-select does not.
+- **May the whole pile move**, emptying the post so the Blitz top drops into it via
+  `refillPosts`? That is the strongest move in the game — emptying the Blitz pile
+  is the only way to win a round.
+- Trigger at 3+ cards as proposed, or 2+? A 2-card pile is equally movable.
+
+**Watch:** `hasLegalMove` / `isStuck` become *wrong* if not updated with the rule —
+`syncStuck` writes stuck claims automatically and three fruitless rotations end
+the round, so a player with a legal run move could be declared stuck. The hold
+gesture also collides with `useDrag`, which takes pointer capture and shows a
+ghost card on pointerdown. And `movePostRun` must not assume a post stack is a
+clean run: `reconcileTableau` filters post stacks by centre membership and
+`normalizeTableau` returns whatever RTDB holds.
+
+### 5. Host option: orderly grid, one colour per column — _built 2026-08-27_
+
+`RoomMeta.orderlyGrid`, a lobby toggle under "Play to", and `CenterSpace.suit`
+enforced in `canPlayToSpace` - which is the one definition highlighting,
+`hasLegalMove`, `isStuck`, the bots, the hint and `centerPlayTxn` all share, so
+none of them can offer a move another refuses.
+
+**The starvation worry in the original spec does not survive the arithmetic.**
+`spaceCountForPlayers` is `4 x players`, so spaces-per-suit exactly equals
+Aces-per-suit: if all four red spaces are busy at four players, all four red Aces
+are already down and nobody can be holding a fifth. The one place it *did* bite
+was above the old 24-space cap, at 7-8 players - and that was fixed by removing
+the cap rather than by softening the rule: `MAX_SPACES` is 32 now, so the ratio
+holds at every player count. `rules.test.ts` pins the property, not the reasoning.
+
+What actually constrained the design was the column count, not card size:
+`gridColumns` is `max(4, ceil(count/4))`, so a 20-space board is **5 columns** -
+which cannot be one colour per column with four suits. Hence:
+
+- **Four columns up to 16 spaces, eight above** (`orderlyColumns`), with adjacent
+  columns paired per suit so eight columns read as four wide bands rather than a
+  stripe pattern. 2-4 players get exactly the layout they get today.
+- **An orderly board rounds up to a whole number of rows**: 20 -> 24 and 28 -> 32,
+  both of which would otherwise leave holes in the bottom row. Everything else
+  already divides, no orderly board goes past four rows, and the rounding is
+  stable under its own output so nothing downstream can disagree about the size.
+- Cards land ~42px on a 360px phone at eight columns, which is about what they
+  are now - the spec's "~34px, at the floor" was pessimistic in the same way the
+  six-column estimate was.
+
+**Why the suit lives on the space rather than being derived from its index:**
+`centerPlayTxn` is a transaction against `round/spaces/$i` and sees only that one
+node - it never learns which index it is. So the constraint has to be *in* the
+node, which is why `startRound` now writes the spaces for an orderly round (an
+ordinary one still leaves them absent for each client to normalize into being).
+`normalizeSpaces` fills the suits in client-side as well, so a client is never
+briefly playing looser rules than the transaction will hold it to.
+
+Two traps that came out of building it, both now pinned by tests:
+
+- **`normalizeSpace` must not set `suit: undefined`.** `centerPlayTxn` spreads
+  that object straight back into RTDB, which rejects an undefined value outright.
+  The key has to be absent, not empty.
+- **The archive branch dropped the suit.** Completing a pile returned a freshly
+  built `{ stack: [], history }` rather than spreading the space, so an orderly
+  board came apart one finished pile at a time. Caught by a test written for the
+  claim, not by playing it.
+
+Verified against the emulator and the real rules: a wrong-colour play is refused
+by the transaction, and the constraint survives the write.
+
+### 6. Helper hint that flashes a playable card — _built 2026-08-27, inverted_
+
+**This switch covers TWO nudges now, not one** (2026-08-27). The five-second
+stalled-player hint described below, and the just-opened glow from #9 - a space
+somebody else played to that you are holding a card for, ringed in that card's
+colour. They fire at opposite moments, a stalled player and a fast board, and
+neither has a control of its own on purpose: two switches for "help me a bit" is
+one more than a lobby full of people wants to argue about.
+
+**It flashes the destination, not the card.** That is the opposite of the original
+request and is the product owner's call: the hint marks the space on the grid
+where *something* of yours could go, and the player still has to work out which
+card that is, find it in their own tableau and drag it there. A nudge towards the
+board rather than the move played for them.
+
+`src/game/hint.ts` reuses the bot's own `botMoves` / `rankMove`, so "best" means
+the same thing to the hint as it does to a Hard bot - one definition, not two that
+drift. Ties settle on the first space generated, deliberately: an Ace fits every
+empty space at the same rank and the hint must not wander between renders.
+
+Decisions taken:
+
+- **Host-controlled for the whole room** (`RoomMeta.hintsOn`, lobby toggle), not a
+  device preference. Hints are an advantage and bot difficulty was tuned against a
+  human without them, so everyone plays the same game.
+- **After `HINT_DELAY_MS` (5s) of no input**, so it never fires under somebody
+  playing at speed. The idle counter watches *your* input only, not board changes -
+  a fast table would otherwise keep resetting the clock of the one player who has
+  actually stalled.
+- **Two pulses over `HINT_SHOW_MS` (1s), and then it is gone**, rather than
+  breathing on the board until it becomes furniture and stops being read. The
+  *element* is removed on the timer rather than the animation being left to end
+  itself, which is what makes reduced motion behave identically - the same
+  one-second mark, held steady instead of pulsed.
+- **And again every `HINT_REPEAT_MS` (10s) for as long as the player goes on not
+  playing.** A player who is genuinely stuck has nothing on the grid to point at,
+  so nothing shows for them and the amber band speaks instead - but the moment
+  somebody else's card opens a move up, the next tick of this is what says so,
+  because the hint is recomputed at render rather than stored. **That reading of
+  "re-fire when they are stuck" is the confirmed one**: the repeat is keyed on the
+  player not acting, never on `stuckAt`, because a player with `stuckAt` set has by
+  definition no move to be shown. Do not "fix" the silence. Any input at all
+  restarts the cycle from `HINT_DELAY_MS`. Measured: on at 4.6s, 14.6s and 24.6s,
+  a second each, and a tap puts the next one back to five seconds out.
+- **Violet** (`--hint`), never green: green on this board means exactly one thing,
+  "the card you are holding lands here", and a second green would erode it.
+- **Reduced motion is handled**, which it was not anywhere else: `MotionConfig
+  reducedMotion="user"` does not reach CSS keyframes, so the pulse has its own
+  `prefers-reduced-motion` rule. The outline stays; it just stops breathing.
+
+**Intended, and confirmed as wanted:** a post-to-post move has no square on the
+grid to point at, so nothing flashes for it. Early in a round, before anyone has
+an Ace down, a player with no centre move at all gets no hint at all. That is the
+behaviour asked for - the hint is about the grid - so a quiet first few seconds is
+the feature working, not the feature broken. Do not "fix" it.
+
+### 7. Score screen: round arithmetic — _landed in `b38da9b`_
+
+Rows on both sheets now read `🌷 Dave -4 +6 = +2 │ 47`: penalty, cards played,
+`=`, the round's delta, then the running total set off by a rule.
+
+Decisions taken, so they don't get re-litigated:
+
+- **The `=` sits between the components and the sum, not before the total.** The
+  originally requested `-4 +6 2 = 47` asserts "2 = 47", which is false for anyone
+  with a prior score. No header row: labels wide enough to read ("Played",
+  "Round") cost more width than the numbers they label and squeeze the name below
+  an ellipsis on a 360px phone.
+- **The sum is `RoundScore.delta` verbatim**, never recomputed from
+  `centerCount`/`blitzLeft`, so it cannot disagree with the total beside it.
+  `render.test.ts` feeds a contradicting fixture to pin exactly that.
+- **Zero is unsigned and muted** — a blitzer reads `0 +9 = +9`, not `-0`, and the
+  danger red is reserved for a real penalty.
+- The duplicated row moved out of both overlays into `ScoreRow`, which takes
+  `score` as optional: game over can render from a snapshot with no
+  `round/scores`, and degrades to a name and a total.
+
+Rendered headlessly at 360px in both themes (see "What still needs testing" for
+the recipe), which caught two things worth keeping:
+
+- **Every row is its own grid**, because the row is the card that carries the
+  background and border. `auto` columns therefore size to each row's own digits
+  and the `=` signs stagger down the sheet, so the value columns are floored at
+  `3ch` — exactly three tabular digits, which is every value the game can produce
+  — and right-aligned. `minmax` lets anything wider grow rather than clip.
+- **`--danger` at 1.9:1 on the dark surface** was barely readable as text. It is
+  now two tokens: `--danger` stays the fill (the disconnected pill needs white
+  text on it), `--danger-ink` is the text colour and lifts to `#ff8a7d` in dark
+  mode. `.error` uses it too, so every error message in the app got legible.
+
+That leaves the name track: `minmax(0, 1fr)` with `text-overflow: ellipsis`, which
+is what keeps a 14-character name from overflowing the sheet into a horizontal
+scrollbar. At 360px a name gets about 90px — "Annalisa-Marie" ellipses to
+"Annalisa-…". Widening it means taking width from the arithmetic.
 
 ---
 

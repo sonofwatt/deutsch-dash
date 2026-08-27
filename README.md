@@ -111,19 +111,27 @@ room rather than to one device — everybody should be playing the same game.
 
 **Play to** 25, 50, 75 or 100 points.
 
-**Helper hints** (off by default). After five seconds of touching nothing, the
-space where your best move would land pulses twice and fades. It marks the
+**Helper hints** (off by default). One switch, two nudges — room-wide rather than
+per-device on purpose, because a hint is a real advantage and the bots were tuned
+against a human playing without one.
+
+*When you stall:* after five seconds of touching nothing, the space where your
+best move would land pulses twice in violet and fades. It marks the
 *destination*, never the card: you still have to work out which of your cards
 fits and get it there. It returns every ten seconds for as long as you go on not
-playing, and any tap restarts the clock. Room-wide rather than per-device on
-purpose — a hint is a real advantage, and the bots were tuned against a human
-playing without one.
+playing, and any tap restarts the clock.
+
+*When the board moves:* if somebody else plays a card and you are holding one
+that fits on top of it, that space rings once in the colour of the card that just
+landed. On a board of up to 32 squares a card arriving is easy to miss, and this
+is about the change — it never marks a space that did not just move, and never
+one you put a card on yourself.
 
 Two silences are deliberate. A move from one post pile to another has no square
 on the board to point at, so nothing flashes for it — which early in a round,
 before anyone has an Ace down, can mean no hint at all. And a player who is
 genuinely stuck has no move to be shown, so the amber "no moves left" note in the
-drop band speaks for them instead.
+drop zone speaks for them instead.
 
 **Orderly grid** (off by default). Every center space belongs to one colour for
 the whole round, so the board reads as blocks of colour rather than a jumble, and
