@@ -8,7 +8,7 @@ for a day, so anything it changed - the keeper's round timer, the wood/Blitz sid
 picker - was "built" but not live; check `git status -sb` before trusting a
 playtest._
 
-_**259 tests green** (238 unit + 21 emulator). This is the only place in the repo
+_**272 tests green** (250 unit + 22 emulator). This is the only place in the repo
 that quotes a count — it drifted three separate ways when it lived in four
 places, so keep it here and nowhere else._
 
@@ -409,8 +409,7 @@ Three things changed in the code so this cannot bite that hard again:
 Taken down verbatim in intent, with what each one collides with in the code as it
 stands. **None of these are started.** They are listed in the order they were
 asked for, which is not the order to build them in - #11, #12 and #13 are one
-lobby overhaul and want doing together, and #12 needs a rules change and a
-redeploy before it can work at all.
+lobby overhaul and want doing together.
 
 **#8. Retire the drop band; make the whole gap the drop zone.** Everything
 between the bottom of the grid and the top of the tableau becomes `data-drop=
@@ -439,31 +438,45 @@ has pocketed their phone, and the overlay covers the screen so there was nothing
 else to reach for. `App.tsx`'s route effect calls `s.leave()` on the way home, so
 these are plain `href="#/"` links and need no handler.
 
-**#11. A ready gate in the lobby, then a 3-2-1-GO countdown.** Every player marks
-ready; when all are ready the screen counts down three seconds and shows "GO!".
-*Collides with:* `start()` is host-only today and there is no per-player lobby
-state at all. Wants a new `players/$uid/ready` (writable by its owner - the
-existing `players/$uid` rule already allows exactly that, no rules change). The
-countdown has to be driven off something every client agrees on; a server
-timestamp written once by the host is the only clock this app trusts (see the
-`awayAt` note on why client clocks are never compared).
+**#11. A ready gate in the lobby, then a 3-2-1-GO countdown.** — _built 2026-08-27._ Every human marks ready; bots are born ready
+because there is nothing to press them with. When the table is ready the host's
+client counts it down and deals.
 
-**#12. Editable name, badge and prefs in the lobby until ready.** Tap the badge
-for a grid of all eight with the taken ones greyed out; tap the name to edit it.
-Un-readying re-opens both. *Collides with:* `BadgePicker` already renders exactly
-that grid with a `taken` prop, so it can be lifted straight in. Badge *changes*
-are the hard part: `badges/$badgeId` validate is `newData.val() === auth.uid &&
-(!data.exists() || data.val() === auth.uid)`, so a player can claim a free badge
-and re-claim their own, but **nothing lets them release the old one** - swapping
-badges leaks the previous claim and blocks it for everyone, for the life of the
-room. That needs a rules change (allow a delete where `data.val() === auth.uid`)
-and a redeploy.
+**The countdown is a DIGIT the host writes (`meta.countdown`), not a deadline
+every client races its own clock to.** Two phones do not agree on the time - the
+same reason `awayAt` is only ever tested against null - so the host's timer is
+the single clock and everyone else renders whatever number is currently in
+there. 3, 2, 1, then 0 which reads "GO!", then `startRound` clears it in the
+same write that deals.
 
-**#13. Ready button states.** "I'm Ready" black-on-white, "Ready" black-on-green,
-"Away" black-on-yellow when the player has backgrounded the tab or switched away.
-*Collides with:* nothing - `awayAt` already exists and is already written by the
-player's own client (`AWAY_MS` in `store.ts`), but it is only armed during
-`phase === 'playing'`. A lobby ready gate needs it armed in the lobby too.
+`tableReady` (store.ts) is the gate, and it is stricter than "everyone pressed
+the button": a ready player who is away or disconnected still blocks it, because
+starting would deal a hand to somebody not looking at their phone. Every tick
+re-checks, so un-readying at 2 stops it dead. The host keeps a **"Start anyway
+(n/m ready)"** override so a dead phone cannot strand a table; it disappears
+entirely once the countdown has it.
+
+**#12. Editable name, badge and prefs in the lobby until ready.** — _built 2026-08-27._ Tap the badge for the grid with everybody
+else's greyed out, tap the name to edit it; readying closes both, un-readying
+re-opens them.
+
+**It needed no rules change after all** - the note here used to say it did. The
+claim is allowed by `badges/$badgeId`'s validate against a free badge, and the
+RELEASE is allowed because **RTDB does not run validate rules on a delete** and
+that node's `.write` is only `auth != null`. `setIdentity` sends both halves plus
+the name as ONE atomic update, which is also what makes a race safe: if somebody
+takes the badge first the claim fails its validate and the whole update is
+refused, so the player keeps the name and badge they already had rather than
+being left holding neither. Both halves are pinned against the real rules in
+`rooms.emu.test.ts`.
+
+**#13. Ready button states.** — _built 2026-08-27._ `awayAt` already existed and is already written
+by the player's own client, but during a round it means "45 seconds of no input"
+(`AWAY_MS`). In the lobby it means **the tab is hidden**, which the browser says
+instantly - so `noteVisible` owns it there and the idle timer owns it in a round.
+They never run at once, so the field still has exactly one writer per phase. The
+three colours are literals rather than theme tokens: the states have to mean the
+same thing on both phones at the table whichever way each has its theme set.
 
 **#14. Home page: shrink the room-code field so Join fits on its line.** — _built 2026-08-27._ The code field was `input.field`'s `width: 100%` inside a
 wrapping `.row`, which put Join on a line of its own. `.join-row` stops the wrap

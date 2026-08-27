@@ -1,6 +1,6 @@
 /// <reference types="node" />
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createRoom, joinRoom, normalizeRoom, peekRoom, MAX_PLAYERS } from './rooms';
+import { createRoom, joinRoom, normalizeRoom, peekRoom, setIdentity, MAX_PLAYERS } from './rooms';
 import { startRound } from './plays';
 import { makeRoomCode } from './roomCodes';
 import {
@@ -400,6 +400,45 @@ emu('app writes under real security rules (regular client SDK, correct namespace
       await set(ref(p2.db, `rooms/${code}/players/${hostUid}/awayAt`), Date.now());
     } catch { rejected = true; }
     expect(rejected, 'a non-host wrote another player\'s awayAt').toBe(true);
+  });
+
+  it('a lobby badge swap releases the old badge, and a taken one is refused whole', async () => {
+    // setIdentity claims this needs no rules change either: the CLAIM is allowed
+    // by badges/$badgeId's validate against a free badge, and the RELEASE is
+    // allowed because RTDB does not run validate rules on a delete and that
+    // node's .write is only `auth != null`. Both halves are claims about
+    // database.rules.json, so both are checked against the real rules here.
+    const code = await createRoom('Dave', 'tulip');
+    const dave = (await peekRoom(code))!.meta.hostId;
+
+    // A second, genuinely different identity holding 'boat' - it has to be a
+    // different uid, because a badge claimed under MY uid is one I am allowed to
+    // re-claim and the refusal below would not be a refusal at all.
+    const p2 = await secondaryIdentity('swap-p2');
+    createdApps.push(p2.app);
+    expect(await joinAs(p2.db, code, p2.uid, 'Sam', 'boat')).toBe('ok');
+
+    await setIdentity(code, dave, 'Davey', 'anchor', 'tulip');
+    const swapped = (await peekRoom(code))!;
+    expect(swapped.players[dave].name).toBe('Davey');
+    expect(swapped.players[dave].badgeId).toBe('anchor');
+    const { db } = await import('./firebase');
+    const badges = (await get(ref(db, `rooms/${code}/badges`))).val() as Record<string, string>;
+    expect(badges.anchor).toBe(dave);
+    expect(badges.tulip, 'the old badge is still claimed, so nobody else can take it').toBeUndefined();
+
+    // Sam's badge is refused - and because the write is atomic, the name that
+    // travelled with it does not land either. Half a swap would be worse than
+    // none: a player left with a name they did not keep and a badge they lost.
+    let rejected = false;
+    try {
+      await setIdentity(code, dave, 'Nope', 'boat', 'anchor');
+    } catch { rejected = true; }
+    expect(rejected, 'a player took a badge somebody else was wearing').toBe(true);
+    const after = (await peekRoom(code))!;
+    expect(after.players[dave].name).toBe('Davey');
+    expect(after.players[dave].badgeId).toBe('anchor');
+    expect(after.players[p2.uid].badgeId).toBe('boat');
   });
 
   it('CANARY: a non-host cannot write another player\'s round/tableaus - proves rules are ON in this namespace', async () => {

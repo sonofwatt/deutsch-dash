@@ -33,6 +33,9 @@ export interface Deps {
   joinRoom(code: string, name: string, badgeId: BadgeId): Promise<JoinResult>;
   createRoom(name: string, badgeId: BadgeId): Promise<string>;
   setTargetScore(code: string, n: number): Promise<void>;
+  setReady(code: string, uid: string, on: boolean): Promise<void>;
+  setCountdown(code: string, n: number | null): Promise<void>;
+  setIdentity(code: string, uid: string, name: string, badgeId: BadgeId, wasBadgeId: BadgeId): Promise<void>;
   setHints(code: string, on: boolean): Promise<void>;
   setOrderly(code: string, on: boolean): Promise<void>;
   startRound(code: string, room: Room): Promise<void>;
@@ -82,7 +85,11 @@ export interface GameStore {
   markStuck(): void;
   /** Any sign of life from the player: clears the away flag and restarts its timer. */
   noteActivity(): void;
+  /** The tab was hidden or shown. In the LOBBY that is exactly what away means. */
+  noteVisible(visible: boolean): void;
   setTarget(n: number): void;
+  setReady(on: boolean): void;
+  setIdentity(name: string, badgeId: BadgeId): void;
   setHints(on: boolean): void;
   setOrderly(on: boolean): void;
   start(): void;
@@ -112,6 +119,25 @@ export function myPlayer(s: { uid: string | null; room: Room | null }): PlayerIn
   return (s.uid && s.room?.players[s.uid]) || null;
 }
 
+/** How long "GO!" is on screen before the cards land. */
+export const GO_MS = 700;
+
+/**
+ * Is the table ready to be counted down?
+ *
+ * Bots are ready by definition. An away or disconnected player blocks it even
+ * with their flag set, and that is the point: away here means the tab is hidden
+ * (see `noteVisible`), so starting would deal a hand to somebody who is not
+ * looking at their phone. They readied, they wandered off, the table waits - and
+ * the moment they come back the countdown starts by itself. The host's "Start
+ * anyway" is the way past a player whose phone has died for good.
+ */
+export function tableReady(room: Room): boolean {
+  const players = Object.values(room.players);
+  if (players.length < 2) return false;
+  return players.every(p => p.isBot || (p.ready === true && p.awayAt == null && p.connected));
+}
+
 export function createGameStore(deps: Deps): StoreApi<GameStore> {
   let unwatch: (() => void) | null = null;
   let hostTimer: ReturnType<typeof setTimeout> | null = null;
@@ -133,6 +159,10 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
   // stayed on screen. Cleared when the connection comes back, because "offline" is
   // the one cause a retry can actually fix.
   let commitFailedFor: string | null = null;
+  // The lobby countdown's one and only clock. Host-side; every other client just
+  // renders meta.countdown. See RoomMeta.countdown for why it is a digit rather
+  // than a deadline.
+  let countdownTimer: ReturnType<typeof setTimeout> | null = null;
 
   const store = createStore<GameStore>((set, get) => {
 
@@ -216,6 +246,58 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
     function hostAction(work: Promise<unknown>, whatFailed: string) {
       set({ actionError: null });
       work.catch(() => set({ actionError: `Could not ${whatFailed}. Check your connection and try again.` }));
+    }
+
+    function stopCountdown() {
+      if (countdownTimer) clearTimeout(countdownTimer);
+      countdownTimer = null;
+    }
+
+    /**
+     * One second of the countdown, on the host. Re-checks the table every tick,
+     * so somebody un-readying (or backgrounding their tab) at 2 stops it dead
+     * rather than dealing a hand they did not agree to.
+     */
+    function tickCountdown() {
+      countdownTimer = null;
+      const s = get();
+      const { code, room } = s;
+      if (!code || !room || !isHost(s) || room.meta.phase !== 'lobby') return;
+      if (!tableReady(room)) { void deps.setCountdown(code, null); return; }
+      const n = room.meta.countdown ?? 0;
+      if (n > 1) {
+        void deps.setCountdown(code, n - 1);
+        countdownTimer = setTimeout(tickCountdown, 1000);
+        return;
+      }
+      if (n === 1) {
+        void deps.setCountdown(code, 0);          // 0 renders as GO!
+        countdownTimer = setTimeout(tickCountdown, GO_MS);
+        return;
+      }
+      // startRound clears the digit in the same write that deals, so there is no
+      // window where a client holds a countdown over a board.
+      hostAction(deps.startRound(code, room), 'start the game');
+    }
+
+    /** Start or cancel the countdown to match the lobby we are looking at. */
+    function syncCountdown(room: Room) {
+      const s = get();
+      if (!s.code || !isHost({ uid: s.uid, room }) || room.meta.phase !== 'lobby') {
+        stopCountdown();
+        return;
+      }
+      if (tableReady(room)) {
+        // Guarded on the timer as well as the digit: writing 3 raises a snapshot
+        // synchronously, and that snapshot must not start a second chain.
+        if (room.meta.countdown == null && !countdownTimer) {
+          void deps.setCountdown(s.code, 3);
+          countdownTimer = setTimeout(tickCountdown, 1000);
+        }
+        return;
+      }
+      stopCountdown();
+      if (room.meta.countdown != null) void deps.setCountdown(s.code, null);
     }
 
     function stopBots() {
@@ -339,6 +421,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         // (2) AI players. Bot hands belong to a single round, exactly like ours.
         if (phase !== 'playing') { if (Object.keys(get().botTableaus).length) set({ botTableaus: {} }); flips.clear(); }
         syncBots(room);
+        syncCountdown(room); // somebody readied, un-readied, joined or wandered off
         syncAllStuck(); // the centre moved: someone may have just been freed, or trapped
         if (phase === 'playing') armAway(); else disarmAway();
 
@@ -491,6 +574,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         if (hostTimer) { clearTimeout(hostTimer); hostTimer = null; }
         disarmAway();
         stopBots();
+        stopCountdown();
         flips.clear();
         commitFailedFor = null;
         deps.stopPresence();
@@ -566,7 +650,40 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
 
       noteActivity,
 
+      /**
+       * Away, in the lobby, means "not looking at this tab" - and unlike the
+       * 45-second idle timer that owns `awayAt` during a round, that is a thing
+       * the browser tells us the instant it happens. The two never run at once:
+       * this returns immediately outside the lobby, and `armAway` only arms
+       * inside a round, so `awayAt` still has exactly one writer per phase.
+       */
+      noteVisible(visible) {
+        const { code, uid, room } = get();
+        if (!code || !uid || room?.meta.phase !== 'lobby') return;
+        const me = room.players[uid];
+        if (!me) return;
+        if (!visible && me.awayAt == null) void deps.markAway(code, uid);
+        else if (visible && me.awayAt != null) void deps.clearAway(code, uid);
+      },
+
       setTarget(n) { const c = get().code; if (c) void deps.setTargetScore(c, n); },
+      setReady(on) {
+        const { code, uid } = get();
+        if (code && uid) hostAction(deps.setReady(code, uid, on), 'change your ready state');
+      },
+      setIdentity(name, badgeId) {
+        const { code, uid, room } = get();
+        const me = uid ? room?.players[uid] : null;
+        if (!code || !uid || !me) return;
+        // Only in the lobby, and only before readying: the badge is how every
+        // other screen colours this player's cards, so it cannot move under a
+        // hand that has already been dealt.
+        if (room!.meta.phase !== 'lobby' || me.ready) return;
+        const trimmed = name.trim().slice(0, 14) || me.name;
+        if (trimmed === me.name && badgeId === me.badgeId) return;
+        hostAction(deps.setIdentity(code, uid, trimmed, badgeId, me.badgeId),
+          badgeId === me.badgeId ? 'change your name' : 'change your badge');
+      },
       setHints(on) { const c = get().code; if (c) void deps.setHints(c, on); },
       setOrderly(on) { const c = get().code; if (c) void deps.setOrderly(c, on); },
       start() {
@@ -601,6 +718,9 @@ const realDeps: Deps = {
   joinRoom: netRooms.joinRoom,
   createRoom: netRooms.createRoom,
   setTargetScore: netRooms.setTargetScore,
+  setReady: netRooms.setReady,
+  setCountdown: netRooms.setCountdown,
+  setIdentity: netRooms.setIdentity,
   setHints: netRooms.setHints,
   setOrderly: netRooms.setOrderly,
   startRound: netPlays.startRound,
@@ -632,7 +752,11 @@ try {
   // and we must not flap presence for everyone else by reconnecting when fine.
   if (typeof document !== 'undefined') {
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState !== 'visible') return;
+      const visible = document.visibilityState === 'visible';
+      // Both directions, unlike the reconnect nudge below: the lobby's Away
+      // state is the leaving half, and it has to land while the tab still can.
+      gameStore.getState().noteVisible(visible);
+      if (!visible) return;
       const nudgeIfDown = () => { if (!gameStore.getState().online) reconnect(); };
       nudgeIfDown();
       setTimeout(nudgeIfDown, 2500);

@@ -26,6 +26,39 @@
 .tag { font-size: 11px; font-weight: 600; color: var(--ink-soft); border: 1px solid var(--line);
   border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
 .btn-slim { min-height: 34px; padding: 0 12px; font-size: 13px; box-shadow: none; }
+
+/* The ready gate. Three states, and the three colours are LITERALS rather than
+   theme tokens on purpose: the request was white, green and yellow with black
+   text, and those have to mean the same thing on both phones at the table
+   regardless of which way either one has its theme set. Black on all three is
+   what keeps the yellow legible. */
+.ready-btn { background: #ffffff; color: #111111; border-color: #d8d5cc; font-weight: 800; }
+.ready-btn.on { background: #22c55e; border-color: #16a34a; }
+.ready-btn.away { background: #facc15; border-color: #eab308; }
+/* Somebody else's state, in the same three colours at tag size. */
+.ready-tag { font-size: 11px; font-weight: 700; border-radius: 999px; padding: 3px 9px;
+  white-space: nowrap; background: #ffffff; color: #111111; border: 1px solid #d8d5cc; }
+.ready-tag.on { background: #22c55e; border-color: #16a34a; }
+.ready-tag.away { background: #facc15; border-color: #eab308; }
+
+/* Editing your own row. Both look like the text they replace until touched, so
+   the lobby does not read as a form. */
+.name-btn { background: none; border: none; padding: 0; font: inherit; color: inherit;
+  text-align: left; cursor: pointer; text-decoration: underline dotted;
+  text-underline-offset: 3px; min-height: 44px; }
+.name-field { flex: 1; min-width: 0; width: auto; min-height: 40px; }
+.chip-btn { cursor: pointer; border: 1px solid var(--badge); }
+
+/* 3, 2, 1, GO! - the digit is whatever the host last wrote (see RoomMeta.countdown). */
+.countdown-overlay { background: rgb(0 0 0 / .62); pointer-events: none; }
+.countdown-num { font-size: clamp(96px, 46vw, 240px); font-weight: 800; color: #fff;
+  line-height: 1; animation: count-pop .45s ease-out; }
+@keyframes count-pop {
+  from { transform: scale(.55); opacity: 0; }
+  60%  { transform: scale(1.06); opacity: 1; }
+  to   { transform: scale(1); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) { .countdown-num { animation: none; } }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; }
 .dot.off { background: var(--line); }
 .chip { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center;

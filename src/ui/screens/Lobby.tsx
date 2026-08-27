@@ -1,13 +1,26 @@
 import { useState } from 'react';
-import { useGameStore, isHost } from '../../state/store';
+import { useGameStore, isHost, tableReady } from '../../state/store';
 import { BADGES, BADGE_IDS, type BadgeId } from '../../game/badges';
 import { BOT_LABELS, BOT_LEVELS, type BotLevel } from '../../game/bot';
 import { MAX_PLAYERS } from '../../net/rooms';
 import { ShareInvite } from '../components/ShareInvite';
+import { BadgePicker } from '../components/BadgePicker';
 import { useWoodSide } from '../prefs';
+import type { PlayerInfo } from '../../game/types';
 
 // Dutch/German-flavoured, to sit alongside the human names without pretending to be one.
 const BOT_NAMES = ['Ada', 'Bram', 'Cleo', 'Dirk', 'Elke', 'Fritz', 'Greta', 'Hans'];
+
+/**
+ * Somebody else's state, in the same three colours as your own button, because
+ * they are the same three states. Bots are simply never anything but ready.
+ */
+function ReadyTag({ p }: { p: PlayerInfo }) {
+  if (p.isBot) return null;
+  const away = p.awayAt != null || !p.connected;
+  const cls = away ? 'away' : p.ready ? 'on' : '';
+  return <span className={`ready-tag ${cls}`}>{away ? 'Away' : p.ready ? 'Ready' : 'Not ready'}</span>;
+}
 
 export function Lobby({ code }: { code: string }) {
   const room = useGameStore(s => s.room)!;
@@ -16,12 +29,17 @@ export function Lobby({ code }: { code: string }) {
   const setTarget = useGameStore(s => s.setTarget);
   const setHints = useGameStore(s => s.setHints);
   const setOrderly = useGameStore(s => s.setOrderly);
+  const setReady = useGameStore(s => s.setReady);
+  const setIdentity = useGameStore(s => s.setIdentity);
   const start = useGameStore(s => s.start);
   const addBot = useGameStore(s => s.addBot);
   const removeBot = useGameStore(s => s.removeBot);
   const actionError = useGameStore(s => s.actionError);
   const [level, setLevel] = useState<BotLevel>('medium');
   const [woodSide, swapSides] = useWoodSide();
+  // Which of my own two fields is open. Both close the moment I ready up.
+  const [picking, setPicking] = useState(false);
+  const [draftName, setDraftName] = useState<string | null>(null);
 
   const players = Object.entries(room.players).sort(([, a], [, b]) => a.joinedAt - b.joinedAt);
   const hostConnected = room.players[room.meta.hostId]?.connected ?? true;
@@ -30,30 +48,86 @@ export function Lobby({ code }: { code: string }) {
   const usedNames = new Set(players.map(([, p]) => p.name));
   const full = players.length >= MAX_PLAYERS;
 
+  const me = uid ? room.players[uid] : null;
+  const iAmReady = me?.ready === true;
+  const iAmAway = me != null && me.awayAt != null;
+  // Everything about me is fixed once I say I am ready. Un-readying is the way
+  // back, which is the whole reason the ready flag is a toggle and not a latch.
+  const canEdit = me != null && !iAmReady;
+  // Mine is excluded, so my own badge never greys itself out in my own picker.
+  const takenByOthers = players.filter(([id]) => id !== uid).map(([, p]) => p.badgeId);
+  const countdown = room.meta.countdown;
+  const readyCount = players.filter(([, p]) => p.isBot || p.ready).length;
+
   function add() {
     if (!freeBadge) return;
     const name = BOT_NAMES.find(n => !usedNames.has(n)) ?? `${BADGES[freeBadge].label} bot`;
     addBot(freeBadge, level, name);
   }
 
+  function commitName() {
+    if (draftName != null && me) setIdentity(draftName, me.badgeId);
+    setDraftName(null);
+  }
+
+  function pickBadge(b: BadgeId) {
+    if (me) setIdentity(me.name, b);
+    setPicking(false);
+  }
+
+  function toggleReady() {
+    // Close both editors on the way in, so a half-typed name cannot sit behind a
+    // Ready badge looking like it was saved.
+    if (!iAmReady) { commitName(); setPicking(false); }
+    setReady(!iAmReady);
+  }
+
   return (
     <div className="screen stack">
       <h1 className="title">Lobby</h1>
       <div className="row"><span className="code-pill">{code}</span><ShareInvite code={code} /></div>
-      {players.map(([id, p]) => (
-        <div className="player-row" key={id}>
-          <span className="chip" style={{ ['--badge' as string]: BADGES[p.badgeId].color }}>
-            {BADGES[p.badgeId].glyph}
-          </span>
-          <span>{p.name}{id === room.meta.hostId ? ' (host)' : ''}</span>
-          {p.isBot && <span className="tag">AI · {BOT_LABELS[p.botLevel ?? 'medium']}</span>}
-          <span className="spacer" />
-          {p.isBot
-            ? host && <button className="btn btn-slim" onClick={() => removeBot(id, p.badgeId)}
+      {players.map(([id, p]) => {
+        const mine = id === uid;
+        const editing = mine && canEdit;
+        return (
+          <div className="player-row" key={id}>
+            {/* Tap the badge for the whole grid, with everybody else's greyed
+                out. Only ever your own, and only before you are ready. */}
+            {editing
+              ? <button className="chip chip-btn" aria-label="Change your badge"
+                  style={{ ['--badge' as string]: BADGES[p.badgeId].color }}
+                  onClick={() => { commitName(); setPicking(v => !v); }}>
+                  {BADGES[p.badgeId].glyph}
+                </button>
+              : <span className="chip" style={{ ['--badge' as string]: BADGES[p.badgeId].color }}>
+                  {BADGES[p.badgeId].glyph}
+                </span>}
+            {editing && draftName != null
+              ? <input className="field name-field" autoFocus maxLength={14} value={draftName}
+                  aria-label="Your name"
+                  onChange={e => setDraftName(e.target.value)}
+                  onBlur={commitName}
+                  onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }} />
+              : editing
+                ? <button className="name-btn" onClick={() => { setPicking(false); setDraftName(p.name); }}>
+                    {p.name}{id === room.meta.hostId ? ' (host)' : ''}
+                  </button>
+                : <span>{p.name}{id === room.meta.hostId ? ' (host)' : ''}</span>}
+            {p.isBot && <span className="tag">AI · {BOT_LABELS[p.botLevel ?? 'medium']}</span>}
+            <span className="spacer" />
+            {/* My own state is the big button at the bottom, not a second copy
+                up here - one player, one place to read it. */}
+            {!mine && <ReadyTag p={p} />}
+            {p.isBot && host && (
+              <button className="btn btn-slim" onClick={() => removeBot(id, p.badgeId)}
                 aria-label={`Remove ${p.name}`}>Remove</button>
-            : <span className={`dot${p.connected ? '' : ' off'}`} />}
-        </div>
-      ))}
+            )}
+          </div>
+        );
+      })}
+      {picking && canEdit && (
+        <BadgePicker value={me!.badgeId} onChange={pickBadge} taken={takenByOthers} />
+      )}
 
       {host && (
         <div className="row">
@@ -101,16 +175,37 @@ export function Lobby({ code }: { code: string }) {
         </button>
       </div>
       {actionError && <p className="error">{actionError}</p>}
-      {host
-        ? <button className="btn btn-primary" disabled={players.length < 2} onClick={start}>
-            {players.length < 2 ? 'Waiting for players…' : 'Start game'}
-          </button>
-        : <p className="muted">
-            {hostConnected ? 'Waiting for the host to start…' : 'Host is away — someone else can start shortly…'}
-          </p>}
+
+      {/* Mine, and the only place my own state is shown. Three states, three
+          fixed colours - white, green and yellow with black ink in both themes,
+          which is why they are literals and not theme tokens. */}
+      <button className={`btn ready-btn${iAmAway ? ' away' : iAmReady ? ' on' : ''}`}
+        onClick={toggleReady}>
+        {iAmAway ? 'Away' : iAmReady ? 'Ready' : "I'm Ready"}
+      </button>
+
+      {/* The host keeps a way past a phone that has died: the ready gate must not
+          be able to strand a table. It is gone entirely once everyone is ready,
+          because the countdown has it from there. */}
+      {host && !tableReady(room) && (
+        <button className="btn btn-primary" disabled={players.length < 2} onClick={start}>
+          {players.length < 2 ? 'Waiting for players…' : `Start anyway (${readyCount}/${players.length} ready)`}
+        </button>
+      )}
+      {!host && !tableReady(room) && (
+        <p className="muted">
+          {hostConnected ? 'Waiting for everyone to be ready…' : 'Host is away — someone else can start shortly…'}
+        </p>
+      )}
       {/* A lobby nobody ever starts is a dead end too - most often a room whose
           host wandered off before pressing anything. */}
       <a className="muted keep-back" href="#/">Home</a>
+
+      {countdown != null && (
+        <div className="overlay countdown-overlay">
+          <div className="countdown-num" key={countdown}>{countdown === 0 ? 'GO!' : countdown}</div>
+        </div>
+      )}
     </div>
   );
 }

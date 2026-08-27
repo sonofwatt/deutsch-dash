@@ -39,6 +39,17 @@ export interface RoomMeta {
   // human without hints. See game/hint.ts.
   hintsOn?: boolean;
   orderlyGrid?: boolean;
+  /**
+   * The lobby countdown: 3, 2, 1, then 0 which reads "GO!", then absent again.
+   *
+   * A NUMBER the host writes, not a deadline every client races its own clock
+   * to. Two phones do not agree on the time - the same reason `awayAt` is only
+   * ever tested against null - so the host's own timer is the single clock and
+   * everybody else simply renders whatever digit is currently in here. A tick
+   * arrives a few tens of milliseconds late on the other phones, which over
+   * three seconds nobody can see. Absent means no countdown is running.
+   */
+  countdown?: number | null;
 }
 
 import type { BadgeId } from './badges';
@@ -54,6 +65,16 @@ export interface PlayerInfo {
    * driven by the host and either act or are stuck.
    */
   awayAt: number | null;
+  /**
+   * "I am ready to start." Written only by the player's own client for its own
+   * uid, which `players/$uid`'s existing rule already allows - no rules change.
+   * Absent means not ready, so rooms and fixtures written before this field
+   * existed simply read as a lobby nobody has readied in yet.
+   *
+   * Bots are born ready: they have no client to press anything with.
+   * `startRound` clears every flag, so the lobby a rematch returns to is blank.
+   */
+  ready?: boolean;
   // AI players. Absent on humans. A bot has no auth identity of its own: the
   // host owns its record and plays its hand (see the bot driver in store.ts).
   isBot?: boolean; botLevel?: BotLevel;

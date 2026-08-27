@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { createGameStore, legalTargets, HOST_AWAY_MS, AWAY_MS, type Deps } from './store';
+import { createGameStore, legalTargets, tableReady, HOST_AWAY_MS, AWAY_MS, type Deps } from './store';
 import type { PlayResult } from '../net/plays';
 import { deal, buildDeck } from '../game/deck';
 import type { Card, CenterSpace, PlayerInfo, RoomMeta, Suit, Room, Tableau } from '../game/types';
@@ -13,6 +13,9 @@ function fakeDeps(over: Partial<Deps> = {}): Deps {
     joinRoom: vi.fn(async code => ({ ok: true as const, code })),
     createRoom: vi.fn(async () => 'ABCDEF'),
     setTargetScore: vi.fn(async () => {}),
+    setReady: vi.fn(async () => {}),
+    setCountdown: vi.fn(async () => {}),
+    setIdentity: vi.fn(async () => {}),
     setHints: vi.fn(async () => {}),
     setOrderly: vi.fn(async () => {}),
     startRound: vi.fn(async () => {}),
@@ -217,6 +220,120 @@ describe('all-stuck rotation re-entrancy', () => {
 
     expect(store.getState().tableau!.wood.map(w => w.v)).toEqual([2, 3, 1]); // rotated by exactly one card
     expect(deps.incrementStuckRounds).toHaveBeenCalledTimes(1); // I am host; at most once
+  });
+});
+
+describe('the lobby ready gate', () => {
+  const lobby = (players: Record<string, PlayerInfo>, countdown?: number | null): Room => ({
+    meta: { createdAt: 1, hostId: 'me', creatorId: 'me', targetScore: 75, phase: 'lobby',
+            roundNumber: 0, ...(countdown === undefined ? {} : { countdown }) },
+    players, round: null,
+  });
+  const human = (over: Partial<PlayerInfo> = {}): PlayerInfo => ({
+    name: 'P', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, awayAt: null,
+    score: 0, ...over,
+  });
+  const bot = (): PlayerInfo => human({ isBot: true, ready: true, badgeId: 'star' });
+
+  describe('tableReady', () => {
+    it('needs two players, so a host alone is never counted down', () => {
+      expect(tableReady(lobby({ me: human({ ready: true }) }))).toBe(false);
+    });
+    it('is true when every human has readied and bots are taken as read', () => {
+      expect(tableReady(lobby({ me: human({ ready: true }), b: bot() }))).toBe(true);
+    });
+    it('is false while anyone has not readied', () => {
+      expect(tableReady(lobby({ me: human({ ready: true }), you: human() }))).toBe(false);
+    });
+    it('is false while a ready player has their tab hidden', () => {
+      const players = { me: human({ ready: true }), you: human({ ready: true, awayAt: 5 }) };
+      expect(tableReady(lobby(players))).toBe(false);
+    });
+    it('is false while a ready player is disconnected', () => {
+      const players = { me: human({ ready: true }), you: human({ ready: true, connected: false }) };
+      expect(tableReady(lobby(players))).toBe(false);
+    });
+  });
+
+  it('the host writes 3 when the table readies, and nobody else does', async () => {
+    for (const [who, expected] of [['me', 1], ['someone-else', 0]] as const) {
+      let cb!: (room: Room | null) => void;
+      const deps = fakeDeps({
+        ensureSignedIn: vi.fn(async () => who),
+        watchRoom: vi.fn((_c: string, f: (room: Room | null) => void) => { cb = f; return () => {}; }),
+      });
+      const store = createGameStore(deps);
+      await store.getState().enterRoom('ABCDEF', 'D', 'tulip');
+      cb(lobby({ me: human({ ready: true }), b: bot() }));
+      expect(deps.setCountdown).toHaveBeenCalledTimes(expected);
+      if (expected) expect(deps.setCountdown).toHaveBeenCalledWith('ABCDEF', 3);
+      store.getState().leave();
+    }
+  });
+
+  it('does not start a second countdown once one is already running', async () => {
+    let cb!: (room: Room | null) => void;
+    const deps = fakeDeps({
+      watchRoom: vi.fn((_c: string, f: (room: Room | null) => void) => { cb = f; return () => {}; }),
+    });
+    const store = createGameStore(deps);
+    await store.getState().enterRoom('ABCDEF', 'D', 'tulip');
+    const ready = { me: human({ ready: true }), b: bot() };
+    cb(lobby(ready));         // writes 3
+    cb(lobby(ready, 3));      // the snapshot that write raises
+    cb(lobby(ready, 3));      // and any other traffic
+    expect(deps.setCountdown).toHaveBeenCalledTimes(1);
+    store.getState().leave();
+  });
+
+  it('cancels a running countdown the moment somebody un-readies', async () => {
+    let cb!: (room: Room | null) => void;
+    const deps = fakeDeps({
+      watchRoom: vi.fn((_c: string, f: (room: Room | null) => void) => { cb = f; return () => {}; }),
+    });
+    const store = createGameStore(deps);
+    await store.getState().enterRoom('ABCDEF', 'D', 'tulip');
+    cb(lobby({ me: human({ ready: true }), you: human({ ready: true }) }));
+    expect(deps.setCountdown).toHaveBeenLastCalledWith('ABCDEF', 3);
+    cb(lobby({ me: human({ ready: true }), you: human() }, 2));
+    expect(deps.setCountdown).toHaveBeenLastCalledWith('ABCDEF', null);
+    expect(deps.startRound).not.toHaveBeenCalled();
+    store.getState().leave();
+  });
+
+  it('refuses to change identity once the player has readied', async () => {
+    const deps = fakeDeps();
+    const store = createGameStore(deps);
+    store.setState({ uid: 'me', code: 'ABCDEF', room: lobby({ me: human({ ready: true }) }) });
+    store.getState().setIdentity('New name', 'boat');
+    expect(deps.setIdentity).not.toHaveBeenCalled();
+  });
+
+  it('changes name and badge together, passing the badge being given up', async () => {
+    const deps = fakeDeps();
+    const store = createGameStore(deps);
+    store.setState({ uid: 'me', code: 'ABCDEF', room: lobby({ me: human({ name: 'D' }) }) });
+    store.getState().setIdentity('  Samantha  ', 'boat');
+    expect(deps.setIdentity).toHaveBeenCalledWith('ABCDEF', 'me', 'Samantha', 'boat', 'tulip');
+  });
+
+  it('marks away when the tab is hidden in the lobby, and clears it on return', () => {
+    const deps = fakeDeps();
+    const store = createGameStore(deps);
+    store.setState({ uid: 'me', code: 'ABCDEF', room: lobby({ me: human() }) });
+    store.getState().noteVisible(false);
+    expect(deps.markAway).toHaveBeenCalledWith('ABCDEF', 'me');
+    store.setState({ room: lobby({ me: human({ awayAt: 9 }) }) });
+    store.getState().noteVisible(true);
+    expect(deps.clearAway).toHaveBeenCalledWith('ABCDEF', 'me');
+  });
+
+  it('leaves awayAt alone outside the lobby - the idle timer owns it in a round', () => {
+    const deps = fakeDeps();
+    const store = createGameStore(deps);
+    store.setState({ uid: 'me', code: 'ABCDEF', room: playingRoom(seededTableau()) });
+    store.getState().noteVisible(false);
+    expect(deps.markAway).not.toHaveBeenCalled();
   });
 });
 

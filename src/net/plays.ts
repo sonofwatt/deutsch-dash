@@ -48,8 +48,17 @@ export async function startRound(code: string, room: Room, rng?: Rng): Promise<v
     },
     'meta/phase': 'playing',
     'meta/roundNumber': room.meta.roundNumber + 1,
+    // The countdown belongs to the lobby that led here and nothing else. Cleared
+    // in the same write that starts the round so no client can be left holding a
+    // digit over a board.
+    'meta/countdown': null,
   };
-  for (const uid of uids) patch[`players/${uid}/stuckAt`] = null;
+  // Ready is a lobby fact too: cleared here so a rematch comes back to a lobby
+  // nobody has readied in, rather than one that starts again immediately.
+  for (const uid of uids) {
+    patch[`players/${uid}/stuckAt`] = null;
+    patch[`players/${uid}/ready`] = room.players[uid]?.isBot ? true : null;
+  }
   await update(r(code), patch);
 }
 
@@ -189,7 +198,10 @@ export async function rematch(code: string, room: Room): Promise<void> {
     // stats describe one game, and a rematch is a new one.
     'meta/phase': 'lobby', 'meta/roundNumber': 0, round: null, stats: null,
   };
-  for (const uid of Object.keys(room.players)) patch[`players/${uid}/score`] = 0;
+  for (const [uid, p] of Object.entries(room.players)) {
+    patch[`players/${uid}/score`] = 0;
+    patch[`players/${uid}/ready`] = p.isBot ? true : null;
+  }
   await update(r(code), patch);
 }
 

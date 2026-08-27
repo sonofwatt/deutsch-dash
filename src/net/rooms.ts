@@ -158,7 +158,8 @@ export async function addBot(code: string, badgeId: BadgeId, level: BotLevel, na
       name, badgeId, joinedAt: serverTimestamp(), connected: true,
       // awayAt stays null for the life of a bot: it has no client to notice it has
     // wandered off, and the host either plays its hand or marks it stuck.
-    stuckAt: null, awayAt: null, score: 0, isBot: true, botLevel: level,
+    // ready is true for the same reason - there is nothing to press it with.
+    stuckAt: null, awayAt: null, score: 0, ready: true, isBot: true, botLevel: level,
     },
     [`badges/${badgeId}`]: uid,
   });
@@ -171,6 +172,49 @@ export function removeBot(code: string, id: string, badgeId: BadgeId): Promise<v
 
 export function setTargetScore(code: string, target: number): Promise<void> {
   return set(ref(db, `rooms/${code}/meta/targetScore`), target);
+}
+
+/** "I am ready." Own record, own uid - already covered by players/$uid's rule. */
+export function setReady(code: string, uid: string, on: boolean): Promise<void> {
+  return set(ref(db, `rooms/${code}/players/${uid}/ready`), on ? true : null);
+}
+
+/**
+ * The lobby countdown digit. Host-by-convention like the other lobby controls -
+ * meta is writable by any authed client (see database.rules.json and the trust
+ * model), and only the host's client ever drives it. See RoomMeta.countdown.
+ */
+export function setCountdown(code: string, n: number | null): Promise<void> {
+  return set(ref(db, `rooms/${code}/meta/countdown`), n);
+}
+
+/**
+ * Change your own name and/or badge from the lobby.
+ *
+ * One atomic update, and the badge RELEASE is the whole reason it has to be:
+ * `badges/$badgeId` is how the room stops two players wearing the same one, so
+ * claiming a new badge without giving the old one back would block it for
+ * everybody for the life of the room. Both halves are already permitted -
+ * the claim by the validate rule (`newData.val() === auth.uid` against a badge
+ * that is free), the release because RTDB does not run validate rules on a
+ * delete and `badges/$badgeId`'s .write is only `auth != null`.
+ *
+ * Atomic also means a race is safe: if somebody else takes the badge first, the
+ * claim fails its validate, the whole update is refused, and the player keeps
+ * the name AND badge they already had rather than being left holding neither.
+ */
+export function setIdentity(
+  code: string, uid: string, name: string, badgeId: BadgeId, wasBadgeId: BadgeId,
+): Promise<void> {
+  const patch: Record<string, unknown> = {
+    [`players/${uid}/name`]: name,
+    [`players/${uid}/badgeId`]: badgeId,
+  };
+  if (badgeId !== wasBadgeId) {
+    patch[`badges/${badgeId}`] = uid;
+    patch[`badges/${wasBadgeId}`] = null;
+  }
+  return update(roomRef(code), patch);
 }
 
 // Host options. Host-by-convention like the other lobby controls: meta is
