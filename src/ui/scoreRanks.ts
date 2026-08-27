@@ -13,22 +13,42 @@ export const signed = (n: number) => (n > 0 ? `+${n}` : `${n}`);
  * `commitScores` added - gives the total the sheet would have shown last time.
  * That keeps the animation honest without storing a scoreboard history in RTDB.
  *
- * Both orders use the same tie-break (insertion order, which for a room straight
- * out of RTDB is key order), so players level on points never trade places for
- * no reason.
+ * **Movement is counted as overtakes, not as a change of row.** `places[id]` is
+ * how many players this one was strictly behind and is now strictly ahead of,
+ * minus how many went the other way; `move` is just its sign. Both comparisons
+ * are strict, so *being level with somebody and then beating them is not a
+ * place gained* - and that is the whole point. Before round one every player is
+ * on zero, so ranking them by row would have the first round's standings read as
+ * everyone leaping over everyone else, purely along the order they joined the
+ * room in. A playtest duly reported "dropped 2 places" after round one. Nobody
+ * moved: they were level, and the round decided an order for the first time.
+ *
+ * `previous` is ordered the same way for the same reason. Players tied before the
+ * round are listed in the order they ended it in, so a tie the round happens to
+ * break slides nothing across the sheet - the rows land where they belong and
+ * only a genuine overtake is acted out.
  */
 export function rankRows(
   players: Record<string, PlayerInfo>, scores?: Record<string, RoundScore> | null,
-): { previous: string[]; current: string[]; move: Record<string, Move> } {
+): { previous: string[]; current: string[]; move: Record<string, Move>; places: Record<string, number> } {
   const ids = Object.keys(players);
   const before = (id: string) => players[id].score - (scores?.[id]?.delta ?? 0);
-  const current = [...ids].sort((a, b) => players[b].score - players[a].score);
-  const previous = [...ids].sort((a, b) => before(b) - before(a));
+  const after = (id: string) => players[id].score;
+  const current = [...ids].sort((a, b) => after(b) - after(a));
+  const rankNow = new Map(current.map((id, i) => [id, i]));
+  const previous = [...ids].sort((a, b) => before(b) - before(a) || rankNow.get(a)! - rankNow.get(b)!);
+
+  const places: Record<string, number> = {};
   const move: Record<string, Move> = {};
   for (const id of ids) {
-    const was = previous.indexOf(id);
-    const now = current.indexOf(id);
-    move[id] = was === now ? null : was > now ? 'up' : 'down';
+    let net = 0;
+    for (const other of ids) {
+      if (other === id) continue;
+      if (before(other) > before(id) && after(id) > after(other)) net += 1;
+      else if (before(id) > before(other) && after(other) > after(id)) net -= 1;
+    }
+    places[id] = net;
+    move[id] = net > 0 ? 'up' : net < 0 ? 'down' : null;
   }
-  return { previous, current, move };
+  return { previous, current, move, places };
 }

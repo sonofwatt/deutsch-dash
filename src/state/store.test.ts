@@ -220,6 +220,57 @@ describe('all-stuck rotation re-entrancy', () => {
   });
 });
 
+describe('the host committing scores', () => {
+  const roundEnd = (): Room => {
+    const r = playingRoom(seededTableau());
+    r.meta.phase = 'roundEnd';
+    r.round!.blitzedBy = 'me';
+    return r;
+  };
+
+  it('attempts the commit once per round, not once per snapshot, when it is refused', async () => {
+    // A rejected RTDB write is rolled back out of the local cache, and the
+    // rollback raises another snapshot - which used to walk straight back into
+    // the commit. Against the live database (rules missing the `stats` grant)
+    // that was a write every few milliseconds for as long as the round was up.
+    let cb!: (room: Room | null) => void;
+    const deps = fakeDeps({
+      watchRoom: vi.fn((_code: string, f: (room: Room | null) => void) => { cb = f; return () => {}; }),
+      commitScores: vi.fn(async () => { throw new Error('PERMISSION_DENIED'); }),
+    });
+    const store = createGameStore(deps);
+    await store.getState().enterRoom('ABCDEF', 'D', 'tulip');
+
+    cb(roundEnd());
+    await Promise.resolve();
+    cb(roundEnd());   // the rollback snapshot
+    cb(roundEnd());   // and another
+    await Promise.resolve();
+
+    expect(deps.commitScores).toHaveBeenCalledTimes(1);
+    expect(store.getState().actionError).toMatch(/scores/i);
+  });
+
+  it('re-arms the commit when the connection comes back', async () => {
+    let cb!: (room: Room | null) => void;
+    const deps = fakeDeps({
+      watchRoom: vi.fn((_code: string, f: (room: Room | null) => void) => { cb = f; return () => {}; }),
+      commitScores: vi.fn(async () => { throw new Error('offline'); }),
+    });
+    const store = createGameStore(deps);
+    await store.getState().enterRoom('ABCDEF', 'D', 'tulip');
+
+    cb(roundEnd());
+    await Promise.resolve();
+    store.getState().setOnline(false);
+    store.getState().setOnline(true);
+    cb(roundEnd());
+    await Promise.resolve();
+
+    expect(deps.commitScores).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe('stale-session guards', () => {
   // Defaults model the plain stand-in scenario: 'h' both created the room and holds
   // host, and is disconnected. Pass metaOverrides for phase/creatorId, and

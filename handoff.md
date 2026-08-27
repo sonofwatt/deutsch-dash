@@ -8,7 +8,7 @@ for a day, so anything it changed - the keeper's round timer, the wood/Blitz sid
 picker - was "built" but not live; check `git status -sb` before trusting a
 playtest._
 
-_**246 tests green** (226 unit + 20 emulator). This is the only place in the repo
+_**259 tests green** (238 unit + 21 emulator). This is the only place in the repo
 that quotes a count — it drifted three separate ways when it lived in four
 places, so keep it here and nowhere else._
 
@@ -212,6 +212,15 @@ Locally, `npm test` skipping the rules tests is still fine and intended — but 
   player while wedging the counter at 8.
 - `MAX_PLAYERS = 8` in `src/net/rooms.ts` is mirrored as a bare literal `8` in
   `database.rules.json`. Change both or client and server disagree.
+- **Editing `database.rules.json` is half the job. Deploying it is the other
+  half:** `npx firebase deploy --only database`. Nothing here can tell you that
+  you have not — the emulator always loads the file from disk, so the whole suite
+  passes against rules the live database has never seen. A missing grant does not
+  fail visibly either: because a multi-path `update()` is atomic, one denied node
+  takes down every other path in the same write, and RTDB shows the writer a
+  local copy of the write before the server refuses it, so the client that made
+  it is the one client that appears to be fine. This has already cost one whole
+  playtest — see "The first iPhone playtest".
 
 ### Trust model
 
@@ -310,13 +319,164 @@ deliberate.
 
 ## Pending work
 
-**Nothing is pending.** The idle-table hang is fixed and all seven playtest
-requests are settled: **#1 retired**, **#4 deferred**, and **#2, #3, #5, #6, #7
-built**. Numbering is kept as-is so earlier notes still point at the right item.
+The first three-humans-on-iPhones playtest happened on 2026-08-27, on a build
+older than `92f57d0`. It produced six faults (all now fixed - see "The first
+iPhone playtest" below) and nine feature requests, none of which are built yet.
 
-What is left is not work in here - it is playing the thing. See "What still needs
-testing"; the honest summary is that three or more humans have never played a
-round, and iPhone Safari has never been opened.
+The seven requests from the earlier rounds are all settled: **#1 retired**,
+**#4 deferred**, and **#2, #3, #5, #6, #7 built**. Numbering is kept as-is so
+earlier notes still point at the right item, and the new batch starts at #8.
+
+### The first iPhone playtest — _six faults, all fixed 2026-08-27_
+
+Three humans on iPhones, Safari, on a build older than `92f57d0`. Read this
+before touching the score commit or the drag ghost.
+
+**The big one: a rules deploy that never happened.** Two of the six reports - "only
+the host sees the round score sheet" and "everyone else is stuck on 0 pts" - were
+one fault, and it was not in the client at all. `stats` gained its own `.write`
+grant in `a93e7d2` (2026-08-26); the live database was still serving rules from
+before that commit. `commitScores` sent `round/scores`, every player's total, and
+`stats` as **one multi-path update**, a multi-path update is atomic, so the denied
+stats write rejected the entire round.
+
+What that looks like from the outside is worth knowing, because none of it points
+at permissions:
+
+- The **host sees a score sheet** anyway. RTDB applies a write to the local cache
+  and raises `onValue` locally before the server has answered it.
+- The rejection then rolls that write back, which raises **another** snapshot,
+  which had `!room.round.scores` true again, which re-entered `commitScores`. A
+  denied write every ~13ms for as long as the round was on screen.
+- The host's own header total therefore showed **that round's delta, not a running
+  total** - the previous round's total had been rolled back too. The playtest
+  reported 14, then 2, then 0. Those were three round scores.
+- Every other client saw **nothing**: no sheet (`RoundEndOverlay` renders null
+  without `round.scores`) and a permanent 0.
+
+Reproduced end to end by pointing three real browser clients at the emulator
+running `git show a93e7d2^:database.rules.json`, and confirmed fixed the same way.
+
+**So: after ANY change to `database.rules.json`, run
+`npx firebase deploy --only database`.** Nothing in the repo can detect that you
+have not. The emulator suite always loads the file from disk and will pass
+happily against rules the live database has never seen. Two other grants landed
+the same day and have the same exposure if the deploy was skipped: `races`
+(`7803a44`) and `duels` (`05516a8`), which together make race flashes and the
+rivalry commentary silently vanish.
+
+Three things changed in the code so this cannot bite that hard again:
+
+- **Stats are a second, separate, best-effort write** (`commitScores`). They are
+  commentary material; the scores are the game. Nothing that only decorates a
+  round can lose it again. `plays.emu.test.ts` pins the separation by asserting
+  there is a snapshot where the scores exist and the stats do not.
+- **The commit is attempted once per round, not once per snapshot** (`store.ts`,
+  `commitFailedFor`), so a rejection cannot loop. Cleared on reconnect, because
+  offline is the one cause a retry fixes.
+- **A refused commit is shown**, on the game screen as well as the sheet - the
+  write most likely to fail is the one that builds the sheet, so the sheet is not
+  there to carry its own error.
+
+**The other four:**
+
+- **The drag ghost floated above the finger on two of three iPhones.** The ghost is
+  `position: fixed` driven by `clientX/clientY`; iOS Safari resolves fixed against
+  the *visual* viewport while pointer coordinates and `getBoundingClientRect()`
+  stay in the *layout* viewport, and the two part company around an address bar
+  mid-collapse. `DragGhost` now measures where it actually rendered against where
+  the pointer actually was and translates by the difference (`ghostFix` in
+  `useDrag.ts`), in a **layout** effect so the corrected position is the first one
+  painted. It re-measures on `visualViewport` events. On a browser that was
+  already right the correction is zero - verified in Chromium, ghost centre dead
+  on the pointer.
+- **"Dropped 2 places" after round one.** Everyone starts on zero, so `rankRows`
+  was ranking the opening standings by `Object.keys` order - the order players
+  joined the room in. Movement is now counted as **overtakes with strict
+  comparisons on both sides**, so being level with somebody and then beating them
+  is not a place gained, and `previous` breaks its ties by the current order so
+  nothing slides across the sheet either. See `scoreRanks.ts`.
+- **The "no moves" note was amber.** It is `--danger` red now. The move into the
+  drop band itself had already landed in `db81ee0`, after the build they played.
+- **The Blitz count appeared twice per opponent** - beside the name and again in
+  the bubble on the pile. The bubble stays: it is attached to the pile it counts.
+
+### Requested 2026-08-27, not built
+
+Taken down verbatim in intent, with what each one collides with in the code as it
+stands. **None of these are started.** They are listed in the order they were
+asked for, which is not the order to build them in - #10 and #11 overlap heavily
+and want doing together.
+
+**#8. Retire the drop band; make the whole gap the drop zone.** Everything
+between the bottom of the grid and the top of the tableau becomes `data-drop=
+"nearest"`, with no visible box. The "no moves left" notice still appears in that
+area. *Collides with:* `.snap-band` is currently a real, sized element in
+`.grid-wrap` (`game.css`), and the grid above it is sized against the space the
+band leaves. Making the band fill the leftover space means the grid has to stop
+being `1fr`-greedy, or the band gets nothing. The band is also the only thing
+`nearestSpace` has to aim from - the drop target itself stays exactly as it is,
+this is a layout change, not a behaviour one.
+
+**#9. Glow a playable space in the card's own colour.** When somebody else plays
+to a centre space and I hold a *visible* card that could go there, that space
+glows in that card's suit colour. *Collides with:* `.pile-space.glow` is one
+fixed green today, and green on this board means one specific thing already ("the
+card you are holding lands here"); see the note in `game.css` under `.hint` about
+why a second green was refused. This wants a third visual language, not a reuse
+of either. Also note the hint (`game/hint.ts`) already answers a near-identical
+question and is host-gated behind `meta.hintsOn` - decide whether this new glow is
+free or is another host option, or the two will fight.
+
+**#10. A Home/back button out of every dead end.** From the join screen, and from
+a finished or stale game, back to the home screen. *Collides with:* the Join
+screen already has one (`.keep-back`, added for stale invites); `GameOverOverlay`
+and the lobby do not. `App.tsx`'s route effect calls `s.leave()` on the way to
+home, so the plumbing exists - this is placement, not mechanism.
+
+**#11. A ready gate in the lobby, then a 3-2-1-GO countdown.** Every player marks
+ready; when all are ready the screen counts down three seconds and shows "GO!".
+*Collides with:* `start()` is host-only today and there is no per-player lobby
+state at all. Wants a new `players/$uid/ready` (writable by its owner - the
+existing `players/$uid` rule already allows exactly that, no rules change). The
+countdown has to be driven off something every client agrees on; a server
+timestamp written once by the host is the only clock this app trusts (see the
+`awayAt` note on why client clocks are never compared).
+
+**#12. Editable name, badge and prefs in the lobby until ready.** Tap the badge
+for a grid of all eight with the taken ones greyed out; tap the name to edit it.
+Un-readying re-opens both. *Collides with:* `BadgePicker` already renders exactly
+that grid with a `taken` prop, so it can be lifted straight in. Badge *changes*
+are the hard part: `badges/$badgeId` validate is `newData.val() === auth.uid &&
+(!data.exists() || data.val() === auth.uid)`, so a player can claim a free badge
+and re-claim their own, but **nothing lets them release the old one** - swapping
+badges leaks the previous claim and blocks it for everyone, for the life of the
+room. That needs a rules change (allow a delete where `data.val() === auth.uid`)
+and a redeploy.
+
+**#13. Ready button states.** "I'm Ready" black-on-white, "Ready" black-on-green,
+"Away" black-on-yellow when the player has backgrounded the tab or switched away.
+*Collides with:* nothing - `awayAt` already exists and is already written by the
+player's own client (`AWAY_MS` in `store.ts`), but it is only armed during
+`phase === 'playing'`. A lobby ready gate needs it armed in the lobby too.
+
+**#14. Home page: shrink the room-code field so Join fits on its line.** The
+`.row` holding them already lays them out side by side; the field is what is
+greedy.
+
+**#15. Home page: move and rework the meat-space scorepad entry.** Put the button
+*below* the code field and Join, spaced down by the height of the code field.
+Rename it to "Keep score for meat space". In the keeper itself, add a second
+`-`/`+` pair stepping by 3 alongside the existing one, and rename the middle
+field's label to "dutch piles count". *Collides with:* `Keeper.tsx`'s
+`.keep-step` is a fixed `44px 1fr 44px` grid, so a second pair needs a new track
+layout rather than another button dropped in.
+
+**#16. Pre-set the wood/Blitz side in the lobby.** Keep the in-game `⇄` as it is
+and add a lobby control that sets the same preference before the round starts.
+*Collides with:* nothing - `useWoodSide` (`prefs.ts`) is device-local
+`localStorage`, readable from the lobby as easily as from the game. This is the
+cheapest item on the list.
 
 ### The idle-table hang — _fixed 2026-08-27_
 
@@ -865,14 +1025,17 @@ game is frozen, including the bot. That is inherent to a serverless design.
 
 ### Scale
 
-- Three or more players — only two have ever played, and the bots have now been
-  driven for real but only briefly.
-- Five to eight players, and the 24-space cap in practice.
+- ~~Three or more players~~ — three humans played on 2026-08-27. Five to eight is
+  still untried, and so is the 24-space cap in practice.
 - Several bots at once with a low-end phone as host — every bot turn runs there.
 
 ### Carried over, still true
 
-- iPhone Safari has never been opened.
+- **iPhone Safari has now been opened once** (2026-08-27, three phones), which is
+  where the drag-ghost offset came from. What that session did NOT cover: the
+  ghost's new self-correction, written afterwards and so far only proved on a
+  browser that never needed it; address-bar behaviour during a drag; and the red
+  "no moves" band, which needs a player genuinely stuck to appear.
 - Spec §7 touch acceptance: no pull-to-refresh, no rubber-band scroll, no
   double-tap zoom, no text selection while dragging.
 - The ledgered pointer-capture re-select check on mouse drags.
@@ -922,6 +1085,7 @@ game is frozen, including the bot. That is inherent to a serverless design.
 | `db81ee0` | Stuck alert into the drop band; orderly grid; helper hint |
 | `8bdc017` | Away in the opponent strip; 32 spaces; the hint stops nagging |
 | `d33f3c4` | Rails off the screen edge at 7-8 players; the hint returns |
+| `9492386` | The first iPhone playtest: six faults, and the rules deploy that was not |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`. The README carries setup, the security model,

@@ -64,9 +64,14 @@
 /* Stuck: the band is the one element on the board that is always present and
    already the largest, so saying it here costs no layout at all. min-height is
    kept a MINIMUM - longer copy must be able to reflow rather than clip. */
-.snap-band.stuck { opacity: 1; border-style: solid; border-color: var(--warn);
-  color: var(--warn-ink); font-weight: 700; font-size: 12px;
-  background: color-mix(in srgb, var(--warn) 9%, transparent); }
+/* Red, not amber. This is the band saying the player has nothing to play and the
+   table is waiting on the others - the strongest thing it ever says - and amber
+   against a dashed grey band was read in a playtest as no change at all. Red is
+   already the board's word for "this did not work" (the rejected-play shake, the
+   negative score column), which is the right family for it. */
+.snap-band.stuck { opacity: 1; border-style: solid; border-color: var(--danger);
+  color: var(--danger-ink); font-weight: 700; font-size: 12px;
+  background: color-mix(in srgb, var(--danger) 12%, transparent); }
 
 /* Completed piles, stacked down each side of the board. */
 .done-rail { --rail-w: clamp(16px, 4.5vw, 26px); width: var(--rail-w);
@@ -176,7 +181,6 @@
   font-size: 12px; white-space: nowrap; }
 .opp-head { display: flex; align-items: center; gap: 6px; }
 .opp.absent { opacity: .5; }
-.opp-blitz { font-weight: 800; color: var(--badge); }
 .opp-ai { font-size: 9px; font-weight: 800; letter-spacing: .06em; color: var(--ink-soft);
   border: 1px solid var(--line); border-radius: 999px; padding: 0 5px; }
 .opp-cards { display: flex; gap: 3px; align-items: flex-end;

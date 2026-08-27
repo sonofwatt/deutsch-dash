@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { createRoom, normalizeRoom, setOrderly } from './rooms';
 import { commitScores, nextRound, playToCenter, startRound } from './plays';
-import { get, ref, update } from 'firebase/database';
+import { get, onValue, ref, update } from 'firebase/database';
 import type { Card, CenterSpace, Room, Suit } from '../game/types';
 
 const emu = describe.runIf(process.env.EMULATOR === '1');
@@ -163,5 +163,49 @@ emu('the round shown in the 2026-08-25 playtest screenshot', () => {
       expect(t.wood).toHaveLength(25);
     }
     expect(afterNext.players[dave].score).toBe(24); // totals carry into round 2
+  });
+});
+
+emu('the score commit does not ride on the stats write', () => {
+  // The 2026-08-27 playtest fault. `stats` gained its own .write grant in
+  // a93e7d2; the live database was still running rules from before it. Stats went
+  // in the SAME multi-path update as the scores, a multi-path update is atomic,
+  // so one denied decoration rejected the round's scores AND every player's
+  // total. The host saw a sheet regardless (RTDB shows a write locally before the
+  // server answers it) and nobody else saw one at all.
+  //
+  // The fix is that they are two writes, scores first. This proves it from the
+  // outside: there must be a moment where the scores are committed and the stats
+  // are not, which cannot happen if the two are one write.
+  it('commits the scores in a write of their own, before the stats', async () => {
+    const code = await createRoom('Host', 'tulip');
+    const { db, ensureSignedIn } = await import('./firebase');
+    const uid = await ensureSignedIn();
+    const players = { [uid]: { name: 'Host', badgeId: 'tulip' as const, joinedAt: 1,
+                               connected: true, stuckAt: null, awayAt: null, score: 0 } };
+    const meta = { createdAt: Date.now(), hostId: uid, creatorId: uid, targetScore: 75,
+                   phase: 'roundEnd' as const, roundNumber: 1 };
+    await startRound(code, { meta: { ...meta, phase: 'lobby' }, players, round: null });
+    await update(ref(db, `rooms/${code}/meta`), { phase: 'roundEnd' });
+
+    const seen: { scores: boolean; stats: boolean }[] = [];
+    const off = onValue(ref(db, `rooms/${code}`), snap => {
+      const v = (snap.val() ?? {}) as { round?: { scores?: unknown }; stats?: unknown };
+      seen.push({ scores: v.round?.scores != null, stats: v.stats != null });
+    });
+
+    const room: Room = {
+      meta, players,
+      round: { spaces: Array.from({ length: 16 }, () => ({ stack: [] as Card[], history: [] as Card[][] })),
+               tableaus: { [uid]: { blitz: [], post: [[], [], []], wood: [], woodIndex: 0 } },
+               blitzedBy: uid, scores: null, races: null, duels: null, endedAt: null,
+               stuckRounds: 0, startedAt: 1 },
+    };
+    await commitScores(code, room);
+    off();
+
+    expect(seen.some(v => v.scores && !v.stats), 'scores and stats landed as one write').toBe(true);
+    const written = (await get(ref(db, `rooms/${code}`))).val() as { stats?: unknown };
+    expect(written.stats, 'the stats still get written, just separately').not.toBeNull();
   });
 });

@@ -53,7 +53,12 @@ export function OpponentStrip(props: {
               <span>{b.glyph}</span>
               <span>{p.name}</span>
               {p.isBot && <span className="opp-ai">AI</span>}
-              <span className="opp-blitz">{t ? t.blitz.length : '-'}</span>
+              {/* The Blitz count is NOT repeated here. It is on the pile it
+                  counts, in the bubble at its corner (see Slot) - having it in
+                  both places had players reading two numbers off one player and
+                  looking for the difference between them. The bubble wins because
+                  it is attached to the thing it describes; a bare number beside a
+                  name says nothing about which pile it belongs to. */}
               {p.stuckAt != null && <span title="stuck">⏳</span>}
             </div>
             {/* Same left-to-right order as your own tableau, so a glance across

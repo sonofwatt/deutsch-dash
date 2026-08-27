@@ -147,8 +147,9 @@ export async function commitScores(code: string, room: Room): Promise<void> {
     totals[uid] = p.score + (scores[uid]?.delta ?? 0);
     patch[`players/${uid}/score`] = totals[uid];
   }
-  // The game-long tally, in the same idempotent write as the scores, so no round
-  // can ever be counted into it twice.
+  // The game-long tally. Computed from the SAME pre-write snapshot as the scores
+  // above, which is what keeps it idempotent: two commits racing off one snapshot
+  // produce byte-identical stats, so neither can count the round twice.
   //
   // The duration is the host's own clock against a server timestamp, because
   // round/endedAt is a sentinel until this write lands - so it is thrown away
@@ -156,7 +157,7 @@ export async function commitScores(code: string, room: Room): Promise<void> {
   // "blitzed in Ns" reads endedAt - startedAt, which is server time on both ends.
   const elapsed = round.startedAt > 0 ? Date.now() - round.startedAt : 0;
   const durationMs = elapsed >= 3_000 && elapsed <= 20 * 60_000 ? elapsed : null;
-  patch.stats = nextStats(room.stats ?? null, {
+  const stats = nextStats(room.stats ?? null, {
     roundNumber: room.meta.roundNumber,
     scores, duels: round.duels, blitzedBy: round.blitzedBy,
     durationMs, stuckRounds: round.stuckRounds, totals,
@@ -164,6 +165,19 @@ export async function commitScores(code: string, room: Room): Promise<void> {
   // Ties at/above target play another round (spec: game ends only when someone stands alone on top)
   if (winnerIds(totals, room.meta.targetScore).length === 1) patch['meta/phase'] = 'gameOver';
   await update(r(code), patch);
+  // Stats go in a SECOND write, on purpose, and their failure is swallowed.
+  //
+  // They used to ride along in the patch above, and that is exactly how one
+  // missing grant took a whole game's scoring down with it: `stats` was added to
+  // database.rules.json in a93e7d2, the live database was still running rules
+  // from before it, and because a multi-path update is atomic the denied stats
+  // write rejected the scores and the totals too. The host saw a score sheet
+  // anyway - RTDB applies a write to the local cache before the server answers -
+  // and nobody else saw one at all. See "The first iPhone playtest" in handoff.md.
+  //
+  // The tally is commentary material; the scores are the game. Nothing that only
+  // decorates a round is allowed to be able to lose it again.
+  await update(r(code), { stats }).catch(() => {});
 }
 
 export function nextRound(code: string, room: Room): Promise<void> {

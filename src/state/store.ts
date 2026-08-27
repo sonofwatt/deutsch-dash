@@ -126,6 +126,13 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
   // tell "no move right now" (flip and try again) from "been through the whole
   // pile and there is nothing" - see isStuck in rules.ts.
   const flips = new Map<string, number>();
+  // `<code>/<roundNumber>` of a score commit that was REJECTED, so it is attempted
+  // once per round and not once per snapshot. A rejected write is rolled back out
+  // of the local cache, which raises a fresh snapshot, which used to re-enter the
+  // commit - a tight loop that hammered the database for as long as the round
+  // stayed on screen. Cleared when the connection comes back, because "offline" is
+  // the one cause a retry can actually fix.
+  let commitFailedFor: string | null = null;
 
   const store = createStore<GameStore>((set, get) => {
 
@@ -378,8 +385,18 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         }
 
         // (4) host commits scores once
-        if (isHost({ uid: me, room }) && phase === 'roundEnd' && room.round && !room.round.scores) {
-          void deps.commitScores(get().code!, room);
+        //
+        // Once per ROUND, not once per snapshot, and loudly when it fails. This
+        // is the write the whole round end hangs off: no scores means no sheet
+        // for anybody (RoundEndOverlay renders nothing without them) and no
+        // running totals, and it used to fail in complete silence.
+        const commitKey = `${get().code}/${room.meta.roundNumber}`;
+        if (isHost({ uid: me, room }) && phase === 'roundEnd' && room.round && !room.round.scores
+            && commitFailedFor !== commitKey) {
+          deps.commitScores(get().code!, room).catch(() => {
+            commitFailedFor = commitKey;
+            set({ actionError: 'Could not save this round\'s scores. Check your connection and try again.' });
+          });
         }
 
         // (5) creator reclaim: the creator is host whenever present, no timer needed.
@@ -428,6 +445,10 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
 
       setOnline(v) {
         set({ online: v });
+        // A dropped socket is the one reason a rejected score commit is worth
+        // retrying, so coming back re-arms it. A rules rejection will simply fail
+        // again on the next snapshot and re-latch.
+        if (v) commitFailedFor = null;
         const room = get().room;
         if (room) syncBots(room); // bots idle while we are offline, resume when back
       },
@@ -471,6 +492,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         disarmAway();
         stopBots();
         flips.clear();
+        commitFailedFor = null;
         deps.stopPresence();
         set({ code: null, room: null, tableau: null, selection: null, joinPhase: 'idle',
               botTableaus: {}, actionError: null });

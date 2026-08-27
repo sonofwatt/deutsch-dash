@@ -7,6 +7,41 @@ export interface Point { x: number; y: number }
 
 export interface DragState { card: Card; source: PlaySource; x: number; y: number }
 
+/**
+ * Where the pointer sits on the dragged card, as a fraction of the card's own
+ * box: halfway across, and a whisker above the middle so the card is not quite
+ * buried under the fingertip. Shared by the transform that positions the ghost
+ * and by `ghostFix` below, which has to know the same thing to check it landed.
+ */
+export const GHOST_ANCHOR = { x: 0.5, y: 0.55 };
+
+/**
+ * The ghost is `position: fixed` and driven by `clientX/clientY`, which by spec
+ * are the same coordinate space - so on a correct browser it lands exactly under
+ * the finger and this returns the fix unchanged.
+ *
+ * iOS Safari is not reliably a correct browser here: it resolves fixed elements
+ * against the VISUAL viewport while pointer coordinates and
+ * `getBoundingClientRect()` stay in the LAYOUT viewport, and the two part company
+ * whenever the address bar is mid-collapse or the page is pinched. The gap is a
+ * constant offset, and a playtest found it on two of three iPhones - the card
+ * floating well above the finger holding it - while a third phone and every
+ * desktop browser were fine.
+ *
+ * Rather than guess at the cause, measure the miss: `rect` is where the ghost
+ * actually rendered, `at` is where the pointer actually was, and the difference
+ * is whatever this browser did wrong. Returns the correction to translate by,
+ * accumulated onto the one already `applied` so it can be re-measured mid-drag.
+ */
+export function ghostFix(
+  rect: { left: number; top: number; width: number; height: number }, at: Point, applied: Point,
+): Point {
+  return {
+    x: applied.x + (at.x - rect.width * GHOST_ANCHOR.x - rect.left),
+    y: applied.y + (at.y - rect.height * GHOST_ANCHOR.y - rect.top),
+  };
+}
+
 export function parseDrop(el: Element | null): DropTarget | null {
   const host = el?.closest('[data-drop]');
   const v = host?.getAttribute('data-drop');

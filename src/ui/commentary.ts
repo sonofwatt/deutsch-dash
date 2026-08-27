@@ -94,7 +94,7 @@ export function commentary(input: CommentaryInput): Remark[] {
   }
 
   // --- standings -----------------------------------------------------------
-  const { previous, current, move } = rankRows(players, scores);
+  const { previous, current, move, places } = rankRows(players, scores);
   const total = (id: string) => players[id].score;
   const leader = current[0];
   const last = current[current.length - 1];
@@ -208,9 +208,11 @@ export function commentary(input: CommentaryInput): Remark[] {
       `${nameOf(last)} is playing a different, sadder game.`,
     ], [last]);
   }
-  const climber = ids.find(id => move[id] === 'up' && previous.indexOf(id) - current.indexOf(id) >= 2);
+  // Two genuine overtakes, not two rows. See rankRows: on a table where everyone
+  // was level, finishing above somebody is not passing them.
+  const climber = ids.find(id => places[id] >= 2);
   if (climber) {
-    const places = previous.indexOf(climber) - current.indexOf(climber);
+    const climbed = places[climber];
     if (current.indexOf(climber) === 0 && previous.indexOf(climber) === previous.length - 1) {
       add('comeback', 82, [
         `${nameOf(climber)} went from last to first in one round. Insufferable.`,
@@ -218,15 +220,15 @@ export function commentary(input: CommentaryInput): Remark[] {
       ], [climber]);
     } else {
       add('climb', 58, [
-        `${nameOf(climber)} climbed ${plural(places, 'place')}. Ladder acquired.`,
-        `${plural(places, 'place')} up for ${nameOf(climber)}. Somebody found a gear.`,
+        `${nameOf(climber)} climbed ${plural(climbed, 'place')}. Ladder acquired.`,
+        `${plural(climbed, 'place')} up for ${nameOf(climber)}. Somebody found a gear.`,
       ], [climber]);
     }
   }
-  const faller = ids.find(id => move[id] === 'down' && current.indexOf(id) - previous.indexOf(id) >= 2);
+  const faller = ids.find(id => places[id] <= -2);
   if (faller) {
     add('freefall', 56, [
-      `${nameOf(faller)} dropped ${plural(current.indexOf(faller) - previous.indexOf(faller), 'place')}. Gravity is undefeated.`,
+      `${nameOf(faller)} dropped ${plural(-places[faller], 'place')}. Gravity is undefeated.`,
       `A bad round for ${nameOf(faller)}, and the table noticed.`,
     ], [faller]);
   }

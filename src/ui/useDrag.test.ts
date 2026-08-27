@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseDrop, nearestOf } from './useDrag';
+import { parseDrop, nearestOf, ghostFix, GHOST_ANCHOR } from './useDrag';
 
 describe('parseDrop', () => {
   it('reads the three drop kinds off the attribute', () => {
@@ -22,5 +22,36 @@ describe('nearestOf', () => {
   });
   it('is null when nothing is a legal target', () => {
     expect(nearestOf([], 50, 50)).toBeNull();
+  });
+});
+
+describe('ghostFix', () => {
+  // A 40x56 card anchored halfway across and 55% down, dropped at (200, 300).
+  const at = { x: 200, y: 300 };
+  const where = (offX: number, offY: number) => ({
+    left: at.x - 40 * GHOST_ANCHOR.x + offX,
+    top: at.y - 56 * GHOST_ANCHOR.y + offY,
+    width: 40, height: 56,
+  });
+
+  it('asks for no correction when the ghost landed under the finger', () => {
+    expect(ghostFix(where(0, 0), at, { x: 0, y: 0 })).toEqual({ x: 0, y: 0 });
+  });
+
+  it('pulls the ghost back down when the browser floated it above the finger', () => {
+    // The iPhone case: fixed resolved 90px too high, so the card sits above the
+    // finger. The correction is the miss, negated.
+    expect(ghostFix(where(0, -90), at, { x: 0, y: 0 })).toEqual({ x: 0, y: 90 });
+  });
+
+  it('accumulates onto a correction already applied, so re-measuring converges', () => {
+    // Half the error was already taken out; only the remainder is left to add.
+    expect(ghostFix(where(0, -40), at, { x: 0, y: 50 })).toEqual({ x: 0, y: 90 });
+    // And re-measuring a ghost that is now correct leaves that correction alone.
+    expect(ghostFix(where(0, 0), at, { x: 0, y: 90 })).toEqual({ x: 0, y: 90 });
+  });
+
+  it('corrects sideways too', () => {
+    expect(ghostFix(where(12, 0), at, { x: 0, y: 0 })).toEqual({ x: -12, y: 0 });
   });
 });

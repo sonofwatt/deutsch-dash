@@ -4,7 +4,7 @@ import { useGameStore, legalTargets, gameStore } from '../../state/store';
 import { hasLegalMove } from '../../game/rules';
 import { HINT_DELAY_MS, HINT_REPEAT_MS, HINT_SHOW_MS, hintSpace } from '../../game/hint';
 import type { BadgeId } from '../../game/badges';
-import { CardView } from '../components/CardView';
+import { DragGhost } from '../components/DragGhost';
 import { CenterGrid } from '../components/CenterGrid';
 import { TableauView } from '../components/TableauView';
 import { OpponentStrip } from '../components/OpponentStrip';
@@ -32,6 +32,7 @@ export function Game() {
   const markStuck = useGameStore(s => s.markStuck);
   const lastRejected = useGameStore(s => s.lastRejected);
   const online = useGameStore(s => s.online);
+  const actionError = useGameStore(s => s.actionError);
   const noteActivity = useGameStore(s => s.noteActivity);
   const [woodSide, swapSides] = useWoodSide();
 
@@ -131,6 +132,11 @@ export function Game() {
             postHighlight={targets.posts} onSelect={select} onFlip={flip}
             onTapPost={i => void playTo({ post: i })} startDrag={startDrag} />
         </motion.div>
+        {/* A host write that was refused. It belongs on THIS screen and not only
+            on the score sheet, because the write most likely to fail is the one
+            that builds the sheet - so the sheet is not there to carry its own
+            error. Costs no layout until something has actually gone wrong. */}
+        {actionError && <p className="error" style={{ margin: '6px 0 0', fontSize: 13 }}>{actionError}</p>}
         {/* The automatic "no moves left" note is in the drop band now (CenterGrid),
             where it costs no layout. This slot carries the away note instead. */}
         {me.awayAt != null
@@ -142,12 +148,7 @@ export function Game() {
               </button>
             )}
       </div>
-      {drag && (
-        <div className="drag-ghost"
-          style={{ transform: `translate(${drag.x}px, ${drag.y}px) translate(-50%, -55%)` }}>
-          <CardView card={drag.card} badgeId={me.badgeId} />
-        </div>
-      )}
+      {drag && <DragGhost drag={drag} badgeId={me.badgeId} />}
     </div>
   );
 }

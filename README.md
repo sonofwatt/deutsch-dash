@@ -34,7 +34,10 @@ deliberately, run `VITE_USE_PROD=1 npm run dev`.
 4. Project settings -> Your apps -> Web app (</>) -> register -> copy the
    `firebaseConfig` values into `src/net/firebaseConfig.ts`.
 5. Put your project id in `.firebaserc`, then deploy the security rules:
-   `npx firebase login` and `npx firebase deploy --only database`.
+   `npx firebase login` and `npx firebase deploy --only database`. **Re-run that
+   deploy every time `database.rules.json` changes** — tests and local dev use the
+   emulator, which reads the file straight off disk, so nothing here will tell you
+   the live database is running older rules.
 6. Commit and push. Committing the config is safe: access control lives in
    `database.rules.json`, not in the config values.
 7. Authentication -> Settings -> User account management -> enable **automatic
