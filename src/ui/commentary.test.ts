@@ -91,9 +91,15 @@ describe('commentary', () => {
       ann: player('Ann', 10),
       bot: player('Botty', 40, { isBot: true, botLevel: 'easy' }),
     };
-    expect(ids(base({ players, scores: { ann: sc(2, 3), bot: sc(9, 0) } }))).toContain('easy-shame');
+    const over = { players, scores: { ann: sc(2, 3), bot: sc(9, 0) } };
+    // A bot in front stays in front, so the line alternates rather than nagging
+    // every round: exactly one of any two consecutive rounds carries it.
+    const rounds = [3, 4].map(n => ids(base({ ...over, roundNumber: n })));
+    expect(rounds.filter(r => r.includes('easy-shame'))).toHaveLength(1);
     const hard = { ...players, bot: player('Botty', 40, { isBot: true, botLevel: 'hard' }) };
-    expect(ids(base({ players: hard, scores: { ann: sc(2, 3), bot: sc(9, 0) } }))).toContain('bot-ahead');
+    const hardRounds = [3, 4].map(n =>
+      ids(base({ players: hard, scores: over.scores, roundNumber: n })));
+    expect(hardRounds.filter(r => r.includes('bot-ahead'))).toHaveLength(1);
   });
 
   it('credits whoever closed the piles, from the board rather than the scores', () => {
@@ -123,6 +129,14 @@ describe('commentary', () => {
     expect(soloAnn.length).toBeLessThanOrEqual(2);
     // A remark she shares with someone still lands: the other party has not spoken.
     expect(remarks.some(r => r.about.length > 1 && r.about.includes('ann'))).toBe(true);
+  });
+
+  it('does not fill a quiet stretch with the same line every round', () => {
+    // Nobody moving is true for as long as it is true; saying so every round is noise.
+    const still = { players: { ann: player('Ann', 30), bo: player('Bo', 10) },
+      scores: { ann: sc(0, 0), bo: sc(0, 0) } };
+    const rounds = [4, 5].map(n => ids(base({ ...still, roundNumber: n })));
+    expect(rounds.filter(r => r.includes('stasis'))).toHaveLength(1);
   });
 
   it('leads with the most interesting thing that happened', () => {
@@ -180,9 +194,13 @@ describe('commentary', () => {
     expect(textOf(base({ stats: stats({ rounds: 4, players }) }), 'never-blitzed')).toContain('Bo');
   });
 
-  it('counts the standstills across the whole game', () => {
-    expect(textOf(base({ stats: stats({ allStuck: 4 }) }), 'all-stuck')).toMatch(/\b4\b/);
-    expect(ids(base({ stats: stats({ allStuck: 2 }) }))).not.toContain('all-stuck');
+  it('counts the standstills across the whole game, in a round that had one', () => {
+    const stalled = base({ stats: stats({ allStuck: 4 }), stuckRounds: 1 });
+    expect(textOf(stalled, 'all-stuck')).toMatch(/\b4\b/);
+    expect(ids(base({ stats: stats({ allStuck: 2 }), stuckRounds: 1 }))).not.toContain('all-stuck');
+    // The running total does not change in between, and it was turning up for
+    // five rounds after the last actual standstill.
+    expect(ids(base({ stats: stats({ allStuck: 4 }), stuckRounds: 0 }))).not.toContain('all-stuck');
   });
 
   it('says nothing game-long in the first round of a game', () => {

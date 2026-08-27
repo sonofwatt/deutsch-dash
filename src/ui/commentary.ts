@@ -51,6 +51,14 @@ export function commentary(input: CommentaryInput): Remark[] {
   if (ids.length === 0) return [];
 
   const nameOf = (id: string) => players[id]?.name ?? 'Somebody';
+  /**
+   * Some facts are true for the rest of the game once they are true at all - a
+   * standing blitz record, a bot in front, a player who has not lost a race - and
+   * repeating one every round is how a carousel teaches people to ignore it.
+   * These surface on alternating rounds, staggered per rule so they do not all
+   * arrive and leave together.
+   */
+  const standing = (id: string) => (roundNumber + hash(id)) % 2 === 0;
   const out: Remark[] = [];
   const add = (id: string, priority: number, variants: string[], about: string[] = []) =>
     out.push({ id, priority, about, text: pick(variants, `${id}:${roundNumber}:${about.join()}`) });
@@ -220,7 +228,9 @@ export function commentary(input: CommentaryInput): Remark[] {
       `A bad round for ${nameOf(faller)}, and the table noticed.`,
     ], [faller]);
   }
-  if (roundNumber > 1 && ids.every(id => move[id] === null)) {
+  // Also alternated: a settled table stays settled, and this was filling a slot
+  // every round of a quiet stretch.
+  if (roundNumber > 1 && ids.every(id => move[id] === null) && standing('stasis')) {
     add('stasis', 32, [
       'Not one place changed hands. A round of quiet mutual respect.',
       'Everyone finished exactly where they started. Efficient.',
@@ -285,12 +295,12 @@ export function commentary(input: CommentaryInput): Remark[] {
     const bestBot = botIds.sort((a, b) => total(b) - total(a))[0];
     const bestHuman = humanIds.sort((a, b) => total(b) - total(a))[0];
     if (total(bestBot) > total(bestHuman)) {
-      if (players[bestBot].botLevel === 'easy') {
+      if (players[bestBot].botLevel === 'easy' && standing('easy-shame')) {
         add('easy-shame', 86, [
           `${nameOf(bestBot)} is on Easy. ${nameOf(bestBot)} is also winning. Sit with that.`,
           `Losing to the easy bot is a choice, and you have all made it.`,
         ], [bestBot]);
-      } else {
+      } else if (standing('bot-ahead')) {
         add('bot-ahead', 68, [
           `${nameOf(bestBot)} is ahead of every human here, and it does not have thumbs.`,
           `A bot is beating all of you. It is not even trying to enjoy itself.`,
@@ -333,13 +343,16 @@ export function commentary(input: CommentaryInput): Remark[] {
       const p = statsFor(stats, id);
       return p.racesLost === 0 && p.racesWon >= 2;
     });
-    if (unbeaten && stats.races >= 4) {
+    if (unbeaten && stats.races >= 4 && standing('unbeaten')) {
       add('unbeaten', 66, [
         `${nameOf(unbeaten)} has not lost a single race all game. Suspicious reflexes.`,
         `Every race ${nameOf(unbeaten)} has been in, ${nameOf(unbeaten)} has won. Nobody likes that.`,
       ], [unbeaten]);
     }
-    if (stats.fastest && stats.fastest.round !== roundNumber && players[stats.fastest.uid]) {
+    // ...and only in a round where somebody blitzed and failed to beat it, which
+    // is when the record is actually the story.
+    if (stats.fastest && stats.fastest.round !== roundNumber && players[stats.fastest.uid]
+        && blitzedBy && input.durationMs != null && standing('standing-record')) {
       add('standing-record', 48, [
         `${nameOf(stats.fastest.uid)}'s ${Math.round(stats.fastest.ms / 1000)}-second blitz is still the one to beat.`,
         `Nobody has got near ${nameOf(stats.fastest.uid)}'s ${Math.round(stats.fastest.ms / 1000)} seconds yet.`,
@@ -361,7 +374,9 @@ export function commentary(input: CommentaryInput): Remark[] {
         ], [quiet]);
       }
     }
-    if (stats.allStuck >= 3) {
+    // Only in a round the table actually stalled: the running total does not
+  // change in between, and it was turning up for five rounds after the fact.
+    if (stats.allStuck >= 3 && input.stuckRounds > 0) {
       add('all-stuck', 52, [
         `You have all seized up at the same time ${plural(stats.allStuck, 'time')} now. Impressive teamwork.`,
         `${plural(stats.allStuck, 'full standstill')} this game. The cards are not the problem.`,
