@@ -560,7 +560,10 @@ Decisions taken:
   playing.** A player who is genuinely stuck has nothing on the grid to point at,
   so nothing shows for them and the amber band speaks instead - but the moment
   somebody else's card opens a move up, the next tick of this is what says so,
-  because the hint is recomputed at render rather than stored. Any input at all
+  because the hint is recomputed at render rather than stored. **That reading of
+  "re-fire when they are stuck" is the confirmed one**: the repeat is keyed on the
+  player not acting, never on `stuckAt`, because a player with `stuckAt` set has by
+  definition no move to be shown. Do not "fix" the silence. Any input at all
   restarts the cycle from `HINT_DELAY_MS`. Measured: on at 4.6s, 14.6s and 24.6s,
   a second each, and a tap puts the next one back to five seconds out.
 - **Violet** (`--hint`), never green: green on this board means exactly one thing,
