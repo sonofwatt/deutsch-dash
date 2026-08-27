@@ -64,14 +64,14 @@
 /* Stuck: the band is the one element on the board that is always present and
    already the largest, so saying it here costs no layout at all. min-height is
    kept a MINIMUM - longer copy must be able to reflow rather than clip. */
-/* Red, not amber. This is the band saying the player has nothing to play and the
-   table is waiting on the others - the strongest thing it ever says - and amber
-   against a dashed grey band was read in a playtest as no change at all. Red is
-   already the board's word for "this did not work" (the rejected-play shake, the
-   negative score column), which is the right family for it. */
-.snap-band.stuck { opacity: 1; border-style: solid; border-color: var(--danger);
-  color: var(--danger-ink); font-weight: 700; font-size: 12px;
-  background: color-mix(in srgb, var(--danger) 12%, transparent); }
+/* Amber, and it stays amber. Red was tried here after the 2026-08-27 playtest
+   and taken straight back out on sight: red on this board means "that did not
+   work" (the rejected-play shake, the negative score column), and having nothing
+   to play is not an error the player has made. Amber is the right register - it
+   is a wait, not a fault. */
+.snap-band.stuck { opacity: 1; border-style: solid; border-color: var(--warn);
+  color: var(--warn-ink); font-weight: 700; font-size: 12px;
+  background: color-mix(in srgb, var(--warn) 9%, transparent); }
 
 /* Completed piles, stacked down each side of the board. */
 .done-rail { --rail-w: clamp(16px, 4.5vw, 26px); width: var(--rail-w);

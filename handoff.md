@@ -396,8 +396,11 @@ Three things changed in the code so this cannot bite that hard again:
   comparisons on both sides**, so being level with somebody and then beating them
   is not a place gained, and `previous` breaks its ties by the current order so
   nothing slides across the sheet either. See `scoreRanks.ts`.
-- **The "no moves" note was amber.** It is `--danger` red now. The move into the
-  drop band itself had already landed in `db81ee0`, after the build they played.
+- **The "no moves" note.** The move into the drop band had already landed in
+  `db81ee0`, after the build they played, so this one was reported against code
+  that no longer existed. The request also asked for the band to turn red; it was
+  changed and then reverted on sight, and it stays amber - red on this board means
+  "that did not work", and having nothing to play is not the player's error.
 - **The Blitz count appeared twice per opponent** - beside the name and again in
   the bubble on the pile. The bubble stays: it is attached to the pile it counts.
 
@@ -1034,7 +1037,7 @@ game is frozen, including the bot. That is inherent to a serverless design.
 - **iPhone Safari has now been opened once** (2026-08-27, three phones), which is
   where the drag-ghost offset came from. What that session did NOT cover: the
   ghost's new self-correction, written afterwards and so far only proved on a
-  browser that never needed it; address-bar behaviour during a drag; and the red
+  browser that never needed it; address-bar behaviour during a drag; and the
   "no moves" band, which needs a player genuinely stuck to appear.
 - Spec §7 touch acceptance: no pull-to-refresh, no rubber-band scroll, no
   double-tap zoom, no text selection while dragging.

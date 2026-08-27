@@ -21,7 +21,7 @@ export const HINT_SHOW_MS = 1000;
 /**
  * And again this often, for as long as the player goes on not playing. A player
  * who is genuinely stuck has nothing on the grid to point at, so nothing shows
- * for them and the red band in the drop band is what speaks instead - but the
+ * for them and the amber band in the drop band is what speaks instead - but the
  * moment somebody else's card opens a move up, the next tick of this is what
  * says so. Any input at all restarts the whole cycle from HINT_DELAY_MS.
  */
