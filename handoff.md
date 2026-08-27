@@ -312,32 +312,67 @@ Note what is *not* broken: a player who closes the tab stops blocking, because
 idle - a phone face-up on the table - which is exactly what happens when someone
 goes to make tea.
 
-**Decide before coding.** A player with legal moves who is not playing is not
-stuck; the game waiting for them is correct, and only becomes a hang when they
-have actually gone. So the question is what stands in for "gone":
+**Decided: fix it as presence, not as stuckness.** A player with legal moves who
+is not playing is not stuck, and the game waiting for them is correct right up
+until they have gone - so the thing to detect is that they have gone, and
+`allConnectedStuck` already knows how to ignore a player who is not there. It
+filters on `connected`; it will filter on away as well.
 
-- An idle timeout that counts a player as stuck after N seconds of no action,
-  but only while every other connected player is already stuck. Least
-  disruptive, and it does nothing in a game where people are playing.
-- Let the host force the rotation when everyone *else* has been stuck for N
-  seconds. Same effect, decided in one place, but it is the host acting for
-  somebody else.
-- Do nothing in the round, and treat it as a presence problem: mark a player
-  away after N seconds of no input and let `allConnectedStuck` ignore them. This
-  one also fixes the same hang for a player who backgrounded the tab without
-  disconnecting.
+The two alternatives were rejected: marking an idle player *stuck* would put a
+"no moves left" note on the screen of somebody who has plenty, and having the
+host force a rotation on everyone else's behalf puts one client in charge of a
+judgement about another.
 
-**Watch:** `flips` is a closure-scoped `Map` in `createGameStore` that is never
+**The shape of it.**
+
+- **A player's own client marks it.** It is the only one that knows when it last
+  acted, and using its own clock for its own timer means there is no cross-device
+  timestamp comparison anywhere in this - which is exactly why the existing
+  `HOST_AWAY_MS` watchdog uses a local `setTimeout` and not a stored time.
+- `PlayerInfo` gains `awayAt: number | null`, written to `players/$uid/awayAt`.
+  **No rules change**: a player may already write their own record, and the
+  `.validate` there only gates *new* players joining. `normalizeRoom` defaults it,
+  like `stuckAt`.
+- Reset it on any real sign of life, not just a successful play: plays, flips,
+  post moves and a pointerdown anywhere on the board. A player thinking hard for
+  a minute is present, and marking them away would be wrong even if harmless.
+- `allConnectedStuck` skips away players the way it skips disconnected ones. If
+  everybody is away it returns false and nothing happens, which is right.
+- **Never mark a bot away.** Bots are driven by the host and either act or are
+  stuck; an away bot would be a bug in the host, not a player who wandered off.
+- Suggested timeout: **45 seconds**, tunable. A played round takes about two
+  minutes, so three quarters of a minute of nothing is already unusual. A flat
+  timer is fine - being away is a fact about you, not about the table - because
+  it has no effect at all unless everyone else is stuck.
+
+**Why this also fixes a case the other two options miss:** a player who
+backgrounds the tab without the socket dropping is present, silent, and blocking.
+Note the flip side, and why this is not a complete answer: a phone that locks
+hard freezes its timers, so that client cannot mark itself away either. In
+practice that one usually drops the socket and `connected` catches it - but if
+the hang ever shows up again with a locked phone at the table, that is the gap.
+
+**Say so on the away player's own screen.** If the table rotated without them,
+"Away - tap to rejoin the round" explains the board they come back to. Cheap, and
+without it the return is confusing.
+
+**Watch:** `flips` is a closure-scoped `Map` in `createGameStore`, never
 persisted, so it resets to zero on any reload - a player who reloads mid-round
-starts again from "has not been round their wood". Whatever the fix, it should
-not make a reload look like activity. And `syncStuck` writes stuck claims
-automatically: anything that marks a player stuck also puts a note on their
-screen saying so, which for an idle player is the right message at the wrong
-time.
+starts again from "has not been round their wood". A reload must not count as
+activity either: the away timer should start from the reload, not be cleared by
+it, or a player whose tab reloads itself every so often is never away.
 
-**Repro script:** `/tmp/pw/realround.mjs` from this session - create a room, add
-two bots, start, and wait. See the live-app recipe under "What still needs
-testing".
+Also: `syncStuck` writes stuck claims automatically and `startPresence` owns
+`players/$uid/connected` through `onDisconnect`. The away flag is a third thing
+written to the same player record from a third place - keep it out of both, and
+do not try to express it by writing `connected: false`, which would fight the
+`onDisconnect` handler and make a present player look gone to the host watchdog.
+
+**Repro:** it is four lines of the live-app harness under "What still needs
+testing" - create a room, add two bots, click Start, then
+`page.waitForSelector('.sheet', { timeout: 300_000 })` and watch it time out.
+Touch nothing. (The script that found it lived in `/tmp` and is gone; it was not
+worth keeping, because the recipe is the reusable part.)
 
 ### 1. Move the recycle button to the bottom right — _retired 2026-08-26_
 
