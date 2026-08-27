@@ -526,8 +526,6 @@ lobby reads it as easily as the game does. Deliberately not disabled for
 non-hosts and not a room option: it is about the phone in your hand. The board's
 `⇄` stays exactly as it was.
 
----
-
 ### The idle-table hang — _fixed 2026-08-27_
 
 **Was:** one human client, two medium bots, the human doing nothing. Five minutes
