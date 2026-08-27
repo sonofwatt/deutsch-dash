@@ -11,6 +11,7 @@ import { OpponentStrip } from '../components/OpponentStrip';
 import { ConnectionPill } from '../components/ConnectionPill';
 import { nearestSpace, useDrag, type DropTarget, type Point } from '../useDrag';
 import { raceFlashes } from '../raceFlash';
+import { useOpenings } from '../openings';
 import { useWoodSide } from '../prefs';
 import type { PlaySource } from '../../game/types';
 import '../game.css';
@@ -93,6 +94,10 @@ export function Game() {
   if (!round || !hand) return <div className="screen"><p className="muted">dealing…</p></div>;
 
   const races = raceFlashes({ races: round.races, spaces: round.spaces, uid, lastRejected });
+  // Called after the early return above, which is safe only because that return
+  // is unconditional for the whole life of a round: no round means no board and
+  // no hand, and the screen is the "dealing…" placeholder either way.
+  const openings = useOpenings(round.spaces, hand, uid);
   const active = drag ? drag.source : selection;
   const targets = active ? legalTargets(hand, active, round.spaces) : { spaces: [], posts: [] };
   const stuckAvailable = !hasLegalMove(hand, round.spaces);
@@ -123,6 +128,7 @@ export function Game() {
       <CenterGrid spaces={round.spaces} highlight={targets.spaces} badgeOf={badgeOf}
         onTap={i => void playTo({ space: i })} races={races}
         snapping={targets.spaces.length > 0} stuck={me.stuckAt != null} hint={hint}
+        openings={openings}
         onSnapTap={() => { if (targets.spaces.length) void playTo({ space: targets.spaces[0] }); }} />
       <div>
         <motion.div key={lastRejected?.at ?? 0}

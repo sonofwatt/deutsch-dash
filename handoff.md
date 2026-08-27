@@ -8,7 +8,7 @@ for a day, so anything it changed - the keeper's round timer, the wood/Blitz sid
 picker - was "built" but not live; check `git status -sb` before trusting a
 playtest._
 
-_**272 tests green** (250 unit + 22 emulator). This is the only place in the repo
+_**282 tests green** (260 unit + 22 emulator). This is the only place in the repo
 that quotes a count — it drifted three separate ways when it lived in four
 places, so keep it here and nowhere else._
 
@@ -321,7 +321,11 @@ deliberate.
 
 The first three-humans-on-iPhones playtest happened on 2026-08-27, on a build
 older than `92f57d0`. It produced six faults (all now fixed - see "The first
-iPhone playtest" below) and nine feature requests, none of which are built yet.
+iPhone playtest" below) and nine feature requests, **all nine of which are now
+built**. Every one has been driven in a real browser against the emulator; none
+has been played by humans. The notes below are kept because they say WHY each
+one is shaped the way it is, and one of them (#9) carries an open question worth
+settling at the next table.
 
 The seven requests from the earlier rounds are all settled: **#1 retired**,
 **#4 deferred**, and **#2, #3, #5, #6, #7 built**. Numbering is kept as-is so
@@ -404,32 +408,52 @@ Three things changed in the code so this cannot bite that hard again:
 - **The Blitz count appeared twice per opponent** - beside the name and again in
   the bubble on the pile. The bubble stays: it is attached to the pile it counts.
 
-### Requested 2026-08-27, not built
+### Requested 2026-08-27 — all built
 
-Taken down verbatim in intent, with what each one collides with in the code as it
-stands. **None of these are started.** They are listed in the order they were
-asked for, which is not the order to build them in - #11, #12 and #13 are one
-lobby overhaul and want doing together.
+Taken down verbatim in intent, and kept here with what each one turned out to
+collide with. Listed in the order they were asked for, which was not the order
+they were built in: #10/#14/#15/#16 first (self-contained), then #11/#12/#13 as
+one lobby overhaul, then #8/#9 as one board change.
 
-**#8. Retire the drop band; make the whole gap the drop zone.** Everything
-between the bottom of the grid and the top of the tableau becomes `data-drop=
-"nearest"`, with no visible box. The "no moves left" notice still appears in that
-area. *Collides with:* `.snap-band` is currently a real, sized element in
-`.grid-wrap` (`game.css`), and the grid above it is sized against the space the
-band leaves. Making the band fill the leftover space means the grid has to stop
-being `1fr`-greedy, or the band gets nothing. The band is also the only thing
-`nearestSpace` has to aim from - the drop target itself stays exactly as it is,
-this is a layout change, not a behaviour one.
+**#8. Retire the drop band; make the whole gap the drop zone.** — _built 2026-08-27._ The dashed box captioned "drop here" is gone. The
+whole board area is the target now, and the grid sits INSIDE it - which is the
+only arrangement that works, because `parseDrop` walks *up* from whatever is
+under the finger, so a sibling overlay is invisible to `closest()` however it is
+stacked. Nesting it also made the gaps *between* slots droppable, which they
+never were.
 
-**#9. Glow a playable space in the card's own colour.** When somebody else plays
-to a centre space and I hold a *visible* card that could go there, that space
-glows in that card's suit colour. *Collides with:* `.pile-space.glow` is one
-fixed green today, and green on this board means one specific thing already ("the
-card you are holding lands here"); see the note in `game.css` under `.hint` about
-why a second green was refused. This wants a third visual language, not a reuse
-of either. Also note the hint (`game/hint.ts`) already answers a near-identical
-question and is host-gated behind `meta.hintsOn` - decide whether this new glow is
-free or is another host option, or the two will fight.
+The grid keeps the position it always had (centred), so nothing moved. The zone
+is invisible at rest and only speaks when it has something to say: a soft green
+wash plus a caption while a held card has somewhere to go, and the stuck note -
+still amber - when it has not. The note is in the zone's second grid row so it
+sits at the tableau end and can never land on the grid.
+
+**Watch:** each slot's `onClick` now calls `stopPropagation`, because it is
+inside the zone's click handler. Without it a tap on a slot also ran `onSnapTap`.
+That was harmless in practice - `playTo` clears the selection synchronously, so
+the second call finds nothing to play - but it is one refactor away from not
+being. `render.test.ts` pins the nesting itself, not a class name.
+
+**#9. Glow a playable space in the card's own colour.** — _built 2026-08-27._ A space somebody else just played to, that this
+player can use, gets a ring in the colour of the card now sitting on it. See
+`openings.ts`.
+
+**It is about the CHANGE, not about the board.** Three things all have to be
+true: the top card actually changed, somebody else put it there, and I hold a
+visible card that fits. A standing highlight of every playable space would be
+the game played for you; this is "that moved, and it is for you" on a board of
+up to 32 slots where a card landing is genuinely easy to miss.
+
+The colour is the space's new top card, so it needs no third visual language -
+it is not the green that means "the card in your hand lands here" and not the
+violet hint. `useOpenings` derives it DURING RENDER off the identity of
+`round.spaces` (React's "adjust state when a prop changes" pattern), because a
+snapshot is already causing a render and an effect would only be a second one.
+
+**Open question for the next playtest:** it is NOT gated behind `meta.hintsOn`,
+unlike the helper hint. Bot difficulty was tuned against a human without hints,
+and this is an advantage even if a small and passive one. Gating it is a
+one-line change if it reads as too strong.
 
 **#10. A Home/back button out of every dead end.** — _built 2026-08-27._ The Join
 screen already had one. Added to the lobby, the round-end sheet and the game-over

@@ -100,20 +100,42 @@ describe('CenterGrid', () => {
     expect(html).toContain('data-drop="space:2"');
     expect(html).toContain('data-drop="nearest"');
   });
-  it('says "no moves left" inside the drop band, not under the tableau', () => {
+  it('wraps the grid in the drop zone, so the gaps between slots are droppable too', () => {
+    // parseDrop walks UP from whatever is under the finger, so the only way a
+    // point between two slots resolves to "nearest" is for the zone to be an
+    // ANCESTOR of the grid. A sibling overlay is invisible to closest() however
+    // it is stacked, which is why this is asserted on the nesting and not on a
+    // class. A slot still carries its own target, and still wins, being deeper.
+    const zoneAt = html.indexOf('data-drop="nearest"');
+    const gridAt = html.indexOf('class="game-grid"');
+    const slotAt = html.indexOf('data-drop="space:0"');
+    expect(zoneAt).toBeGreaterThan(-1);
+    expect(zoneAt).toBeLessThan(gridAt);
+    expect(gridAt).toBeLessThan(slotAt);
+  });
+
+  it('says "no moves left" in the drop zone, not under the tableau', () => {
     // It used to be a <p> below the tableau, which shoved the whole board up the
-    // screen the moment it appeared. The band is always there, so this costs
-    // nothing; and a stuck player has no legal targets, so the band is never lit
-    // and hinting "drop here" at the same time.
+    // screen the moment it appeared. The zone is always there, so this costs
+    // nothing; and a stuck player has no legal targets, so it is never washed
+    // green and saying "no moves left" at the same time.
     const stuck = renderToStaticMarkup(createElement(CenterGrid, {
       spaces, highlight: [], badgeOf: () => 'star' as const, onTap: noop, onSnapTap: noop, stuck: true,
     }));
-    expect(stuck).toContain('snap-band stuck');
+    expect(stuck).toContain('drop-zone stuck');
     expect(stuck).toContain('No moves left');
-    expect(stuck).not.toContain('drop here');
     expect(stuck).not.toContain('stuck-note');
-    expect(html).toContain('drop here');       // and the ordinary board still says its piece
+    // At rest it says nothing at all - it is a target, not a caption. The old
+    // permanent "drop here" box is what this replaced.
+    expect(html).not.toContain('drop here');
     expect(html).not.toContain('No moves left');
+    expect(html).toContain('data-drop="nearest"');
+    // ...and only speaks up when a held card actually has somewhere to go.
+    const snapping = renderToStaticMarkup(createElement(CenterGrid, {
+      spaces, highlight: [0], badgeOf: () => 'star' as const, onTap: noop, onSnapTap: noop, snapping: true,
+    }));
+    expect(snapping).toContain('drop-zone on');
+    expect(snapping).toContain('nearest space');
   });
   it('marks only the hinted space, and in its own colour', () => {
     const hinted = renderToStaticMarkup(createElement(CenterGrid, {

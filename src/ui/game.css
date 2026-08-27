@@ -24,8 +24,9 @@
    column count comes from the player count (gridColumns), so a slot has to shrink
    below --card-w when the columns would not otherwise fit - hence the container
    query on the wrapper rather than a plain vw sum. */
-.grid-wrap { container-type: inline-size; display: grid; grid-template-rows: 1fr auto;
-  min-height: 0; min-width: 0; }
+/* One row now: the drop zone fills it, and the grid is centred inside the zone
+   exactly where it used to be centred here. */
+.grid-wrap { container-type: inline-size; display: grid; min-height: 0; min-width: 0; }
 .game-grid { --gap: clamp(4px, 1.4vw, 10px);
   --slot: min(var(--card-w), calc((100cqw - (var(--cols) - 1) * var(--gap)) / var(--cols)));
   display: grid; grid-template-columns: repeat(var(--cols), var(--slot));
@@ -33,15 +34,21 @@
 .game-grid > * { --card-w: var(--slot); }
 
 /* Drop target that places a card in the nearest space it can legally land in.
-   Always present so it is a stable target; lit only when the held card has
-   somewhere to go. Deliberately tall - it is aimed at mid-drag with a thumb, and
-   the height is capped against viewport height so a short screen keeps its grid. */
-.snap-band { margin-top: 6px; min-height: clamp(44px, 9vh, 72px); border-radius: var(--radius);
-  border: 2px dashed var(--pile-line); display: grid; place-items: center;
-  font-size: 11px; color: var(--ink-soft); opacity: .3;
-  transition: opacity .15s ease, border-color .15s ease, background-color .15s ease; }
-.snap-band.on { opacity: 1; border-color: #22c55e; color: var(--ink);
-  background: rgb(34 197 94 / .07); }
+   It is the whole gap between the grid and the tableau now, and it has no border:
+   a permanently drawn dashed box captioned "drop here" was furniture, and on a
+   crowded board it was furniture in the way. Invisible at rest, a soft wash while
+   a held card has somewhere to go, and the stuck note when it has not.
+
+   min-height keeps it a usable thumb target on a short screen where the grid has
+   eaten most of the column. */
+.drop-zone { border-radius: var(--radius); min-height: 0; min-width: 0;
+  display: grid; grid-template-rows: 1fr auto; justify-items: center;
+  font-size: 11px; color: var(--ink-soft);
+  transition: background-color .15s ease, color .15s ease; }
+.drop-zone.on { color: var(--ink); background: rgb(34 197 94 / .07); }
+/* The zone's own caption, in the second row so it sits at the tableau end and
+   can never land on the grid. Reserves nothing when there is nothing to say. */
+.drop-note { padding: 6px 8px; text-align: center; }
 /* The helper hint: a slow violet breath around the space a card could go into.
    Violet and not green, because green on this board means one specific thing -
    "the card in your hand lands here" - and a second green would erode it. */
@@ -69,9 +76,8 @@
    work" (the rejected-play shake, the negative score column), and having nothing
    to play is not an error the player has made. Amber is the right register - it
    is a wait, not a fault. */
-.snap-band.stuck { opacity: 1; border-style: solid; border-color: var(--warn);
-  color: var(--warn-ink); font-weight: 700; font-size: 12px;
-  background: color-mix(in srgb, var(--warn) 9%, transparent); }
+.drop-zone.stuck { color: var(--warn-ink); font-weight: 700; font-size: 12px;
+  background: color-mix(in srgb, var(--warn) 8%, transparent); }
 
 /* Completed piles, stacked down each side of the board. */
 .done-rail { --rail-w: clamp(16px, 4.5vw, 26px); width: var(--rail-w);
@@ -192,6 +198,23 @@
 .opp-count { position: absolute; bottom: -2px; right: -2px; background: var(--accent);
   color: var(--bg); font-size: 9px; font-weight: 800; border-radius: 999px;
   min-width: 14px; height: 14px; display: grid; place-items: center; padding: 0 3px; }
+
+/* A space somebody else just played to that this player can use, in the colour of
+   the card now sitting on it (see openings.ts). A ring that swells once and goes:
+   it is a "that moved, and it is for you" tap on the shoulder, not a standing
+   highlight of everywhere you could play - that would be the game played for you.
+   Removed from the DOM by its own key when a newer one replaces it. */
+.open-glow { position: absolute; inset: calc(-1 * var(--slot-border)); border-radius: var(--radius);
+  pointer-events: none; z-index: 2; border: 2px solid var(--open); opacity: 0;
+  animation: open-swell 1.1s ease-out; }
+@keyframes open-swell {
+  0%   { opacity: 0; box-shadow: 0 0 0 0 var(--open); }
+  22%  { opacity: 1; box-shadow: 0 0 9px 2px var(--open); }
+  100% { opacity: 0; box-shadow: 0 0 0 0 var(--open); }
+}
+/* Same reasoning as the hint and the race face: MotionConfig does not reach CSS
+   keyframes, so the still frame has to be the correct one - nothing at all. */
+@media (prefers-reduced-motion: reduce) { .open-glow { animation: none; } }
 
 /* Who won the race for this space. One second, then it is simply gone: the
    animation's own end state is the timer, so no effect has to clear anything.

@@ -4,6 +4,7 @@ import { cardId, type Card, type CenterSpace } from '../../game/types';
 import { EMOJI, type BadgeId } from '../../game/badges';
 import { orderlyColumns } from '../../game/rules';
 import type { RaceFlash } from '../raceFlash';
+import type { Opening } from '../openings';
 
 /**
  * Columns for a board of `count` spaces (4 x players, capped - see
@@ -67,6 +68,8 @@ export function CenterGrid(props: {
   // One colour per column. The suits themselves come off the spaces, which is
   // where the rule lives; this only decides the column count.
   orderly?: boolean;
+  // Spaces somebody else just played to that this player can use. See openings.ts.
+  openings?: Record<number, Opening>;
 }) {
   const done = props.spaces.flatMap(s => s.history);
   // split alternately so both rails grow together rather than one filling first
@@ -77,6 +80,18 @@ export function CenterGrid(props: {
     <div className={`board${props.spaces.length > CROWDED_SPACES ? ' crowded' : ''}`}>
       <DoneRail runs={left} />
       <div className="grid-wrap">
+        {/* The drop zone is the WHOLE board area and the grid sits inside it, which
+            is the only arrangement that makes every pixel between the slots a
+            target: parseDrop walks UP from whatever is under the finger, so a
+            sibling overlay would be invisible to it however it was stacked.
+
+            It used to be a dashed box captioned "drop here" below the grid,
+            permanently drawn whether it was usable or not. Now it is invisible at
+            rest and only speaks when it has something to say - a soft wash while
+            you hold a card that fits somewhere, and the stuck note when you hold
+            nothing that does. The grid keeps the position it always had. */}
+        <div className={`drop-zone${props.snapping ? ' on' : ''}${props.stuck ? ' stuck' : ''}`}
+          data-drop="nearest" onClick={props.onSnapTap}>
         <div className="game-grid"
           style={{ ['--cols' as string]: String(gridColumns(props.spaces.length, props.orderly)) }}>
           {props.spaces.map((s, i) => {
@@ -85,7 +100,11 @@ export function CenterGrid(props: {
             // card's own number already says how deep a centre pile is.
             const layers = depthLayers(s.stack.length, 2);
             return (
-              <div key={i} data-drop={`space:${i}`} onClick={() => props.onTap(i)}
+              <div key={i} data-drop={`space:${i}`}
+                // Stops the tap reaching the drop zone underneath, which would
+                // otherwise ALSO snap-play into whichever space happened to be
+                // first legal - two cards gone on one tap.
+                onClick={e => { e.stopPropagation(); props.onTap(i); }}
                 // The suit tint is the whole point of an orderly board and has to
                 // read while the space is EMPTY - once a card is down its own face
                 // says the colour. So it goes on the slot, not on the card.
@@ -107,19 +126,26 @@ export function CenterGrid(props: {
                     {(props.races[i].kind === 'angry' ? '😠' : '😇') + EMOJI}
                   </span>
                 )}
+                {/* Its own element for the same reason the race face is: a class
+                    toggled on the slot cannot replay its animation, and a second
+                    opening on the same space has to be seen. Keyed by the nonce,
+                    so it remounts. */}
+                {props.openings?.[i] && (
+                  <span key={props.openings[i].at} className="open-glow"
+                    style={{ ['--open' as string]: `var(--suit-${props.openings[i].suit})` }} />
+                )}
               </div>
             );
           })}
         </div>
-        {/* Drop a card anywhere along here and it snaps to the nearest space it
-            can legally land in - which for an Ace is simply the closest free one. */}
-        <div className={`snap-band${props.snapping ? ' on' : ''}${props.stuck ? ' stuck' : ''}`}
-          data-drop="nearest" onClick={props.onSnapTap}>
-          {/* The stuck alert lives HERE rather than under the tableau, where it used
-              to shove the whole board up the screen the moment it appeared. A stuck
-              player has no legal targets, so the band is never lit at the same time
-              and the two messages cannot collide. */}
-          <span>{props.stuck ? 'No moves left — waiting for the others' : 'drop here → nearest space'}</span>
+        {/* Down at the tableau end of the zone, where the old band used to be, so
+            a stuck player reads it without looking away from their own cards -
+            and so it never lands on top of the grid. */}
+        {(props.stuck || props.snapping) && (
+          <span className="drop-note">
+            {props.stuck ? 'No moves left — waiting for the others' : 'drop anywhere here → nearest space'}
+          </span>
+        )}
         </div>
       </div>
       <DoneRail runs={right} />
