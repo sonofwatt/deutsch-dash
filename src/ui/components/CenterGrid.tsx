@@ -71,6 +71,7 @@ export function CenterGrid(props: {
   // Spaces somebody else just played to that this player can use. See openings.ts.
   openings?: Record<number, Opening>;
 }) {
+  const cols = gridColumns(props.spaces.length, props.orderly);
   const done = props.spaces.flatMap(s => s.history);
   // split alternately so both rails grow together rather than one filling first
   const left = done.filter((_, i) => i % 2 === 0);
@@ -93,7 +94,12 @@ export function CenterGrid(props: {
         <div className={`drop-zone${props.snapping ? ' on' : ''}${props.stuck ? ' stuck' : ''}`}
           data-drop="nearest" onClick={props.onSnapTap}>
         <div className="game-grid"
-          style={{ ['--cols' as string]: String(gridColumns(props.spaces.length, props.orderly)) }}>
+          // Rows as well as columns: the slot is sized against the height the
+          // board has as well as its width, and CSS cannot count grid rows.
+          style={{
+            ['--cols' as string]: String(cols),
+            ['--rows' as string]: String(Math.max(1, Math.ceil(props.spaces.length / cols))),
+          }}>
           {props.spaces.map((s, i) => {
             const top = s.stack[s.stack.length - 1];
             // Capped at two: the peek only has the grid gap to grow into, and the

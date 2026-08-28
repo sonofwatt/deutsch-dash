@@ -99,7 +99,7 @@ export function TableauView(props: {
   const ends = props.woodSide === 'left'
     ? [woodGroup, ...postGroups, blitzGroup]
     : [blitzGroup, ...postGroups, woodGroup];
-  return (
-    <div className={`tableau-zone${t.post.length >= 5 ? ' tight' : ''}`}>{ends}</div>
-  );
+  // The pile count and its gap are set on .game (Game.tsx), because --hand-card
+  // is defined there - the drag ghost is a sibling of this and needs the same one.
+  return <div className="tableau-zone">{ends}</div>;
 }

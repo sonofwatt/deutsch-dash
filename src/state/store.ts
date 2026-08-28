@@ -189,6 +189,9 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
       if (room.meta.phase !== 'playing' || !room.round) return;
       const p = room.players[id];
       if (!p) return;
+      // A player sitting out still HAS a hand (it is what they rejoin with), so
+      // without this they would be declared stuck for a round they are not in.
+      if (p.sittingOut) return;
       const stuck = isStuck(t, room.round.spaces, flips.get(id) ?? 0);
       if (stuck && p.stuckAt == null) void deps.declareStuck(code, id);
       else if (!stuck && p.stuckAt != null) void deps.clearStuck(code, id);
@@ -598,6 +601,10 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         // The board stays on screen under the blitz splash for over a second after
         // the round ends, and the splash does not take pointer events.
         if (get().room?.meta.phase !== 'playing') return;
+        // Sitting out keeps the hand so it can be rejoined, so the hand alone is
+        // no longer proof this player is in the round. The screen does not offer
+        // the board, but this is the rule rather than the screen.
+        if (myPlayer(get())?.sittingOut) return;
         const { tableau, selection, code, uid, room } = get();
         if (!tableau || !selection || !code || !uid) return;
         noteActivity();
@@ -680,12 +687,10 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
       setSittingOut(on) {
         const { code, uid } = get();
         if (!code || !uid) return;
-        // Drop the hand locally in the same breath as the write. The snapshot
-        // that removes it is a round trip away, and the board must not stay
-        // playable in between - a card played out of a hand that is being
-        // deleted would land in the centre owned by somebody no longer in the
-        // round. Coming back does NOT restore it: the next deal does that.
-        if (on) set({ tableau: null, selection: null });
+        // The hand is KEPT - it is what they rejoin the round with - so this only
+        // drops the selection. The board stops being reachable because the screen
+        // switches to the watcher view on the flag, and playTo refuses on it.
+        if (on) set({ selection: null });
         hostAction(deps.setSittingOut(code, uid, on), 'change whether you are sitting out');
       },
       setPaleCards(on) { const c = get().code; if (c) void deps.setPaleCards(c, on); },

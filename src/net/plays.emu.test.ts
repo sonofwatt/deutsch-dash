@@ -211,11 +211,12 @@ emu('the score commit does not ride on the stats write', () => {
 });
 
 emu('sitting out leaves the round in progress', () => {
-  // Two claims worth checking against the real rules rather than reasoning
-  // about: that a player can delete their OWN tableau mid-round (both paths of
-  // setSittingOut are their own, so it needs no host), and that having no
-  // tableau is genuinely what makes commitScores leave their total alone.
-  it('deletes the hand, and the round then scores without them', async () => {
+  // The claim worth checking against the real rules rather than reasoning about:
+  // that a round played without somebody moves their total NOT AT ALL, while
+  // their hand is still sitting there for them to come back to. The hand is kept
+  // on purpose - re-dealing one would mint duplicates of the cards they already
+  // have in the middle, same owner, same cardId, playable twice.
+  it('keeps the hand, and the round scores without them', async () => {
     const code = await createRoom('Dave', 'tulip');
     const { db, ensureSignedIn } = await import('./firebase');
     const dave = await ensureSignedIn();
@@ -239,12 +240,21 @@ emu('sitting out leaves the round in progress', () => {
     expect(Object.keys((await normalizeRoom((await get(ref(db, `rooms/${code}`))).val()))!.round!.tableaus))
       .toHaveLength(2);
 
-    // Dave walks away mid-round. His own client writes both paths.
+    // Dave walks away mid-round. His own client writes it, no host involved.
     await setSittingOut(code, dave, true);
     const mid = normalizeRoom((await get(ref(db, `rooms/${code}`))).val())!;
-    expect(Object.keys(mid.round!.tableaus), 'the hand is gone').toEqual([other]);
+    expect(Object.keys(mid.round!.tableaus).sort(), 'the hand is still there to come back to')
+      .toEqual([dave, other].sort());
     expect(mid.players[dave].sittingOut).toBe(true);
     expect(mid.players[dave].ready ?? null, 'ready cleared with it').toBeNull();
+
+    // ...and he can step straight back into the round he left.
+    await setSittingOut(code, dave, false);
+    const back = normalizeRoom((await get(ref(db, `rooms/${code}`))).val())!;
+    expect(back.players[dave].sittingOut ?? null).toBeNull();
+    expect(back.round!.tableaus[dave], 'the same hand, not a fresh deal')
+      .toEqual(mid.round!.tableaus[dave]);
+    await setSittingOut(code, dave, true);   // out again for the scoring below
 
     // Sam blitzes; the round is scored.
     await update(ref(db, `rooms/${code}`), { 'round/blitzedBy': other, 'meta/phase': 'roundEnd' });
@@ -252,7 +262,7 @@ emu('sitting out leaves the round in progress', () => {
     await commitScores(code, atEnd);
     const after = normalizeRoom((await get(ref(db, `rooms/${code}`))).val())!;
 
-    expect(after.round!.scores![dave], 'no RoundScore for a player with no hand').toBeUndefined();
+    expect(after.round!.scores![dave], 'no RoundScore for a player who sat it out').toBeUndefined();
     expect(after.players[dave].score, 'his total stands exactly still').toBe(12);
     expect(after.players[other].score, 'and everyone else is scored as usual').not.toBe(5);
 

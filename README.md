@@ -115,16 +115,19 @@ harmlessly.
 ## Sitting out
 
 The **‖ button** in the top corner of the board takes you out of the round you are
-in, right now — press it twice, because it forfeits that round. Your hand goes
-back in the box, you are not scored for the round in either direction, and nobody
-waits on you. There is a plainer **Sit out the next rounds** button in the lobby
-for the same thing before a round starts.
+in, right now — press it twice, because it stops you being scored for that round.
+Nobody waits on you and the round can finish without you. There is a plainer
+**Sit out the next rounds** button in the lobby for the same thing before a round
+starts.
 
-Tap **I'm back — deal me in** and you are dealt into the next round. You cannot
-rejoin the round you left: the cards have already been dealt.
+**Your hand is kept, so you can come straight back.** Tap **I'm back — rejoin this
+round** and you pick up exactly where you left off. If the round was dealt while
+you were out you have no hand to return to, so you come back in the next one —
+the button says which case you are in.
 
-Cards you had already played to the middle stay there. Other people are building
-on them.
+A round you sat out moves your score not at all, in either direction: no penalty
+for the Blitz pile you left, no credit for what you had already played. Cards you
+had played to the middle stay there — other people are building on them.
 
 ## Host options
 

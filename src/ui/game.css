@@ -4,10 +4,32 @@
   /* Desktop was letting the grid columns stretch edge to edge, which scattered the
      centre piles across a 1920px window. Cap and centre the whole board instead. */
   width: 100%; max-width: 820px; margin-inline: auto;
-  /* Card size is bounded by viewport HEIGHT as well as width. The board is a fixed
-     four-row layout inside 100dvh, so sizing on vw alone lets a short window (a
-     laptop, a phone in landscape) push the bottom row under overflow:hidden. */
+  /* The fallback card size. The two places that matter no longer use it: the
+     centre grid sizes each slot to the space the board actually has (see
+     .game-grid), and the tableau sizes to its own row (--hand-card below). It is
+     still bounded by viewport HEIGHT as well as width, because a short window (a
+     laptop, a phone in landscape) would otherwise push a row under overflow:hidden. */
   --card-w: clamp(34px, min(12vw, 7vh), 96px);
+  /* The player's own cards, and the drag ghost, which MUST match them - the ghost
+     is a sibling of the tableau rather than a child, so it cannot inherit the
+     size and has to be given the same one.
+     Width is derived rather than queried because a container query here would
+     mean `contain` on .game, which would make it the containing block for the
+     fixed-position ghost - the exact confusion ghostFix exists to correct. The
+     board is `max-width: 820px` with the padding below, so its width is knowable
+     without one.
+     The vh term is the important one and it is deliberately mean. The wood column
+     is two cards tall, so the whole tableau row runs about 2.9 x this - and every
+     pixel of it comes off the board. On a tall window the width term binds first
+     and this never applies; on a real phone (Safari leaves about 660px, not 851)
+     it is what stops the hand eating the grid, which is the half of the board
+     that is hard to aim at. */
+  --piles: 5; --tgap: 10px;
+  --hand-w: calc(min(100vw, 820px)
+    - max(8px, env(safe-area-inset-left)) - max(8px, env(safe-area-inset-right)));
+  --hand-card: clamp(34px,
+    min(calc((var(--hand-w) - (var(--piles) - 1) * var(--tgap)) / var(--piles)), 7.5vh),
+    88px);
   user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; overflow: hidden; }
 /* The theme toggle is inside the head's pill on this screen, so nothing is
    floating over the row and no corner needs reserving. */
@@ -24,9 +46,22 @@
    query on the wrapper rather than a plain vw sum. */
 /* One row now: the drop zone fills it, and the grid is centred inside the zone
    exactly where it used to be centred here. */
-.grid-wrap { container-type: inline-size; display: grid; min-height: 0; min-width: 0; }
+/* `size`, not `inline-size`: the grid is sized against the board's HEIGHT as well
+   as its width (see --fit-h), and only a size container exposes cqh. Its own
+   height is definite - .game is a fixed 100dvh grid and this is inside one of its
+   tracks - so containing the size costs nothing. */
+.grid-wrap { container-type: size; display: grid; min-height: 0; min-width: 0; }
+/* The largest slot that fits the space the board actually has, in BOTH axes,
+   rather than a flat fraction of the viewport. At four players that was leaving
+   most of the board empty and the cards at their small-phone size on a screen
+   with room for half again as much.
+   The 34px is the drop zone's caption row, reserved whether or not it is showing:
+   sizing against the leftover would shrink every card the moment somebody picked
+   one up, which is precisely when they must not move. */
 .game-grid { --gap: clamp(4px, 1.4vw, 10px);
-  --slot: min(var(--card-w), calc((100cqw - (var(--cols) - 1) * var(--gap)) / var(--cols)));
+  --fit-w: calc((100cqw - (var(--cols) - 1) * var(--gap)) / var(--cols));
+  --fit-h: calc((100cqh - 34px - (var(--rows) - 1) * var(--gap)) / var(--rows) / 1.4);
+  --slot: clamp(34px, min(var(--fit-w), var(--fit-h)), 96px);
   display: grid; grid-template-columns: repeat(var(--cols), var(--slot));
   gap: var(--gap); justify-content: center; align-self: center; }
 .game-grid > * { --card-w: var(--slot); }
@@ -168,9 +203,11 @@
 .card.dimmed { opacity: .55; }
 .glow { border-color: #22c55e; border-style: solid; box-shadow: 0 0 0 3px rgb(34 197 94 / .35); }
 
-.tableau-zone { display: flex; gap: 10px; align-items: flex-end; justify-content: center;
-  padding-bottom: 4px; }
-.tableau-zone.tight { gap: 6px; --card-w: clamp(34px, min(11.5vw, 6vh), 72px); }
+/* Sized to its own row rather than to a fraction of the viewport, the same way
+   the grid is. --piles and --tgap come from Game.tsx, which is the only place
+   that knows how many post piles this round dealt. */
+.tableau-zone { display: flex; gap: var(--tgap); align-items: flex-end;
+  justify-content: center; padding-bottom: 4px; --card-w: var(--hand-card); }
 .pile-label { font-size: 10px; text-align: center; color: var(--ink-soft); margin-top: 3px; }
 
 /* Recycle affordance: the empty draw slot, once the face-down wood is exhausted.
@@ -254,7 +291,7 @@
 }
 
 .drag-ghost { position: fixed; left: 0; top: 0; z-index: 50; pointer-events: none;
-  will-change: transform; }
+  will-change: transform; --card-w: var(--hand-card); }
 .stuck-btn { min-height: 44px; }
 /* Sits in the stuck note's slot and is deliberately louder than it: it is read on
    return, by someone whose board may have moved while the phone lay on the table. */

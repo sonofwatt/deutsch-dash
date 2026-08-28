@@ -84,13 +84,19 @@
    .corner-btns is the same pill on every screen that has no head to hang it in.
    Grouping only: each button is still one tap. */
 .head-btns { margin-left: auto; }
+/* --btn-w carries the whole width of the island: 3 x 37 + 2 gaps + 2 padding + 2
+   border = 123px, against 102px when the buttons were 30 wide. The extra 20% went
+   into the BUTTONS rather than into the gaps or the padding, so what grew is the
+   part a thumb has to hit. Height is unchanged - the head row is `auto`, and
+   growing it would take the space off the board. */
 .head-btns, .corner-btns {
+  --btn-w: 37px; --btn-h: 30px;
   display: flex; align-items: center; gap: 2px; padding: 3px;
   border: 1px solid var(--line); border-radius: 999px;
   background: var(--surface); box-shadow: var(--shadow); }
 /* Borderless inside the pill: the pill carries the edge, so three of these in a
    row read as one control strip rather than three buttons in a box. */
-.side-swap { width: 30px; height: 30px; border-radius: 999px; border: none;
+.side-swap { width: var(--btn-w, 37px); height: var(--btn-h, 30px); border-radius: 999px; border: none;
   background: none; box-shadow: none; color: var(--ink-soft);
   font-size: 15px; line-height: 1; display: grid; place-items: center; cursor: pointer;
   flex: 0 0 auto; }

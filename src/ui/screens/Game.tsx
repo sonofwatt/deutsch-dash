@@ -114,12 +114,13 @@ export function Game() {
   // whole life or never does, which sitting out is exactly the end of.
   const openings = useOpenings(round?.spaces ?? NO_SPACES, hand, uid, hintsOn);
   if (!round) return <div className="screen"><p className="muted">dealing…</p></div>;
-  // No hand in a live round means sitting out, and it is not a transient state -
-  // "dealing…" would sit there for the rest of the round. Keyed on the missing
-  // HAND rather than on the flag, so tapping "I'm back" mid-round does not drop
-  // through to that placeholder while waiting for the next deal.
-  if (!hand) {
-    const out = me?.sittingOut === true;
+  // Two ways to be off the board, and they end differently. Sitting out KEEPS the
+  // hand, so returning drops straight back into the round in progress. Having no
+  // hand at all means the deal happened without you, and no button can undo that
+  // - the cards are dealt - so that one waits for the next round.
+  const out = me?.sittingOut === true;
+  if (out || !hand) {
+    const canRejoin = out && hand != null;
     return (
       <div className="screen stack">
         <h1 className="title">{out ? 'Sitting out' : 'Back next round'}</h1>
@@ -131,11 +132,16 @@ export function Game() {
         </p>
         {out
           ? <button className="btn ready-btn" onClick={() => setSittingOut(false)}>
-              I'm back — deal me in
+              {canRejoin ? "I'm back — rejoin this round" : "I'm back — deal me in"}
             </button>
           : <button className="btn btn-slim sit-out" onClick={() => setSittingOut(true)}>
               Actually, keep me out
             </button>}
+        {out && !canRejoin && (
+          <p className="muted" style={{ fontSize: 13 }}>
+            This round was dealt without you, so you come back in the next one.
+          </p>
+        )}
         <a className="muted keep-back" href="#/">Home</a>
       </div>
     );
@@ -157,7 +163,17 @@ export function Game() {
     // net than "made a legal move" on purpose: a player weighing up the board is
     // present, and marking them away would be wrong even though it is harmless.
     <div className={`game${room.meta.paleCards ? ' pale-cards' : ''}`}
-      style={{ opacity: online ? 1 : 0.6 }}
+      // --piles/--tgap feed --hand-card in game.css, which sizes the tableau to
+      // the row it actually has. They live HERE rather than on .tableau-zone
+      // because the drag ghost is a sibling of the tableau and must be given the
+      // same size - it cannot inherit one it is not inside.
+      // Two players deal five posts (seven piles across), which is where the
+      // tighter gap is needed; every other size deals three.
+      style={{
+        opacity: online ? 1 : 0.6,
+        ['--piles' as string]: String(hand.post.length + 2),
+        ['--tgap' as string]: hand.post.length >= 5 ? '6px' : '10px',
+      }}
       onPointerDown={() => { noteActivity(); setActivity(n => n + 1); }}>
       <div className="game-head">
         <strong>Round {room.meta.roundNumber}</strong>

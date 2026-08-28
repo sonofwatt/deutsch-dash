@@ -534,6 +534,75 @@ lobby reads it as easily as the game does. Deliberately not disabled for
 non-hosts and not a room option: it is about the phone in your hand. The board's
 `⇄` stays exactly as it was.
 
+### Requested 2026-08-28 — all built
+
+**#21. Cards sized to the space, not to a fraction of the viewport.** At four
+players the board was mostly empty and every card was still at its small-phone
+size. Both halves now measure what they actually have:
+
+- The centre grid takes the largest slot that fits the board in **both axes**
+  (`--fit-w` / `--fit-h` in `.game-grid`). That needs `cqh`, which needs
+  `container-type: **size**` on `.grid-wrap` - not `inline-size`. Its height is
+  definite (`.game` is a fixed `100dvh` grid and this sits in one of its tracks),
+  so containing the size costs nothing. `--rows` is passed in from `CenterGrid`
+  because CSS cannot count grid rows.
+- The tableau sizes to its own row from `--hand-card` on `.game`, fed by
+  `--piles` and `--tgap` from `Game.tsx` - the only place that knows how many
+  posts this round dealt.
+
+**Two traps in here.** `--hand-card` lives on `.game` and NOT on `.tableau-zone`
+because **the drag ghost is a sibling of the tableau**, not a child: it cannot
+inherit a size it is not inside, and a ghost that does not match the card it came
+off is the original iPhone complaint all over again. And the width is derived
+arithmetically (`min(100vw, 820px)` minus the safe-area padding) rather than
+queried, because a container query on `.game` would mean `contain`, which would
+make `.game` the containing block for that same fixed-position ghost.
+
+**The vh cap on the hand is deliberately mean (7.5vh), and this is the whole
+balance of the change.** The wood column is two cards tall, so the tableau row
+runs about 3.7x the card size and every pixel of it comes off the board. On a
+tall window the width term binds and the cap never applies; on a real Safari tab
+it is what stops the hand eating the grid. Measured, 4 players, slot / hand:
+
+| | before | after |
+|---|---|---|
+| 851px tall (home-screen app) | 47 / 47 | **75 / 64** |
+| 660px tall (Safari tab) | 46 / 46 | **50 / 50** |
+| 320x568 (iPhone SE) | 38 / 38 | 37 / 43 |
+
+The 40px reserved for the drop zone's caption is now 34px, and it is reserved
+whether or not the caption is showing: sizing against the leftover would shrink
+every card the moment somebody picked one up, which is exactly when they must
+not move.
+
+**Still on the table:** at four players on a SHORT screen the grid is height-bound
+at 4x4 with spare width. Six columns by three rows would fit a bigger card
+(~50px vs ~45px before the rebalance). `gridColumns` is fixed at four rows by
+design - "height is the scarce axis" - which is right on a tall screen and wrong
+on a short one. Making the column count depend on the box's aspect would help,
+at the cost of the board changing shape between devices.
+
+**#22. Sitting out keeps the hand, so the round can be rejoined.** Superseded the
+2026-08-27 behaviour, which deleted the tableau. Re-dealing one on return would
+have been worse than it sounds: `buildDeck` is per-player and every card carries
+its owner, so a fresh deck mints duplicates of the cards that player already has
+in the middle - same `cardId`, same layout id, playable twice. Keeping the hand
+sidesteps that and restores exactly what they put down.
+
+The **flag** is therefore what every rule reads now, not the absence of a
+tableau: `startRound`, `allConnectedStuck` and `tableReady` skip them,
+`commitScores` filters them out of `scoreRound` so a round played without them
+moves their total not at all, `syncStuck` returns early (they still have a hand
+and would otherwise be declared stuck for a round they are not in), and `playTo`
+refuses. A player who missed the DEAL still has no hand and still waits for the
+next round - the button says which case they are in.
+
+**#23. The corner island 20% wider.** `--btn-w: 37px` (from 30) on
+`.head-btns` / `.corner-btns`: 3 x 37 + gaps + padding + border = 123px against
+102px. The extra went into the buttons rather than the gaps, so what grew is the
+part a thumb has to hit. Height is unchanged - the head row is `auto` and growing
+it would take the space off the board.
+
 ### Requested 2026-08-27, second pass — all built
 
 Four more, from looking at the first batch on a screen.

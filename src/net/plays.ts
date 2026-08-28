@@ -159,8 +159,14 @@ export async function commitScores(code: string, room: Room): Promise<void> {
   const round = room.round;
   // Score the RECONCILED tableaus: a card whose center play committed but whose
   // tableau persist hadn't landed yet must not count as both center and leftover.
+  // Sitting-out players are left out of the scoring entirely - they keep their
+  // hand (so they can rejoin the round) but a round they were not playing must
+  // not move their total in either direction. Their cards already in the middle
+  // still count towards the piles; they just earn nobody anything.
   const tableaus = Object.fromEntries(
-    Object.entries(round.tableaus).map(([uid, t]) => [uid, reconcileTableau(t, round.spaces)]),
+    Object.entries(round.tableaus)
+      .filter(([uid]) => !room.players[uid]?.sittingOut)
+      .map(([uid, t]) => [uid, reconcileTableau(t, round.spaces)]),
   );
   const scores = scoreRound(round.spaces, tableaus);
   // Stamped here so the round has a length for the commentary to talk about.

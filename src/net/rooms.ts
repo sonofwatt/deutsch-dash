@@ -182,34 +182,36 @@ export function setReady(code: string, uid: string, on: boolean): Promise<void> 
 /**
  * "Deal me out" / "deal me back in."
  *
- * Sitting out takes the player OUT OF THE ROUND IN PROGRESS: their tableau is
- * deleted in the same write. Everything downstream follows from the hand being
- * gone rather than needing to know about the flag - `scoreRound` iterates the
- * tableaus, so a player without one gets no `RoundScore`, so `commitScores`
- * leaves their total exactly where it was. Leaving mid-round forfeits that
- * round's arithmetic in both directions: no penalty for the Blitz pile they
- * abandoned, and no credit for what they had already played to the middle.
+ * Sitting out takes the player OUT OF THE ROUND IN PROGRESS, but **their hand is
+ * kept**, so clearing the flag puts them straight back into the round they left
+ * rather than making them wait for the next deal.
  *
- * Cards they already played to the centre stay there. They are part of piles
- * other people are building on and cannot be taken back off the table.
+ * The hand is deliberately not deleted, and re-dealing one on return would be
+ * worse than it sounds: `buildDeck` is per-player and every card carries its
+ * owner, so a fresh deck would mint duplicates of the cards this player already
+ * has sitting in the middle - same `cardId`, same layout id, playable twice.
+ * Keeping the hand sidesteps that entirely and restores exactly what they put
+ * down.
+ *
+ * The flag is therefore what every other rule reads, not the absence of a
+ * tableau: `startRound` skips them, `allConnectedStuck` skips them, `tableReady`
+ * skips them, and `commitScores` leaves them out of the scoring - so a round
+ * played without them moves their total not at all, in either direction.
+ *
+ * Cards they already played to the centre stay there regardless. They are part
+ * of piles other people are building on and cannot be taken back off the table.
  *
  * `ready` and `stuckAt` are cleared with it: a player who is not in the round
  * cannot meaningfully be ready for it or stuck in it, and either flag left set
  * would go on speaking for them - `tableReady` would count them on the way back
  * in without their having said so.
  *
- * Both paths are the player's own (`players/$uid` and `round/tableaus/$uid`), so
- * this needs no rules change and no host.
+ * Every path is the player's own, so this needs no rules change and no host.
  */
 export function setSittingOut(code: string, uid: string, on: boolean): Promise<void> {
-  return update(roomRef(code), on
-    ? {
-        [`players/${uid}/sittingOut`]: true,
-        [`players/${uid}/ready`]: null,
-        [`players/${uid}/stuckAt`]: null,
-        [`round/tableaus/${uid}`]: null,
-      }
-    : { [`players/${uid}/sittingOut`]: null });
+  return update(ref(db, `rooms/${code}/players/${uid}`), on
+    ? { sittingOut: true, ready: null, stuckAt: null }
+    : { sittingOut: null });
 }
 
 /**
