@@ -332,5 +332,15 @@
    is the lobby - and the wood and Blitz piles are the two ENDS of the row, so
    whichever way round the player has them (see prefs.ts) one of them is against
    an edge. The guard is on both sides for that reason: swapping the sides must
-   not move which gesture eats which pile. */
-:root[data-platform="android"] .game { --edge-guard: 10px; }
+   not move which gesture eats which pile.
+
+   20px, not the 10px it started as, and the difference is measured rather than
+   chosen. The row is CENTRED, so padding alone moves nothing until it exceeds
+   the slack the row already has: at four players on a 393x851 screen the cards
+   sat 17px from the edge and a 10px guard moved them to 18px. This is a floor on
+   the clearance, not an offset added to it - 20px here on top of the page's own
+   8px puts the outermost card 28px from the screen edge, which is the 10px the
+   table asked for and also clears Android's own 24dp back-gesture inset with a
+   little to spare. Where the row already has more slack than that (a browser tab,
+   where the hand is bound by 7.5vh and sits 40px in) it costs nothing at all. */
+:root[data-platform="android"] .game { --edge-guard: 20px; }

@@ -420,6 +420,26 @@ five piles size themselves to that width; leave it alone and they would size to 
 width they are no longer given, and the outer two would run back under the guard
 that exists to keep them clear.
 
+**And it is a FLOOR on the clearance, not an offset added to it.** This is the
+trap the first cut fell into: the tableau row is **centred**, so padding on it
+moves nothing at all until it exceeds the slack the row already has. A 10px guard
+therefore bought exactly 1px — the cards sat 17px from the edge and ended up at
+18px. The number has to be read against the screen edge: 20px on top of the
+page's own 8px puts the outermost card at 28px, which is the 10px that was asked
+for and also clears Android's 24dp back-gesture inset. Measured, four players:
+
+| | before | after |
+|---|---|---|
+| 393x851 (home-screen app), card to side edge | 17px | **28px** |
+| 393x727 (browser tab), card to side edge | 40px | 40px — already clear |
+| 390x844 (iOS app), card to bottom edge | 44px | **54px** |
+
+The tab row is where the floor earns its shape: there the hand is bound by
+`7.5vh` rather than by the width, the row already has slack, and the guard costs
+nothing. It only bites in the case that was actually broken. **Measure the card
+rectangles, not the CSS** — `padding-inline` reporting `20px` says nothing about
+where the cards ended up.
+
 `detectPlatform` is pure and tested, because the order of its checks is not
 obvious: Android UAs carry "Linux", and **iPadOS 13+ reports itself as a desktop
 Mac** — the only thing that gives it away is having a touchscreen at all, hence
@@ -590,10 +610,12 @@ growing it would take the space off the board.
 in "Where the OS gets to the swipe first" above, because they are the sort of
 thing somebody needs before they touch the tableau row rather than after.
 
-Measured at 393px: iOS puts 22px under the cards where a desktop has 12, and
-Android starts the row 10px in from each side with the piles re-sized to suit.
-**Neither has been on a real phone** — what is proved is the geometry, not that
-the geometry is enough to stop the gesture. That needs a thumb.
+The measurements, and why the Android number is 20 rather than the 10 that was
+asked for, are up there too — a centred row swallows padding whole, so the guard
+had to become a floor on the clearance. **Neither has been on a real phone**:
+what is proved is the geometry, not that the geometry is enough to stop the
+gesture. That needs a thumb, and if it still fires the number to raise is
+`--edge-guard` (Android's inset goes to 40dp on the widest sensitivity setting).
 
 ### Hints and openings — one switch over two nudges _(#6, #9)_
 
