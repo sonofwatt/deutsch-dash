@@ -10,7 +10,7 @@ import { ScoreList } from './ScoreList';
 import { rankRows } from '../scoreRanks';
 import { raceFlashes } from '../raceFlash';
 import { orderlySpaces } from '../../game/center';
-import { spaceCountForPlayers } from '../../game/rules';
+import { orderlyColumns, spaceCountForPlayers } from '../../game/rules';
 import { splashVariant } from '../splashVariant';
 import type { Card, CenterSpace, PlayerInfo, RoundScore, Suit, Tableau } from '../../game/types';
 
@@ -195,6 +195,37 @@ describe('CenterGrid', () => {
     // goes past four rows, because 20 spaces round up to 24 (spaceCountForPlayers).
     expect(gridColumns(16, true)).toBe(4);
     expect(gridColumns(24, true)).toBe(8);
+  });
+  it('picks the shape that buys the biggest slot once it knows the box', () => {
+    // A four-player board (16 spaces) on the two screens that differ. Tall: four
+    // rows, exactly as it always was. Short - a Safari tab with its address bar
+    // down - the same board is height-bound at 4x4 with width going spare, and
+    // three rows of six fits a bigger card.
+    expect(gridColumns(16, false, { w: 377, h: 450 })).toBe(4);
+    expect(gridColumns(16, false, { w: 377, h: 250 })).toBe(6);
+    // Never a strip and never a smear, whatever the box.
+    for (const count of [8, 16, 20, 24, 28, 32]) {
+      for (const box of [{ w: 320, h: 180 }, { w: 820, h: 200 }, { w: 300, h: 700 }]) {
+        const cols = gridColumns(count, false, box);
+        expect(cols).toBeGreaterThanOrEqual(2);
+        expect(cols).toBeLessThanOrEqual(8);
+      }
+    }
+  });
+  it('leaves an orderly board its suit columns whatever shape the screen is', () => {
+    // Not a layout choice: suitForSpace derives the suit from index % columns,
+    // and that suit is what the transaction enforces. Re-shaping the grid would
+    // recolour the board under the rule.
+    for (const box of [{ w: 377, h: 250 }, { w: 820, h: 200 }, { w: 300, h: 700 }]) {
+      expect(gridColumns(16, true, box)).toBe(orderlyColumns(16));
+      expect(gridColumns(24, true, box)).toBe(orderlyColumns(24));
+      expect(gridColumns(32, true, box)).toBe(orderlyColumns(32));
+    }
+  });
+  it('keeps the fixed shape when nothing has been measured yet', () => {
+    // A first paint and every static render land here.
+    expect(gridColumns(16, false, undefined)).toBe(4);
+    expect(gridColumns(16, false, { w: 0, h: 0 })).toBe(4);
   });
 });
 

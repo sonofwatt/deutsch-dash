@@ -5,7 +5,7 @@ suite. A commit sitting unpushed has already invalidated one playtest — what
 people are playing is whatever last reached Pages — so check `git status -sb`
 before trusting what a table reports._
 
-_**290 tests green** (267 unit + 23 emulator). This is the only place in the repo
+_**297 tests green** (274 unit + 23 emulator). This is the only place in the repo
 that quotes a count — it drifted three separate ways when it lived in four
 places, so keep it here and nowhere else._
 
@@ -346,6 +346,25 @@ mechanisms are deliberately different.
 - The tableau sizes to its own row from `--hand-card` on `.game`, fed by `--piles`
   and `--tgap` from `Game.tsx` — the only place that knows how many posts this
   round dealt.
+- **The column COUNT is measured too**, in JS: `gridColumns` takes the box a
+  `ResizeObserver` on `.grid-wrap` reports and picks the shape that buys the
+  biggest slot. The constants it ranks with (gap, caption reserve, card ratio,
+  the clamp ceiling) mirror `.game-grid` and are approximations **on purpose** —
+  they only rank the candidates against each other, and CSS still does the
+  sizing from the real box, so a drift there costs a slightly wrong shape and
+  never a wrong size.
+
+**An orderly board's columns are not a layout choice and must never become one.**
+`suitForSpace` derives a space's suit from `index % columns`, and that suit is
+what `canPlayToSpace` and `centerPlayTxn` enforce; re-shaping the grid would
+recolour the board underneath the rule. `gridColumns` returns `orderlyColumns`
+before it ever looks at the box, and `render.test.ts` pins that at every box it
+is given.
+
+The measurement cannot feed back on itself: `.grid-wrap` is `container-type:
+size`, so its own box is fixed by the tracks around it and the grid inside it
+cannot push on it. There is still an epsilon on the state write, for sub-pixel
+churn while a window is being resized.
 
 **Two traps in there.** `--hand-card` lives on `.game` and NOT on `.tableau-zone`
 because **the drag ghost is a sibling of the tableau**, not a child: it cannot
@@ -377,6 +396,37 @@ pointer actually was and translates by the difference (`ghostFix` in
 painted, re-measuring on `visualViewport` events. On a browser that was already
 right the correction is zero. The `translate(-50%, -55%)` lift is intentional —
 it keeps the card out from under the thumb.
+
+### Where the OS gets to the swipe first
+
+Two gestures the page never sees, both reported from real tables, and both cost
+the player the round they were in.
+
+- **iOS** takes an upward swipe from the bottom edge as "go home" — and the Blitz
+  and wood piles sit at the bottom of the screen, which is where a drag begins.
+- **Android** takes an inward swipe from either side edge as "back", which from
+  the board is the lobby. Wood and Blitz are the two ENDS of the tableau row, so
+  whichever way round the player has them (`prefs.ts`), one is against an edge.
+
+**A system edge gesture is not the page's to cancel**, so there is nothing to
+prevent and no handler to write: the only defence is keeping the piles out of the
+strip the OS is watching. `ui/platform.ts` stamps `data-platform` on `<html>` once
+at startup (from `main.tsx`, before the first paint) and `game.css` keys two
+custom properties off it — `--tableau-lift` on iOS, `--edge-guard` on Android,
+both `0px` everywhere else so a desktop pays nothing.
+
+**`--edge-guard` has to come out of `--hand-w` as well as being padding.** The
+five piles size themselves to that width; leave it alone and they would size to a
+width they are no longer given, and the outer two would run back under the guard
+that exists to keep them clear.
+
+`detectPlatform` is pure and tested, because the order of its checks is not
+obvious: Android UAs carry "Linux", and **iPadOS 13+ reports itself as a desktop
+Mac** — the only thing that gives it away is having a touchscreen at all, hence
+`maxTouchPoints > 1` (a Mac with a trackpad can report 1).
+
+**Ten pixels each, and no more.** Both come off the board, and the board is the
+half that is hard to aim at.
 
 ### Any emoji the app prints needs `EMOJI` after it
 
@@ -510,10 +560,40 @@ board shifting up the screen the moment somebody got stuck.
 - **The two messages can never collide**, so nothing had to be hidden: a stuck
   player has no legal targets, which is precisely when the zone is unlit.
 
+**The grid picks its own shape from the box it has** _(#24, 2026-08-28)_. Four
+rows was fixed by design — "height is the scarce axis on a phone" — which is right
+on a tall screen and wrong on a short one: a four-player board in a Safari tab
+was height-bound at 4×4 with width going spare on both sides. Measured, at 393px:
+
+| | columns | slot |
+|---|---|---|
+| 851px tall (home-screen app) | 4 | 74.8px |
+| 620px tall (Safari tab) | **6** | **51.0px** (44px at four columns) |
+
+Two things follow from it that are deliberate. **The bottom row can be ragged** —
+16 spaces at six columns is 6/6/4 — because a bigger card is worth more than a
+tidy rectangle; holes are only ever used as a tie-break between shapes within a
+pixel of each other. And **two phones at one table may lay the same board out
+differently**, which is fine and already true of the rails: the shape is local
+presentation, derived per client, and no rule reads it. The one board where it is
+NOT free is the orderly one — see the sizing section.
+
 **The corner island** (`.head-btns` / `.corner-btns`) is `--btn-w: 37px`, up from
 30 — 20% wider. The extra went into the buttons rather than the gaps, so what grew
 is the part a thumb has to hit. Height is unchanged: the head row is `auto` and
 growing it would take the space off the board.
+
+### The two edge guards _(#25, #26)_
+
+`--tableau-lift: 10px` on iOS and `--edge-guard: 10px` on Android, both keyed off
+`data-platform`. The reasoning, the iPadOS detection and the `--hand-w` trap are
+in "Where the OS gets to the swipe first" above, because they are the sort of
+thing somebody needs before they touch the tableau row rather than after.
+
+Measured at 393px: iOS puts 22px under the cards where a desktop has 12, and
+Android starts the row 10px in from each side with the piles re-sized to suit.
+**Neither has been on a real phone** — what is proved is the geometry, not that
+the geometry is enough to stop the gesture. That needs a thumb.
 
 ### Hints and openings — one switch over two nudges _(#6, #9)_
 
@@ -797,19 +877,6 @@ ghost card on pointerdown. And `movePostRun` must not assume a post stack is a
 clean run: `reconcileTableau` filters post stacks by centre membership and
 `normalizeTableau` returns whatever RTDB holds.
 
-### The grid's shape on a short screen
-
-At four players on a SHORT screen the grid is height-bound at 4×4 with spare
-width. Six columns by three rows would fit a bigger card (~50px vs ~45px).
-`gridColumns` is fixed at four rows by design — "height is the scarce axis" — which
-is right on a tall screen and wrong on a short one. Making the column count depend
-on the box's aspect would help, at the cost of the board changing shape between
-devices.
-
-This is what is left of the older "the board wastes its vertical space" complaint;
-the rest of it was answered by sizing the cards to the board they have (#21), which
-took a 4-player slot from 47px to 75px on an 851px-tall screen.
-
 ### Worth a decision
 
 - **The black ring on a selected card.** Asked to be removed after it showed up in
@@ -924,6 +991,12 @@ assuming a code fault.
 - One-tap join from the home page, including the badge-taken fallback.
 - Opponent strip mini-cards updating live.
 - Sitting out and rejoining a round in progress, by a human on a phone.
+- **Whether ten pixels is actually enough** to keep a drag out of the iOS home
+  swipe and the Android back swipe (#25, #26). The geometry is measured; only a
+  real thumb on a real phone can say whether it works, and it is the one thing
+  here that cannot be checked headlessly at all.
+- The re-shaped grid on a real short screen — six columns with a ragged bottom
+  row has only been seen in a headless Chromium.
 - `aspect-ratio: 2.5 / 3.5` on a **wide window** specifically — the phone shots
   cannot show the old `--card-h` bug, which was invisible at 360px because both
   values clamped to the same number.
@@ -1023,6 +1096,8 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `f9dbeb8` | A theme toggle, sitting out, white cards, and a fixed Start anyway |
 | `73ba576` | The three head controls gathered onto one pill |
 | `cc72076` | Cards sized to the board they have; a sat-out round can be rejoined |
+| `650821f` | This handoff, consolidated around why rather than when |
+| `973b9eb` | Columns from the shape of the box; the iOS and Android edge guards |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.

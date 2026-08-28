@@ -25,8 +25,16 @@
      it is what stops the hand eating the grid, which is the half of the board
      that is hard to aim at. */
   --piles: 5; --tgap: 10px;
+  /* Two guards against the OS taking a swipe before the page sees it. Both are
+     0 by default and only a phone sets them - see ui/platform.ts, which stamps
+     data-platform on <html>, and the rules at the bottom of this file.
+     --edge-guard has to come out of --hand-w as well as being padding, or the
+     five piles would size themselves to a width they are no longer given and
+     the outer two would run under the guard they exist to keep clear. */
+  --edge-guard: 0px; --tableau-lift: 0px;
   --hand-w: calc(min(100vw, 820px)
-    - max(8px, env(safe-area-inset-left)) - max(8px, env(safe-area-inset-right)));
+    - max(8px, env(safe-area-inset-left)) - max(8px, env(safe-area-inset-right))
+    - 2 * var(--edge-guard));
   --hand-card: clamp(34px,
     min(calc((var(--hand-w) - (var(--piles) - 1) * var(--tgap)) / var(--piles)), 7.5vh),
     88px);
@@ -207,7 +215,9 @@
    the grid is. --piles and --tgap come from Game.tsx, which is the only place
    that knows how many post piles this round dealt. */
 .tableau-zone { display: flex; gap: var(--tgap); align-items: flex-end;
-  justify-content: center; padding-bottom: 4px; --card-w: var(--hand-card); }
+  justify-content: center; --card-w: var(--hand-card);
+  padding-bottom: calc(4px + var(--tableau-lift));
+  padding-inline: var(--edge-guard); }
 .pile-label { font-size: 10px; text-align: center; color: var(--ink-soft); margin-top: 3px; }
 
 /* Recycle affordance: the empty draw slot, once the face-down wood is exhausted.
@@ -300,3 +310,27 @@
   color: var(--danger-ink); font-size: 13px; font-weight: 600; cursor: pointer; }
 .conn-pill { font-size: 11px; padding: 3px 10px; border-radius: 999px;
   background: var(--danger); color: #fff; }
+
+/* ---------------------------------------------------------------------------
+   Where the OS gets to the swipe first
+
+   Both of these are reports from real tables, not theory, and both cost the
+   player the round they were in: the gesture leaves the game before any handler
+   on the card runs. Neither can be prevented from inside the page - a system
+   edge gesture is not the page's to cancel - so the only defence is to keep the
+   piles far enough in that a drag never starts in the strip the OS is watching.
+
+   The numbers are deliberately small. Ten pixels is off the board, and the board
+   is the half that is hard to aim at; it buys the clearance and nothing more. */
+
+/* iOS: an upward swipe from the bottom edge is "go home", and the Blitz and wood
+   piles sit at the bottom of the screen, which is where a drag begins. Lifting
+   the whole row clear of the home indicator's strip is the fix. */
+:root[data-platform="ios"] .game { --tableau-lift: 10px; }
+
+/* Android: an inward swipe from either side edge is "back", which from the board
+   is the lobby - and the wood and Blitz piles are the two ENDS of the row, so
+   whichever way round the player has them (see prefs.ts) one of them is against
+   an edge. The guard is on both sides for that reason: swapping the sides must
+   not move which gesture eats which pile. */
+:root[data-platform="android"] .game { --edge-guard: 10px; }
