@@ -1097,7 +1097,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `73ba576` | The three head controls gathered onto one pill |
 | `cc72076` | Cards sized to the board they have; a sat-out round can be rejoined |
 | `650821f` | This handoff, consolidated around why rather than when |
-| `973b9eb` | Columns from the shape of the box; the iOS and Android edge guards |
+| `9d72d8b` | Columns from the shape of the box; the iOS and Android edge guards |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
