@@ -5,7 +5,7 @@ suite. A commit sitting unpushed has already invalidated one playtest — what
 people are playing is whatever last reached Pages — so check `git status -sb`
 before trusting what a table reports._
 
-_**297 tests green** (274 unit + 23 emulator). This is the only place in the repo
+_**303 tests green** (280 unit + 23 emulator). This is the only place in the repo
 that quotes a count — it drifted three separate ways when it lived in four
 places, so keep it here and nowhere else._
 
@@ -624,6 +624,45 @@ back-gesture sensitivity rather than the default. **Neither has been on a real
 phone**: what is proved is the geometry, not that the geometry is enough to stop
 the gesture. That needs a thumb.
 
+### Flicking a card at the board _(#27)_
+
+**The gesture is judged on the movement, not on where the finger came off the
+glass.** That is the whole change. Dragging a card into the drop zone still
+works and is untouched; what was broken is that a *throw* at the board had to
+also happen to end inside it, and a fast one usually does not - it ends past the
+top of the board, on the opponent strip, or on a pixel the page does not own,
+and then nothing happened at all. Reported from an iPhone, reproduced on both
+platforms.
+
+`flickOf` (`useDrag.ts`) reads the last `FLICK_WINDOW_MS` (120ms) of pointer
+samples and returns where the card was **aimed** - the release point projected
+`FLICK_PROJECT_MS` (90ms) further along the throw - or null if the gesture was
+not a throw. `Game.tsx` needed no new branch: a flick arrives as the `nearest`
+target it already handles, with `at` set to the aim instead of to the release.
+
+- **The window is the last fraction of the gesture, not the whole of it.**
+  Picking a card up, hesitating and then throwing it is still a throw, and
+  averaging in the hesitation loses it. Pinned by a test.
+- **Upward only** (`dy < 0`). The board is above the hand on every screen, so a
+  flick down or sideways is somebody moving a card between their own piles or
+  thinking better of it, and neither should throw it into the middle.
+- **`FLICK_MIN_TRAVEL` (24px) guards a fast tap** with a jittery finger.
+- **`FLICK_MIN_SPEED` is 0.45 px/ms** - about 450px/s, above a deliberate drag
+  and well under a real thumb flick. It is the number to tune if the gesture
+  feels too eager or too deaf; nothing else in the rule is a judgement call.
+
+**An explicit pile under the finger still wins.** Releasing on a space or a post
+plays there whatever the speed: that is somebody placing a card on a square they
+chose, and it must not be overruled by how fast they got there.
+
+**A cancelled pointer now commits the throw, and this is the half that matters.**
+`pointercancel` fires when the OS takes the gesture away mid-air - an iOS home
+swipe, an Android back swipe, a second finger landing - and the old handler
+discarded the drop outright, so the one gesture most likely to be stolen was
+also the one that silently did nothing. The throw was already over and already
+unambiguous by then, so it counts. Verified by dispatching a real
+`pointercancel` mid-throw against the running app.
+
 ### Hints and openings — one switch over two nudges _(#6, #9)_
 
 `meta.hintsOn` is a **host-controlled room option**, not a device preference, and
@@ -994,6 +1033,20 @@ takes it as real data, because it is.
 `roundEnd` and `scores` is absent, so write the scores you want FIRST or it will
 compute its own from the live round.
 
+**Watch, harder: the bots are playing while you measure.** Counting cards in the
+centre before and after a gesture proves nothing - a bot playing inside the same
+second is indistinguishable from the thing you were testing, and it read as a
+pass twice before it was noticed. Every card carries its owner's badge, so count
+only the ones bearing YOUR glyph:
+
+```js
+[...document.querySelectorAll('.game-grid .card')]
+  .filter(c => c.querySelector('.card-badge')?.textContent.trim() === myGlyph).length
+```
+
+The same applies to anything else timed against a live table. If a measurement
+cannot tell your own action apart from a bot's, it is not a measurement.
+
 ### Check the URL first if something looks broken
 
 **GitHub does not redirect Pages for a renamed repo.** Verified: the old
@@ -1016,6 +1069,12 @@ assuming a code fault.
   round end), but a two-bot table now reaches a normal blitz rather than the stall
   path, so that repro stopped reaching it.
 - The drop zone by touch drag, and by tap.
+- **The flick on real glass** (#27). It is driven and measured on both device
+  profiles in headless Chromium, which is not Safari and not a thumb: the speed
+  threshold in particular has only ever been crossed by a synthetic pointer, and
+  a synthetic one occasionally comes in slow enough to miss it. A real flick is
+  several times faster than the threshold, so the risk is the opposite one - a
+  deliberate drag reading as a throw.
 - Wood recycle: the `↻` empty draw slot.
 - One-tap join from the home page, including the badge-taken fallback.
 - Opponent strip mini-cards updating live.
@@ -1127,6 +1186,8 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `cc72076` | Cards sized to the board they have; a sat-out round can be rejoined |
 | `650821f` | This handoff, consolidated around why rather than when |
 | `9d72d8b` | Columns from the shape of the box; the iOS and Android edge guards |
+| `7a90afc` | The Android edge guard raised to 40dp, the widest the gesture reaches |
+| _(this one)_ | Flicking a card at the board, judged on the throw and not the release |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.

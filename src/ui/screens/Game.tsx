@@ -87,9 +87,11 @@ export function Game() {
   const { drag, startDrag } = useDrag((source: PlaySource, target: DropTarget, at: Point) => {
     gameStore.setState({ selection: source }); // direct set - select() would TOGGLE an already-selected source off
     if ('nearest' in target) {
-      // Dropped on the snap band rather than on a pile: send it to whichever
-      // space it can legally land in that is closest to where they let go. For an
-      // Ace that is just the nearest free space, which is the point of the band.
+      // No particular square was chosen: either the card was let go over the drop
+      // zone, or it was FLICKED at the board and never had to arrive. Send it to
+      // whichever space it can legally land in that is closest to `at` - which is
+      // where they let go in the first case and where the throw was aimed in the
+      // second (see flickOf). For an Ace that is just the nearest free space.
       const legal = round ? legalTargets(tableau!, source, round.spaces).spaces : [];
       const best = nearestSpace(legal, at.x, at.y);
       if (best == null) { gameStore.setState({ selection: null }); return; }
