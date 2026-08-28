@@ -1,6 +1,9 @@
 .game { display: grid; grid-template-rows: auto auto 1fr auto; height: 100dvh; gap: 8px;
-  padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right))
-           max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+  /* Named because three other things measure against them - see --edge-guard. */
+  --page-l: max(8px, env(safe-area-inset-left));
+  --page-r: max(8px, env(safe-area-inset-right));
+  padding: max(8px, env(safe-area-inset-top)) var(--page-r)
+           max(8px, env(safe-area-inset-bottom)) var(--page-l);
   /* Desktop was letting the grid columns stretch edge to edge, which scattered the
      centre piles across a 1920px window. Cap and centre the whole board instead. */
   width: 100%; max-width: 820px; margin-inline: auto;
@@ -28,13 +31,20 @@
   /* Two guards against the OS taking a swipe before the page sees it. Both are
      0 by default and only a phone sets them - see ui/platform.ts, which stamps
      data-platform on <html>, and the rules at the bottom of this file.
-     --edge-guard has to come out of --hand-w as well as being padding, or the
-     five piles would size themselves to a width they are no longer given and
-     the outer two would run under the guard they exist to keep clear. */
+
+     --edge-guard is the TOTAL distance from the screen edge that no card may
+     come inside, measured from the edge and not from the page padding. It is
+     written that way because the other reading cost a fix: the tableau row is
+     centred, so treating the guard as padding to ADD moved the cards by one
+     pixel and the CSS still read 10px. Anything here that is not a clearance a
+     ruler could check on a screenshot is the wrong shape of number.
+
+     It has to come out of --hand-w as well as being padding, or the five piles
+     would size themselves to a width they are no longer given and the outer two
+     would run straight back under the guard they exist to keep clear. */
   --edge-guard: 0px; --tableau-lift: 0px;
   --hand-w: calc(min(100vw, 820px)
-    - max(8px, env(safe-area-inset-left)) - max(8px, env(safe-area-inset-right))
-    - 2 * var(--edge-guard));
+    - max(var(--page-l), var(--edge-guard)) - max(var(--page-r), var(--edge-guard)));
   --hand-card: clamp(34px,
     min(calc((var(--hand-w) - (var(--piles) - 1) * var(--tgap)) / var(--piles)), 7.5vh),
     88px);
@@ -217,7 +227,9 @@
 .tableau-zone { display: flex; gap: var(--tgap); align-items: flex-end;
   justify-content: center; --card-w: var(--hand-card);
   padding-bottom: calc(4px + var(--tableau-lift));
-  padding-inline: var(--edge-guard); }
+  /* Only the part of the guard the page's own padding does not already cover. */
+  padding-left: max(0px, var(--edge-guard) - var(--page-l));
+  padding-right: max(0px, var(--edge-guard) - var(--page-r)); }
 .pile-label { font-size: 10px; text-align: center; color: var(--ink-soft); margin-top: 3px; }
 
 /* Recycle affordance: the empty draw slot, once the face-down wood is exhausted.
@@ -334,13 +346,16 @@
    an edge. The guard is on both sides for that reason: swapping the sides must
    not move which gesture eats which pile.
 
-   20px, not the 10px it started as, and the difference is measured rather than
-   chosen. The row is CENTRED, so padding alone moves nothing until it exceeds
-   the slack the row already has: at four players on a 393x851 screen the cards
-   sat 17px from the edge and a 10px guard moved them to 18px. This is a floor on
-   the clearance, not an offset added to it - 20px here on top of the page's own
-   8px puts the outermost card 28px from the screen edge, which is the 10px the
-   table asked for and also clears Android's own 24dp back-gesture inset with a
-   little to spare. Where the row already has more slack than that (a browser tab,
-   where the hand is bound by 7.5vh and sits 40px in) it costs nothing at all. */
-:root[data-platform="android"] .game { --edge-guard: 20px; }
+   40dp, which is the widest Android's back-gesture inset goes - the sensitivity
+   is a system setting the page cannot read, so the guard is set for the setting
+   that reaches furthest in rather than for the default 24dp. It is a FLOOR on
+   the clearance and not an offset added to it: the row is centred, so a guard
+   expressed as padding to add moves nothing until it exceeds the slack the row
+   already has, which is how the first cut of this moved the cards from 17px to
+   18px while the CSS read 10px.
+
+   It is not free. On a home-screen app at four players the hand goes from a
+   63.8px card to 54.6px to buy the clearance, because narrowing the row is the
+   only way to move a centred one. In a browser tab it costs nothing at all: the
+   hand is bound by 7.5vh there and the cards already sat 40px in. */
+:root[data-platform="android"] .game { --edge-guard: 40px; }
