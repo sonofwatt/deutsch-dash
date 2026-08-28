@@ -1187,7 +1187,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `650821f` | This handoff, consolidated around why rather than when |
 | `9d72d8b` | Columns from the shape of the box; the iOS and Android edge guards |
 | `7a90afc` | The Android edge guard raised to 40dp, the widest the gesture reaches |
-| _(this one)_ | Flicking a card at the board, judged on the throw and not the release |
+| `01a4e99` | Flicking a card at the board, judged on the throw and not the release |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
