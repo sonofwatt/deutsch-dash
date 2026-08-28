@@ -87,12 +87,17 @@ export interface PlayerInfo {
    * "Deal me out." Written only by the player's own client for its own uid, like
    * `ready` and `awayAt`. Absent means playing.
    *
-   * It takes effect IMMEDIATELY: `setSittingOut` deletes the player's tableau in
-   * the same write, so they leave the round in progress rather than the next one.
-   * While it is set they are skipped by `startRound` (no tableau at all), are not
-   * required to be ready, and cannot hold up the all-stuck rotation. With no
-   * tableau they score no delta, so their total simply stands still - leaving
-   * mid-round forfeits that round's arithmetic in both directions.
+   * It takes effect IMMEDIATELY - they leave the round in progress, not the next
+   * one - but their HAND IS KEPT, so clearing the flag puts them straight back
+   * into the round they left. Re-dealing one on return would mint duplicates of
+   * the cards they already have in the middle (see setSittingOut).
+   *
+   * The flag is therefore what every rule reads, never the absence of a tableau:
+   * `startRound`, `allConnectedStuck` and `tableReady` skip them, `commitScores`
+   * leaves them out of the scoring, `syncStuck` returns early, and `playTo`
+   * refuses. A round they sat out moves their total not at all, in either
+   * direction. A player who missed the DEAL has no hand and waits for the next
+   * round - that is the one case returning cannot fix.
    */
   sittingOut?: boolean;
   // AI players. Absent on humans. A bot has no auth identity of its own: the

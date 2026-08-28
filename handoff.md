@@ -642,16 +642,17 @@ One definition for both, so the corner cannot drift away from the board's.
 **#19. Sitting out.** — _built 2026-08-27._ `players/$uid/sittingOut`, owner-written
 like `ready` and `awayAt`, so no rules change.
 
-**It ejects them from the round in progress.** `setSittingOut` deletes their
-tableau in the same write - both paths are the player's own, so no host and no
-rules change - and almost everything else falls out of the hand being gone:
-nothing to play, and no `RoundScore`, so `commitScores` leaves their total
-exactly where it was. Leaving mid-round therefore forfeits that round's
-arithmetic **in both directions**: no penalty for the Blitz pile they abandoned,
-and no credit for what they had already played to the middle. Cards already in
-the centre stay there - other people are building on them.
+**It ejects them from the round in progress**, and leaving mid-round forfeits
+that round's arithmetic **in both directions**: no penalty for the Blitz pile they
+abandoned, no credit for what they had already played. Cards already in the centre
+stay there - other people are building on them. `startRound` keeps skipping them
+until they say otherwise.
 
-`startRound` then keeps skipping them until they say otherwise.
+> **Superseded in part by #22 (2026-08-28).** This first cut deleted the player's
+> tableau, so returning meant waiting for the next deal. It keeps the hand now, so
+> the round in progress can be rejoined - and the consequence is that **the flag,
+> not the absence of a tableau, is what every rule reads**. Read #22 before
+> changing anything here.
 
 **The button is in the game head with the wood swap and the theme toggle, and it
 takes TWO taps.** It ends a player's round and forfeits its score, which is far
@@ -670,9 +671,9 @@ it sets state.
 
 Two things did NOT fall out and had to be written:
 
-- **`allConnectedStuck` must skip them.** With no tableau, `syncStuck` never
-  writes them a `stuckAt`, so counted as present they are the one player the
-  table waits on forever. This is the same trap the idle-table hang was.
+- **`allConnectedStuck` must skip them.** `syncStuck` never writes them a
+  `stuckAt`, so counted as present they are the one player the table waits on
+  forever. This is the same trap the idle-table hang was.
 - **`tableReady` must skip them**, and then check that at least two players are
   actually left. A table of one plus three spectators is not a game.
 

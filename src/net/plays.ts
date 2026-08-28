@@ -25,9 +25,11 @@ export function pickNextHost(players: Record<string, PlayerInfo>): string | null
  * is quite correctly never marked stuck. If everyone is away this is false and
  * nothing happens, which is right - an empty table has nothing to rotate for.
  *
- * A player sitting out is skipped for a harder reason than the others: they have
- * no tableau, so `syncStuck` never writes a `stuckAt` for them and they would sit
- * here forever as the one player the table is still waiting on.
+ * A player sitting out is skipped for a harder reason than the others: `syncStuck`
+ * returns early on the flag and never writes them a `stuckAt`, so counted as
+ * present they would sit here forever as the one player the table is waiting on.
+ * They still HAVE a hand - it is what they rejoin with - so the hand is no proof
+ * either way. The flag is.
  */
 export function allConnectedStuck(players: Record<string, PlayerInfo>): boolean {
   const present = Object.values(players)
@@ -37,9 +39,9 @@ export function allConnectedStuck(players: Record<string, PlayerInfo>): boolean 
 
 export async function startRound(code: string, room: Room, rng?: Rng): Promise<void> {
   const uids = Object.keys(room.players);
-  // Who is actually dealt in. A player sitting out gets no tableau at all, which
-  // is what makes the rest of it fall out for free: nothing to play, nothing to
-  // be stuck with, and no RoundScore, so commitScores leaves their total alone.
+  // Who is actually dealt in. A player sitting out is not, and gets no tableau -
+  // which is why returning mid-round only works for somebody who left one behind.
+  // Miss the deal and there is nothing to come back to until the next one.
   const dealt = uids.filter(uid => !room.players[uid].sittingOut);
   // Sized on the WHOLE room, not on who is dealt in. The board's shape is read
   // from the player count by every client independently (normalizeRoom), and
