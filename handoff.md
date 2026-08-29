@@ -1449,7 +1449,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `84da728` | The bot ladder down a rung, Genius, and a wood turn that deals three |
 | `64e2c7c` | A version at the foot of the home and lobby screens |
 | `1b28628` | The version as v1.2.41, derived from two counters |
-| _(this one)_ | The host can cancel a countdown and keep the lobby |
+| `85705c4` | The host can cancel a countdown and keep the lobby |
 | `c7a1da9` | The flick aimed by direction; the whole space above the hand |
 
 Earlier history, the approved design spec and the original 15-task execution
