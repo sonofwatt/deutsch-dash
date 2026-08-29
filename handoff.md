@@ -1519,7 +1519,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `1b28628` | The version as v1.2.41, derived from two counters |
 | `85705c4` | The host can cancel a countdown and keep the lobby |
 | `406bbad` | Start anyway shares the ready button's row; the stale scowl cleared |
-| _(this one)_ | Start anyway counts down; the players it deals around can deal themselves in |
+| `e2e61e1` | Start anyway counts down; the players it deals around can deal themselves in |
 | `c7a1da9` | The flick aimed by direction; the whole space above the hand |
 
 Earlier history, the approved design spec and the original 15-task execution
