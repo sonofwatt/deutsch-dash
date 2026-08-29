@@ -5,7 +5,7 @@ suite. A commit sitting unpushed has already invalidated one playtest — what
 people are playing is whatever last reached Pages — so check `git status -sb`
 before trusting what a table reports._
 
-_**334 tests green** (310 unit + 24 emulator). This is the only place in the repo
+_**337 tests green** (313 unit + 24 emulator). This is the only place in the repo
 that quotes a count — it drifted three separate ways when it lived in four
 places, so keep it here and nowhere else._
 
@@ -737,6 +737,53 @@ space it can follow rigged into place:
 | 70px flick aimed 90° away | nothing |
 | the same 70px at 400ms - a reposition, not a throw | nothing |
 | slow drag let go over the opponent strip | lands (signal 3) |
+
+### Seats, hands, and the players a forced start deals around _(#50)_
+
+**A SEAT and a HAND are different things now.** `startRound` reserves a seat for
+everybody who is not sitting out and deals a hand only to those who are ready. On
+the ordinary path they are the same people, because the countdown does not run
+until everybody is ready. On a forced start they are not.
+
+- `round.seats` is who had a seat; `round.tableaus` is who was dealt.
+- **The board is sized on SEATS**, so somebody left behind already has their four
+  spaces. `dealMeIn` writes them a hand mid-round and **the grid does not move a
+  pixel** - measured, same top, same height, same slot count.
+- A uid in `seats` with no hand can still join this round. A uid in neither walked
+  in after the deal and waits for the next one, with the standby banner.
+
+**A fresh deck is safe here and nowhere else.** `buildDeck` is per player and
+every card carries its owner, so re-dealing somebody who has already played this
+round mints duplicates of the cards they put in the middle - which is exactly why
+sitting out KEEPS the hand. A player who was never dealt in has no cards anywhere,
+so a fresh deal is clean. Do not generalise it.
+
+`round.postCount` is pinned to the round for the same reason `spaceCount` is: it
+was derived from the live player count, so somebody joining a **two**-player game
+mid-round renormalised every hand from five posts to three and dropped cards off
+the end of it.
+
+**Start anyway counts down too**, and forcing it needed a flag: `forcedCountdown`
+suppresses the `tableReady` check in the two places that would otherwise call the
+countdown off. It is host-local, so if the host reloads inside those three seconds
+the table goes back to its lobby - which is the right thing to happen to a start
+nobody is around to finish.
+
+> **The trap in there, twice.** Firebase raises the local snapshot for a write
+> **synchronously from inside it**, and `syncCountdown` runs on that snapshot.
+> `startAnyway` wrote the digit before assigning its timer, so the snapshot saw a
+> forced countdown that was not running and wiped the digit. Fixed by assigning
+> the timer first - and then the same shape appeared one level down, because
+> `tickCountdown` nulls the timer on its first line and only reassigns it after
+> writing the next digit. A timer test in `syncCountdown` is therefore null for
+> every tick of a perfectly healthy countdown. It now guards on the FLAG alone.
+> Both bugs looked identical from outside: an instant start wearing a one-second
+> countdown.
+
+**Between rounds, ready has to be set again.** `startRound` clears it, and it
+deals on it, so the score sheet's ready gate is now load-bearing rather than
+decorative. Four emulator fixtures had to start readying their players; a fixture
+that skips it now deals nobody a hand.
 
 ### A scowl that outlived its round _(#49)_
 
@@ -1472,6 +1519,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `1b28628` | The version as v1.2.41, derived from two counters |
 | `85705c4` | The host can cancel a countdown and keep the lobby |
 | `406bbad` | Start anyway shares the ready button's row; the stale scowl cleared |
+| _(this one)_ | Start anyway counts down; the players it deals around can deal themselves in |
 | `c7a1da9` | The flick aimed by direction; the whole space above the hand |
 
 Earlier history, the approved design spec and the original 15-task execution

@@ -151,6 +151,24 @@ export interface RoundState {
    * derivation, which is correct for it because nobody could join it late.
    */
   spaceCount?: number;
+  /**
+   * Who had a seat at the deal: every player in the room who was not sitting out,
+   * whether or not they were READY. The board is sized on this, so a player left
+   * behind by a forced start already has their four spaces reserved and can be
+   * dealt in mid-round without the grid changing shape under anybody.
+   *
+   * `tableaus` is the subset that was actually dealt. A uid in `seats` with no
+   * tableau is somebody who can still join this round; a uid in neither walked
+   * into the room after the deal and waits for the next one.
+   */
+  seats?: string[];
+  /**
+   * Posts per player at the deal. Five at two players, three otherwise - and it
+   * has to be pinned to the round for the same reason spaceCount is: somebody
+   * joining a two-player game mid-round would otherwise renormalize everybody's
+   * hand from five posts to three and drop cards off the end of it.
+   */
+  postCount?: number;
   // Stamped when the host commits the scores, so the round has a length.
   endedAt: number | null;
 }

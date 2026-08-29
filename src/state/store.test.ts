@@ -392,6 +392,55 @@ describe('the lobby ready gate', () => {
     store.getState().leave();
   });
 
+  it('start anyway counts the table down too, and survives the ready check', async () => {
+    // It used to deal on the tap. The players it deals around deserve the same
+    // three seconds as everybody else - and the host the same chance to think
+    // better of it. The countdown must not then be called off by the very check
+    // it is overriding.
+    vi.useFakeTimers();
+    try {
+      let cb!: (room: Room | null) => void;
+      const deps = fakeDeps({
+        watchRoom: vi.fn((_c: string, f: (room: Room | null) => void) => { cb = f; return () => {}; }),
+      });
+      const store = createGameStore(deps);
+      await store.getState().enterRoom('ABCDEF', 'D', 'tulip');
+      const notReady = { me: human({ ready: true }), you: human() };
+      cb(lobby(notReady));
+      expect(deps.setCountdown).not.toHaveBeenCalled();   // the table is not ready
+
+      store.getState().startAnyway();
+      expect(deps.setCountdown).toHaveBeenLastCalledWith('ABCDEF', 3);
+      // Snapshots keep arriving with an unready table; none of them may cancel it.
+      cb(lobby(notReady, 3));
+      expect(deps.setCountdown).toHaveBeenLastCalledWith('ABCDEF', 3);
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(deps.setCountdown).toHaveBeenLastCalledWith('ABCDEF', 2);
+      store.getState().leave();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('cancelling a forced countdown leaves the host ready', async () => {
+    // The other cancel un-readies, or syncCountdown counts again on the next
+    // snapshot. A forced one is already running against an unready table, so
+    // taking the digit away is enough - and un-readying the host would be a lie
+    // about a player who is ready.
+    let cb!: (room: Room | null) => void;
+    const deps = fakeDeps({
+      watchRoom: vi.fn((_c: string, f: (room: Room | null) => void) => { cb = f; return () => {}; }),
+    });
+    const store = createGameStore(deps);
+    await store.getState().enterRoom('ABCDEF', 'D', 'tulip');
+    cb(lobby({ me: human({ ready: true }), you: human() }));
+    store.getState().startAnyway();
+    store.getState().cancelCountdown();
+    expect(deps.setCountdown).toHaveBeenLastCalledWith('ABCDEF', null);
+    expect(deps.setReady).not.toHaveBeenCalledWith('ABCDEF', 'me', false);
+    store.getState().leave();
+  });
+
   it('refuses to change identity once the player has readied', async () => {
     const deps = fakeDeps();
     const store = createGameStore(deps);

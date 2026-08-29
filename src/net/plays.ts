@@ -53,7 +53,15 @@ export async function startRound(code: string, room: Room, rng?: Rng): Promise<v
   // Who is actually dealt in. A player sitting out is not, and gets no tableau -
   // which is why returning mid-round only works for somebody who left one behind.
   // Miss the deal and there is nothing to come back to until the next one.
-  const dealt = uids.filter(uid => !room.players[uid].sittingOut);
+  // A SEAT is reserved for everybody who is not sitting out; a HAND goes only to
+  // those who are ready for it. On the ordinary path those are the same people,
+  // because the countdown does not run until everybody is ready. On a forced
+  // start they are not: the players who never readied are left behind with a seat
+  // and no cards, watching, and can deal themselves in whenever they like (see
+  // dealMeIn). Sizing the board on seats rather than on hands is what makes that
+  // possible without the grid changing shape under everybody mid-round.
+  const seats = uids.filter(uid => !room.players[uid].sittingOut);
+  const dealt = seats.filter(uid => room.players[uid].isBot || room.players[uid].ready === true);
   // Sized on the WHOLE room, not on who is dealt in. The board's shape is read
   // from the player count by every client independently (normalizeRoom), and
   // somebody sitting down mid-round would otherwise resize the grid under a hand
@@ -75,6 +83,7 @@ export async function startRound(code: string, room: Room, rng?: Rng): Promise<v
       // change mid-round now that a game in progress admits spectators - and a
       // board that changes shape under a hand somebody is holding costs the round.
       spaceCount: spaceCountForPlayers(uids.length, orderly),
+      postCount, seats,
       ...(spaces ? { spaces } : {}),
     },
     'meta/phase': 'playing',

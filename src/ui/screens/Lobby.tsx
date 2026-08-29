@@ -38,8 +38,8 @@ export function Lobby({ code }: { code: string }) {
   const setPaleCards = useGameStore(s => s.setPaleCards);
   const setFling = useGameStore(s => s.setFling);
   const cancelCountdown = useGameStore(s => s.cancelCountdown);
+  const startAnyway = useGameStore(s => s.startAnyway);
   const setIdentity = useGameStore(s => s.setIdentity);
-  const start = useGameStore(s => s.start);
   const addBot = useGameStore(s => s.addBot);
   const removeBot = useGameStore(s => s.removeBot);
   const actionError = useGameStore(s => s.actionError);
@@ -224,7 +224,7 @@ export function Lobby({ code }: { code: string }) {
            counting. Ready first, then "everyone else can catch up". */
         : <div className={`ready-row${showOverride ? ' with-override' : ''}`}>
             {showOverride && (
-              <button className="btn start-anyway" onClick={start}>Start anyway</button>
+              <button className="btn start-anyway" onClick={startAnyway}>Start anyway</button>
             )}
             <button className={`btn ready-btn${iAmAway ? ' away' : iAmReady ? ' on' : ''}`}
               onClick={toggleReady}>

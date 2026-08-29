@@ -410,7 +410,7 @@
 .standby-banner span { font-size: 12px; color: var(--ink-soft); }
 /* Holds the tableau's track open so the board does not grow into it and then
    shrink back the moment their cards arrive. */
-.standby-hand { min-height: calc(var(--hand-card) * 2); display: grid;
+.standby-hand { min-height: calc(var(--hand-card) * 2.8 + 56px); display: grid;
   place-items: center; margin: 0; font-size: 13px; }
 
 /* A wood turn brings three cards over, so it looks like three cards being dealt
@@ -436,3 +436,20 @@
 @media (prefers-reduced-motion: reduce) {
   @keyframes wood-deal { 0% { opacity: 0; } 100% { opacity: 1; } }
 }
+
+/* The way back in for a player a forced start left behind. It sits in the track
+   their tableau will occupy, so taking a hand does not move the board a pixel -
+   the cards simply appear where the bar was. Shaped like the lobby's ready
+   button on purpose: it is the same question, asked in the same words. */
+/* As tall as the tableau it stands in for, so the cards appear where the bar was
+   and the board does not resize under a table already playing. The wood column is
+   two cards plus its gap, and every pile carries a label under it - that is the
+   24px. Matching it to the card alone left the board 200px taller than it would
+   be a moment later. */
+/* .btn also sets min-height, at the same specificity and later in the bundle, so
+   this has to carry both classes to win. A card is 2.5 by 3.5, so its HEIGHT is
+   1.4 x --hand-card and the wood column is two of them plus a gap; the rest is
+   the pile label and the row's own padding. */
+.btn.deal-me-in { width: 100%; min-height: calc(var(--hand-card) * 2.8 + 56px);
+  font-weight: 800; }
+.deal-me-in span { font-weight: 400; font-size: 13px; opacity: .75; }

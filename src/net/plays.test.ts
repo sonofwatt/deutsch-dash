@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { pickNextHost, allConnectedStuck } from './plays';
+import { spaceCountForPlayers } from '../game/rules';
 import type { PlayerInfo } from '../game/types';
 
 const p = (joinedAt: number, connected: boolean, stuckAt: number | null = null,
@@ -68,5 +69,23 @@ describe('sitting out', () => {
 
   it('still needs somebody actually playing to be stuck', () => {
     expect(allConnectedStuck({ c: who({ sittingOut: true }) })).toBe(false);
+  });
+});
+
+describe('a forced start keeps a seat for the players it deals around', () => {
+  // seats is everybody not sitting out; tableaus is the subset that was ready.
+  // The board is sized on SEATS, so somebody left behind already has their four
+  // spaces and can be dealt in mid-round without the grid changing shape.
+  it('is the distinction dealMeIn turns on', () => {
+    const players: Record<string, PlayerInfo> = {
+      a: p(1, true, null), b: p(2, true, null), c: p(3, true, null),
+    };
+    players.a.ready = true; players.b.ready = true; // c never readied
+    const seats = Object.keys(players).filter(u => !players[u].sittingOut);
+    const dealt = seats.filter(u => players[u].isBot || players[u].ready === true);
+    expect(seats).toEqual(['a', 'b', 'c']);
+    expect(dealt).toEqual(['a', 'b']);
+    // Four spaces per SEAT, so c's are already on the board.
+    expect(spaceCountForPlayers(seats.length)).toBe(12);
   });
 });

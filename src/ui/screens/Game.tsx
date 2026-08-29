@@ -44,6 +44,7 @@ export function Game() {
   const noteActivity = useGameStore(s => s.noteActivity);
   const setSittingOut = useGameStore(s => s.setSittingOut);
   const setSingleFlip = useGameStore(s => s.setSingleFlip);
+  const dealMeIn = useGameStore(s => s.dealMeIn);
   const [woodSide, swapSides] = useWoodSide();
 
   // The helper hint waits for the player to go quiet, so it never fires under
@@ -135,6 +136,12 @@ export function Game() {
   // and are dealt in at the next one - and watching means the BOARD, live, not a
   // waiting-room screen. The standby banner stands in for the opponent strip.
   const watching = !out && !hand;
+  // Two ways to be watching, and they end differently. A SEAT was kept for
+  // anybody who was in the room at the deal, ready or not, and the board was
+  // sized to include them - so somebody a forced start left behind can take a
+  // hand whenever they like, and the grid does not change shape when they do.
+  // Somebody who walked in after the deal has no seat and waits for the next one.
+  const seated = watching && (round.seats?.includes(uid) ?? false);
   if (out) {
     const canRejoin = hand != null;
     return (
@@ -229,11 +236,14 @@ export function Game() {
       {/* The banner takes the opponent strip's PLACE rather than sitting above it:
           that row is a fixed track in .game's grid, so a second thing in it would
           come straight off the board this player is here to watch. */}
-      {watching
+      {watching && !seated
         ? <div className="standby-banner" role="status">
             <strong>Standby. Game in progress.</strong>
             <span>You are dealt in at the start of the next round.</span>
           </div>
+        /* A player left behind by a forced start keeps the opponent strip: they
+           are at this table, not waiting outside it, and the way in is the bar
+           where their own cards will be. */
         : <OpponentStrip me={uid} players={room.players} tableaus={round.tableaus} woodSide={woodSide} />}
       <CenterGrid spaces={round.spaces} highlight={targets.spaces} badgeOf={badgeOf}
         onTap={i => void playTo({ space: i })} races={races}
@@ -264,7 +274,15 @@ export function Game() {
                 {me.stuckAt != null ? 'Waiting for others…' : "I'm stuck"}
               </button>
             )}
-        </> : (
+        </> : seated ? (
+          /* In the place their cards will be, and shaped like the button they
+             already know from the lobby - because it is the same question. The
+             answer is immediate: a seat was kept and the board already has their
+             spaces, so there is nothing to wait for. */
+          <button className="btn ready-btn deal-me-in" onClick={dealMeIn}>
+            Ready? <span>— deal me into this round</span>
+          </button>
+        ) : (
           /* A watcher has no cards, but the row is still a track in .game's grid
              and leaving it empty would let the board grow into it and then shrink
              back the moment they are dealt in. */

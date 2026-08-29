@@ -5,6 +5,7 @@ import { cardId, type Card, type CenterSpace, type PlayerInfo, type PlaySource, 
 import { canBuildOnPost, canPlayToSpace, isStuck, placeOnPost, sourceTop, takeCard } from '../game/rules';
 import { flipWood, rotateWood, WOOD_STEP } from '../game/wood';
 import { reconcileTableau } from '../game/center';
+import { buildDeck, deal, shuffle } from '../game/deck';
 import { botDelay, chooseBotAction, type BotLevel } from '../game/bot';
 import * as netRooms from '../net/rooms';
 import * as netPlays from '../net/plays';
@@ -116,9 +117,15 @@ export interface GameStore {
   setSingleFlip(on: boolean): void;
   /** Host-only: stop a countdown in progress and leave the table in its lobby. */
   cancelCountdown(): void;
+  /** Host-only: count the table down without waiting for everybody to be ready. */
+  startAnyway(): void;
+  /**
+   * Take a hand in a round already in progress. Only for a player who has a SEAT
+   * and no cards - somebody a forced start left behind.
+   */
+  dealMeIn(): void;
   setHints(on: boolean): void;
   setOrderly(on: boolean): void;
-  start(): void;
   next(): void;
   again(): void;
   addBot(badgeId: BadgeId, level: BotLevel, name: string): void;
@@ -203,6 +210,16 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
   // renders meta.countdown. See RoomMeta.countdown for why it is a digit rather
   // than a deadline.
   let countdownTimer: ReturnType<typeof setTimeout> | null = null;
+  /**
+   * The host has chosen to start without waiting for everybody. It suppresses the
+   * tableReady check in the two places that would otherwise call the countdown
+   * off - a forced countdown is by definition running against a table that is not
+   * ready - and nothing else. Host-local rather than in `meta`, because the host
+   * is the only client that ticks: if they reload inside those three seconds the
+   * flag goes with them and syncCountdown puts the table back in its lobby, which
+   * is the right thing to happen to a start nobody is around to finish.
+   */
+  let forcedCountdown = false;
   // When each centre space last changed hands, and to whom. Kept from snapshots
   // rather than read off the board, because the board only says who owns a space
   // NOW - never when they took it. `reported` makes one near miss one race, so
@@ -326,8 +343,8 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
       countdownTimer = null;
       const s = get();
       const { code, room } = s;
-      if (!code || !room || !isHost(s) || room.meta.phase !== 'lobby') return;
-      if (!tableReady(room)) { void deps.setCountdown(code, null); return; }
+      if (!code || !room || !isHost(s) || room.meta.phase !== 'lobby') { forcedCountdown = false; return; }
+      if (!forcedCountdown && !tableReady(room)) { void deps.setCountdown(code, null); return; }
       const n = room.meta.countdown ?? 0;
       if (n > 1) {
         void deps.setCountdown(code, n - 1);
@@ -341,6 +358,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
       }
       // startRound clears the digit in the same write that deals, so there is no
       // window where a client holds a countdown over a board.
+      forcedCountdown = false;
       hostAction(deps.startRound(code, room), 'start the game');
     }
 
@@ -360,6 +378,17 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         }
         return;
       }
+      // A forced countdown is running against a table that is not ready - that is
+      // what it is for - so it must not be called off here.
+      //
+      // Guarded on the FLAG alone and deliberately not on the timer as well.
+      // tickCountdown nulls the timer on its first line and only reassigns it
+      // after writing the next digit - and that write raises this snapshot
+      // synchronously from inside itself, so a timer test here is null for every
+      // tick of a countdown that is perfectly healthy. It cancelled the digit on
+      // the first tick every time, and the tick after that read the missing digit
+      // as zero and dealt: an instant start wearing a one-second countdown.
+      if (forcedCountdown) return;
       stopCountdown();
       if (room.meta.countdown != null) void deps.setCountdown(s.code, null);
     }
@@ -663,6 +692,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         stopCountdown();
         flips.clear();
         spaceTouched.clear();
+        forcedCountdown = false;
         commitFailedFor = null;
         deps.stopPresence();
         // lastRejected too: it outlived the room it belonged to, so the next
@@ -810,8 +840,53 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         const s = get();
         const { code, uid, room } = s;
         if (!code || !uid || !room || !isHost(s)) return;
+        const wasForced = forcedCountdown;
+        forcedCountdown = false;
         stopCountdown();   // our own tick must not fire between here and the write
+        // A forced countdown was already running against an unready table, so
+        // taking the digit away is enough - nothing will start it again. An
+        // ordinary one needs the host to stop being ready, or syncCountdown finds
+        // a ready table with no digit on the very next snapshot and counts again.
+        if (wasForced) { void deps.setCountdown(code, null); return; }
         hostAction(deps.setReady(code, uid, false), 'cancel the countdown');
+      },
+
+      startAnyway() {
+        const s = get();
+        const { code, room } = s;
+        if (!code || !room || !isHost(s) || room.meta.phase !== 'lobby') return;
+        if (room.meta.countdown != null || countdownTimer) return;
+        // The same three seconds everybody else gets. It was an instant deal, and
+        // the players it deals around deserve the same warning as the rest - and
+        // the host the same three seconds to change their mind.
+        // Timer FIRST, then the write. Firebase raises the local snapshot for that
+        // write synchronously from inside it, and syncCountdown runs on that
+        // snapshot: with the timer still null it sees a forced countdown that is
+        // not running, calls it off, and wipes the digit before this line is
+        // reached. The next tick then finds no digit, reads it as zero and deals
+        // on the spot - which is exactly the instant start this was replacing.
+        forcedCountdown = true;
+        countdownTimer = setTimeout(tickCountdown, 1000);
+        void deps.setCountdown(code, 3);
+      },
+
+      dealMeIn() {
+        const { code, uid, room } = get();
+        const round = room?.round;
+        if (!code || !uid || !room || !round) return;
+        if (room.meta.phase !== 'playing' || room.players[uid]?.sittingOut) return;
+        if (round.tableaus[uid]) return;                 // already holding cards
+        if (!round.seats?.includes(uid)) return;         // no seat was kept for them
+        // A fresh deck is safe HERE and nowhere else. buildDeck is per player and
+        // every card carries its owner, so re-dealing somebody who has already
+        // played this round mints duplicates of the cards they put in the middle
+        // (see sitting out, which keeps the hand for exactly that reason). This
+        // player was never dealt in, so none of their cards is anywhere.
+        const t = deal(shuffle(buildDeck(uid)), round.postCount ?? round.tableaus[
+          Object.keys(round.tableaus)[0]]?.post.length ?? 3);
+        set({ tableau: t, selection: null });
+        noteActivity();
+        hostAction(deps.persistTableau(code, uid, t), 'take a hand in this round');
       },
       setIdentity(name, badgeId) {
         const { code, uid, room } = get();
@@ -828,10 +903,6 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
       },
       setHints(on) { const c = get().code; if (c) void deps.setHints(c, on); },
       setOrderly(on) { const c = get().code; if (c) void deps.setOrderly(c, on); },
-      start() {
-        const { code, room } = get();
-        if (code && room) hostAction(deps.startRound(code, room), 'start the game');
-      },
       next() {
         const { code, room } = get();
         if (code && room) hostAction(deps.nextRound(code, room), 'start the next round');

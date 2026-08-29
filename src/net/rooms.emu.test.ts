@@ -122,7 +122,7 @@ emu('server-side player cap and badge uniqueness (database.rules.json)', () => {
       createdAt: Date.now(), hostId: HOST, targetScore: 75, phase: 'lobby', roundNumber: 0, playerCount: 1,
     }));
     await assertSucceeds(db.ref(`rooms/${code}`).update({
-      [`players/${HOST}`]: { name: 'Host', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, awayAt: null, score: 0 },
+      [`players/${HOST}`]: { name: 'Host', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, awayAt: null, score: 0, ready: true },
       'badges/tulip': HOST,
     }));
     for (let i = 0; i < extraPlayers; i++) {
@@ -225,7 +225,7 @@ emu('server-side player cap and badge uniqueness (database.rules.json)', () => {
       createdAt: Date.now(), hostId: HOST, targetScore: 75, phase: 'lobby', roundNumber: 0, playerCount: 1,
     }));
     await assertSucceeds(db.ref(`rooms/${code}`).update({
-      [`players/${HOST}`]: { name: 'Host', badgeId: 'kite', joinedAt: 1, connected: true, stuckAt: null, awayAt: null, score: 0 },
+      [`players/${HOST}`]: { name: 'Host', badgeId: 'kite', joinedAt: 1, connected: true, stuckAt: null, awayAt: null, score: 0, ready: true },
       'badges/kite': HOST,
     }));
 
@@ -367,7 +367,7 @@ emu('app writes under real security rules (regular client SDK, correct namespace
         await update(ref(database, `rooms/${code}/players/${uid}`), { connected: true });
       } else {
         await update(ref(database, `rooms/${code}`), {
-          [`players/${uid}`]: { name, badgeId, joinedAt: Date.now(), connected: true, stuckAt: null, awayAt: null, score: 0 },
+          [`players/${uid}`]: { name, badgeId, joinedAt: Date.now(), connected: true, stuckAt: null, awayAt: null, score: 0, ready: true },
           [`badges/${badgeId}`]: uid,
           'meta/playerCount': increment(1),
         });
@@ -393,7 +393,7 @@ emu('app writes under real security rules (regular client SDK, correct namespace
       createdAt: Date.now(), hostId: uid, targetScore: 75, phase: 'lobby', roundNumber: 0, playerCount: 1,
     });
     await update(ref(database, `rooms/${code}`), {
-      [`players/${uid}`]: { name, badgeId, joinedAt: Date.now(), connected: true, stuckAt: null, awayAt: null, score: 0 },
+      [`players/${uid}`]: { name, badgeId, joinedAt: Date.now(), connected: true, stuckAt: null, awayAt: null, score: 0, ready: true },
       [`badges/${badgeId}`]: uid,
     });
     return code;

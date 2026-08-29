@@ -14,7 +14,7 @@ emu('center transactions against emulator', () => {
     const uid = await ensureSignedIn();
     const room: Room = {
       meta: { createdAt: Date.now(), hostId: uid, creatorId: uid, targetScore: 75, phase: 'lobby', roundNumber: 0 },
-      players: { [uid]: { name: 'Host', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, awayAt: null, score: 0 } },
+      players: { [uid]: { name: 'Host', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, awayAt: null, score: 0, ready: true } },
       round: null,
     };
     await startRound(code, room);
@@ -70,7 +70,7 @@ emu('game-over threshold against emulator', () => {
     const meta = { createdAt: Date.now(), hostId: uid, creatorId: uid, targetScore: 25,
                    phase: 'roundEnd' as const, roundNumber: 1 };
     const players = { [uid]: { name: 'Host', badgeId: 'tulip' as const, joinedAt: 1,
-                               connected: true, stuckAt: null, awayAt: null, score: 0 } };
+                               connected: true, stuckAt: null, awayAt: null, score: 0, ready: true } };
     await startRound(code, { meta: { ...meta, phase: 'lobby' }, players, round: null });
     await update(ref(db, `rooms/${code}/meta`), { phase: 'roundEnd' }); // the blitz landed
 
@@ -112,13 +112,13 @@ emu('the round shown in the 2026-08-25 playtest screenshot', () => {
     const other = 'other-player-uid';
     await update(ref(db, `rooms/${code}`), {
       [`players/${other}`]: { name: 'sonofwatt', badgeId: 'anchor', joinedAt: 2,
-                              connected: true, stuckAt: null, awayAt: null, score: 0 },
+                              connected: true, stuckAt: null, awayAt: null, score: 0, ready: true },
       'meta/targetScore': 25,
     });
 
     const players = {
-      [dave]: { name: 'Dave', badgeId: 'boat' as const, joinedAt: 1, connected: true, stuckAt: null, awayAt: null, score: 0 },
-      [other]: { name: 'sonofwatt', badgeId: 'anchor' as const, joinedAt: 2, connected: true, stuckAt: null, awayAt: null, score: 0 },
+      [dave]: { name: 'Dave', badgeId: 'boat' as const, joinedAt: 1, connected: true, stuckAt: null, awayAt: null, score: 0, ready: true },
+      [other]: { name: 'sonofwatt', badgeId: 'anchor' as const, joinedAt: 2, connected: true, stuckAt: null, awayAt: null, score: 0, ready: true },
     };
     const meta = { createdAt: Date.now(), hostId: dave, creatorId: dave, targetScore: 25,
                    phase: 'roundEnd' as const, roundNumber: 1 };
@@ -148,7 +148,15 @@ emu('the round shown in the 2026-08-25 playtest screenshot', () => {
     expect(afterScoring.players[other].score).toBe(-12);
     expect(afterScoring.meta.phase).toBe('roundEnd'); // 24 does not clear a target of 25
 
-    await nextRound(code, afterScoring);
+    // startRound clears `ready`, and it deals a HAND only to players who have
+    // one set - which is what leaves an unready player behind on a forced start.
+    // Between rounds the score sheet's own ready gate is what puts it back; here
+    // that is done by hand.
+    await update(ref(db, `rooms/${code}`), {
+      [`players/${dave}/ready`]: true, [`players/${other}/ready`]: true,
+    });
+    const readied = normalizeRoom((await get(ref(db, `rooms/${code}`))).val())!;
+    await nextRound(code, readied);
     const afterNext = normalizeRoom((await get(ref(db, `rooms/${code}`))).val())!;
     expect(afterNext.meta.phase).toBe('playing');
     expect(afterNext.meta.roundNumber).toBe(afterScoring.meta.roundNumber + 1);
@@ -182,7 +190,7 @@ emu('the score commit does not ride on the stats write', () => {
     const { db, ensureSignedIn } = await import('./firebase');
     const uid = await ensureSignedIn();
     const players = { [uid]: { name: 'Host', badgeId: 'tulip' as const, joinedAt: 1,
-                               connected: true, stuckAt: null, awayAt: null, score: 0 } };
+                               connected: true, stuckAt: null, awayAt: null, score: 0, ready: true } };
     const meta = { createdAt: Date.now(), hostId: uid, creatorId: uid, targetScore: 75,
                    phase: 'roundEnd' as const, roundNumber: 1 };
     await startRound(code, { meta: { ...meta, phase: 'lobby' }, players, round: null });
@@ -225,14 +233,14 @@ emu('sitting out leaves the round in progress', () => {
     // a fixture that only claims a score in memory proves nothing about it.
     await update(ref(db, `rooms/${code}`), {
       [`players/${other}`]: { name: 'Sam', badgeId: 'anchor', joinedAt: 2, connected: true,
-                              stuckAt: null, awayAt: null, score: 5 },
+                              stuckAt: null, awayAt: null, score: 5, ready: true },
       [`players/${dave}/score`]: 12,
     });
     const players = {
       [dave]: { name: 'Dave', badgeId: 'tulip' as const, joinedAt: 1, connected: true,
-                stuckAt: null, awayAt: null, score: 12 },
+                stuckAt: null, awayAt: null, score: 12, ready: true },
       [other]: { name: 'Sam', badgeId: 'anchor' as const, joinedAt: 2, connected: true,
-                 stuckAt: null, awayAt: null, score: 5 },
+                 stuckAt: null, awayAt: null, score: 5, ready: true },
     };
     const meta = { createdAt: Date.now(), hostId: dave, creatorId: dave, targetScore: 75,
                    phase: 'lobby' as const, roundNumber: 1 };
@@ -266,8 +274,16 @@ emu('sitting out leaves the round in progress', () => {
     expect(after.players[dave].score, 'his total stands exactly still').toBe(12);
     expect(after.players[other].score, 'and everyone else is scored as usual').not.toBe(5);
 
-    // The next deal leaves him out until he says otherwise.
-    await nextRound(code, after);
+    // The next deal leaves him out until he says otherwise. `other` has to be
+    // readied again first: startRound clears the flag and deals a hand only to
+    // players who have set it, which is the same mechanism that leaves an unready
+    // player behind on a forced start. Sitting out is the stronger claim of the
+    // two - it survives being ready - and that is what this pins.
+    await update(ref(db, `rooms/${code}`), {
+      [`players/${other}/ready`]: true, [`players/${dave}/ready`]: true,
+    });
+    const readied = normalizeRoom((await get(ref(db, `rooms/${code}`))).val())!;
+    await nextRound(code, readied);
     const dealt = normalizeRoom((await get(ref(db, `rooms/${code}`))).val())!.round!.tableaus;
     expect(Object.keys(dealt)).toEqual([other]);
   });

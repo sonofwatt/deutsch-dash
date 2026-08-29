@@ -45,11 +45,15 @@ export function normalizeRoom(raw: unknown): Room | null {
     paleCards: r.meta.paleCards ?? true,
   };
   const playerCount = Object.keys(players).length;
-  const postCount = postCountForPlayers(playerCount);
   const orderly = meta.orderlyGrid ?? false;
   let round: RoundState | null = null;
   if (r.round && typeof r.round === 'object') {
     const rr = r.round as Partial<RoundState> & { tableaus?: Record<string, unknown> };
+    // The shape this round was DEALT with, not the shape the room implies now.
+    // Deriving it from the live player count renormalized every hand the moment
+    // somebody walked in - five posts to three at a two-player table, which drops
+    // cards off the end of everybody's tableau.
+    const postCount = rr.postCount ?? postCountForPlayers(playerCount);
     round = {
       // The size this round was dealt with, not the size the room implies now: a
       // spectator arriving mid-round must not grow the board under everybody.
@@ -63,6 +67,8 @@ export function normalizeRoom(raw: unknown): Room | null {
       races: rr.races ?? null,
       duels: rr.duels ?? null,
       spaceCount: rr.spaceCount,
+      postCount: rr.postCount,
+      seats: rr.seats,
       stuckRounds: rr.stuckRounds ?? 0,
       startedAt: rr.startedAt ?? 0,
       endedAt: rr.endedAt ?? null,
