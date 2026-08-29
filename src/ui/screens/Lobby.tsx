@@ -203,7 +203,11 @@ export function Lobby({ code }: { code: string }) {
           </button>
         : <button className={`btn ready-btn${iAmAway ? ' away' : iAmReady ? ' on' : ''}`}
             onClick={toggleReady}>
-            {iAmAway ? 'Away' : iAmReady ? 'Ready' : "I'm Ready"}
+            {/* A question when it is asking and a statement when it is answered.
+                "I'm Ready" then "Ready" read as the same word twice, and people
+                could not tell which state they were looking at - the colour was
+                carrying the whole message on its own. */}
+            {iAmAway ? 'Away' : iAmReady ? 'Ready!' : 'Ready?'}
           </button>}
       {/* Quiet, and below the ready button: stepping away is the rarer thing to
           want, and it must not be the button a thumb finds by accident. */}

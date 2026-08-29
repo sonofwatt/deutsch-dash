@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { BADGES } from '../../game/badges';
+import { BADGES, EMOJI } from '../../game/badges';
 import { signed, type Move } from '../scoreRanks';
 import type { PlayerInfo, RoundScore } from '../../game/types';
 
@@ -16,7 +16,11 @@ import type { PlayerInfo, RoundScore } from '../../game/types';
  * `move` tints it for the trip. Both are inert until something actually reorders.
  */
 export function ScoreRow(
-  { player, score, move }: { player: PlayerInfo; score?: RoundScore; move?: Move },
+  // `blitzed` is optional like everything else here: render.test.ts builds these
+  // props as complete literals and tsc -b typechecks it, so a REQUIRED prop
+  // breaks the build rather than just the tests.
+  { player, score, move, blitzed }:
+  { player: PlayerInfo; score?: RoundScore; move?: Move; blitzed?: boolean },
 ) {
   const badge = BADGES[player.badgeId];
   return (
@@ -35,6 +39,11 @@ export function ScoreRow(
       <span className="score-math muted">{score ? '=' : ''}</span>
       <span className="score-math score-delta">{score ? signed(score.delta) : ''}</span>
       <span className="score-total">{player.score}</span>
+      {/* Who emptied their Blitz pile, said once, on the row it belongs to. The
+          column is always there so the totals stay in line down the sheet. */}
+      <span className="score-blitz" aria-label={blitzed ? 'Blitzed this round' : undefined}>
+        {blitzed ? '\u26a1' + EMOJI : ''}
+      </span>
     </motion.div>
   );
 }

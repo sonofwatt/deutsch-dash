@@ -136,6 +136,18 @@ export const GO_MS = 700;
  * the moment they come back the countdown starts by itself. The host's "Start
  * anyway" is the way past a player whose phone has died for good.
  */
+/**
+ * How many of the players who will be dealt in have said they are ready, for the
+ * host's "anyway" button to show what it is overriding. Bots are ready by
+ * definition, so they count on both sides of the fraction rather than being
+ * hidden from it - a table of one human and three bots reads 0/4 until that human
+ * presses the button, which is the truth.
+ */
+export function readyTally(room: Room): { ready: number; total: number } {
+  const playing = Object.values(room.players).filter(p => !p.sittingOut);
+  return { ready: playing.filter(p => p.isBot || p.ready === true).length, total: playing.length };
+}
+
 export function tableReady(room: Room): boolean {
   const playing = Object.values(room.players).filter(p => !p.sittingOut);
   // Two players who are actually going to be dealt in. A table of one plus three

@@ -125,8 +125,11 @@
    360px phone otherwise overflows the sheet into a horizontal scrollbar instead
    of ellipsing. */
 .score-row { display: grid; gap: 6px; align-items: center;
+  /* badge | name | penalty | played | = | round | TOTAL | blitz bolt. The last
+     column is reserved whether or not a bolt is in it, so the totals stay in a
+     line down the sheet instead of the blitzer's row shunting left. */
   grid-template-columns: 28px minmax(0, 1fr) repeat(2, minmax(3ch, auto)) auto
-                         repeat(2, minmax(3ch, auto));
+                         repeat(2, minmax(3ch, auto)) 16px;
   padding: 8px 10px; border-radius: var(--radius);
   background: var(--surface); border: 1px solid var(--line); font-size: 14px; }
 .score-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -138,8 +141,14 @@
 .score-math, .score-total { text-align: right; font-variant-numeric: tabular-nums; }
 .score-neg { color: var(--danger-ink); }
 .score-delta { font-weight: 600; }
-/* The running total, set apart from the round's arithmetic to its left. */
-.score-total { font-weight: 800; padding-left: 6px; border-left: 1px solid var(--line); }
+/* The running total, set apart from the round's arithmetic to its left. The rule
+   is the whole point of the separation and a 1px hairline in --line was losing
+   it against the row's own border, so it is drawn full height, in ink rather
+   than in furniture, and given room on both sides. */
+.score-total { font-weight: 800; padding-left: 10px; margin-left: 4px;
+  border-left: 2px solid color-mix(in srgb, var(--ink) 28%, transparent);
+  align-self: stretch; display: flex; align-items: center; justify-content: flex-end; }
+.score-blitz { font-size: 13px; line-height: 1; text-align: right; }
 .error { color: var(--danger-ink); }
 /* A row that changed place holds its colour through the slide, then lets go. The
    animation carries the fade so no second timer has to clear the class. */
@@ -195,11 +204,22 @@
    sheet does not jump as remarks of different lengths rotate through; a rare
    three-liner grows the box rather than being clipped, because a cut-off joke is
    worse than a slightly taller sheet. overflow is for the slide, not the text. */
-.commentary { min-height: 62px; display: grid; align-content: center; gap: 6px;
-  padding: 8px 12px; border-radius: var(--radius); border: 1px dashed var(--line);
+/* Room for two lines of the bigger type without the sheet jumping as remarks of
+   different lengths rotate through. The arrows sit in the row with the line, so
+   the grid is three columns wide rather than one. */
+.commentary { min-height: 76px; display: grid; align-content: center; gap: 6px;
+  padding: 8px 6px; border-radius: var(--radius); border: 1px dashed var(--line);
   overflow: hidden; }
-.commentary-line { margin: 0; font-size: 13px; line-height: 1.35; text-align: center;
-  color: var(--ink-soft); }
+.commentary-row { display: grid; grid-template-columns: 32px minmax(0, 1fr) 32px;
+  align-items: center; }
+.commentary-line { margin: 0; font-size: 15px; line-height: 1.4; text-align: center;
+  color: var(--ink); }
+/* Deliberately quiet: they are there for somebody who wants to go back for a line
+   they only half read, not an invitation to click through the whole set. They are
+   still a full 32px of target, which is what matters on a phone. */
+.commentary-step { min-height: 32px; border: 0; background: none; padding: 0;
+  color: var(--ink-soft); font-size: 18px; line-height: 1; cursor: pointer; }
+.commentary-step:hover { color: var(--ink); }
 .commentary-dots { display: flex; gap: 4px; justify-content: center; }
 .commentary-dots span { width: 4px; height: 4px; border-radius: 999px; background: var(--line); }
 .commentary-dots span.on { background: var(--ink-soft); }
