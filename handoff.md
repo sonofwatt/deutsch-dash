@@ -1226,7 +1226,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `9d72d8b` | Columns from the shape of the box; the iOS and Android edge guards |
 | `7a90afc` | The Android edge guard raised to 40dp, the widest the gesture reaches |
 | `01a4e99` | Flicking a card at the board, judged on the throw and not the release |
-| _(this one)_ | The flick aimed by direction; the whole space above the hand |
+| `c7a1da9` | The flick aimed by direction; the whole space above the hand |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
