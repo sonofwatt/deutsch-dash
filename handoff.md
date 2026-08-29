@@ -1471,7 +1471,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `64e2c7c` | A version at the foot of the home and lobby screens |
 | `1b28628` | The version as v1.2.41, derived from two counters |
 | `85705c4` | The host can cancel a countdown and keep the lobby |
-| _(this one)_ | Start anyway shares the ready button's row; the stale scowl cleared |
+| `406bbad` | Start anyway shares the ready button's row; the stale scowl cleared |
 | `c7a1da9` | The flick aimed by direction; the whole space above the hand |
 
 Earlier history, the approved design spec and the original 15-task execution
