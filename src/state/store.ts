@@ -513,7 +513,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         // event, and the away note is there to explain the board on return.
         const meP = room.players[me];
         const partOfIt = meP != null && (meP.stuckAt != null || meP.awayAt != null);
-        if (phase === 'playing' && partOfIt && allConnectedStuck(room.players)) {
+        if (phase === 'playing' && partOfIt && allConnectedStuck(room.players, room.round?.tableaus)) {
           // clear first: a snapshot raised synchronously by the writes below must not see me still stuck
           if (meP.stuckAt != null) void deps.clearStuck(get().code!, me);
           flips.set(me, 0); // a rotation changes which third of the pile is reachable

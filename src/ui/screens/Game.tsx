@@ -173,7 +173,7 @@ export function Game() {
   // for everybody; only the host is offered the button that starts it.
   const stall = room.meta.singleFlip
     ? { mode: 'rescue' as const, canRescue: false, onRescue: () => {} }
-    : allConnectedStuck(room.players)
+    : allConnectedStuck(room.players, round.tableaus)
       ? { mode: 'stalled' as const, canRescue: isHost({ uid, room }),
           onRescue: () => setSingleFlip(true) }
       : undefined;
@@ -224,10 +224,11 @@ export function Game() {
       <OpponentStrip me={uid} players={room.players} tableaus={round.tableaus} woodSide={woodSide} />
       <CenterGrid spaces={round.spaces} highlight={targets.spaces} badgeOf={badgeOf}
         onTap={i => void playTo({ space: i })} races={races}
-        snapping={targets.spaces.length > 0} stuck={me.stuckAt != null} hint={hint}
+        snapping={targets.spaces.length > 0} stuck={hand != null && me.stuckAt != null} hint={hint}
         openings={openings} stall={stall}
         onSnapTap={() => { if (targets.spaces.length) void playTo({ space: targets.spaces[0] }); }} />
       <div>
+        {hand ? <>
         <motion.div key={lastRejected?.at ?? 0}
           animate={lastRejected ? { x: [0, -8, 8, -5, 5, 0] } : { x: 0 }}
           transition={{ duration: 0.35 }}>
@@ -250,8 +251,14 @@ export function Game() {
                 {me.stuckAt != null ? 'Waiting for others…' : "I'm stuck"}
               </button>
             )}
+        </> : (
+          /* A watcher has no cards, but the row is still a track in .game's grid
+             and leaving it empty would let the board grow into it and then shrink
+             back the moment they are dealt in. */
+          <p className="muted standby-hand">Your cards arrive with the next deal.</p>
+        )}
       </div>
-      {drag && <DragGhost drag={drag} badgeId={me.badgeId} />}
+      {hand && drag && <DragGhost drag={drag} badgeId={me.badgeId} />}
     </div>
   );
 }

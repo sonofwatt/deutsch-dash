@@ -395,3 +395,20 @@
    only way to move a centred one. In a browser tab it costs nothing at all: the
    hand is bound by 7.5vh there and the cards already sat 40px in. */
 :root[data-platform="android"] .game { --edge-guard: 40px; }
+
+/* Standby: somebody who joined a game already in progress, or who missed the
+   deal. They watch the board live and are dealt in at the next round.
+
+   It stands in for the opponent strip rather than sitting above it, because that
+   row is a fixed track in .game's grid - adding a second thing to it would come
+   straight off the board they are here to watch. */
+.standby-banner { display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 2px; padding: 8px 12px; text-align: center;
+  border-radius: var(--radius); border: 1px dashed var(--line);
+  background: color-mix(in srgb, var(--warn) 8%, transparent); }
+.standby-banner strong { font-size: 15px; color: var(--warn-ink); }
+.standby-banner span { font-size: 12px; color: var(--ink-soft); }
+/* Holds the tableau's track open so the board does not grow into it and then
+   shrink back the moment their cards arrive. */
+.standby-hand { min-height: calc(var(--hand-card) * 2); display: grid;
+  place-items: center; margin: 0; font-size: 13px; }

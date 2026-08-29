@@ -721,8 +721,13 @@ describe('away players', () => {
       me:   { name: 'D', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: 123, awayAt: null, score: 0 },
       idle: { name: 'I', badgeId: 'star',  joinedAt: 2, connected: true, stuckAt: null, awayAt, score: 0 },
     },
+    // Everybody dealt in has a hand. That is not decoration: allConnectedStuck
+    // now skips players who have none, because a spectator who joined mid-game
+    // has a player record and no cards and can never be stuck - counted as
+    // present they are one more player the table waits on forever.
     round: { spaces: Array.from({ length: 16 }, () => ({ stack: [], history: [] })),
-             tableaus: {}, blitzedBy: null, scores: null, races: null, duels: null,
+             tableaus: { me: deal(buildDeck('me'), 3), idle: deal(buildDeck('idle'), 3) },
+             blitzedBy: null, scores: null, races: null, duels: null,
              endedAt: null, stuckRounds: 0, startedAt: 1 },
   });
 
@@ -730,7 +735,8 @@ describe('away players', () => {
     meta: { createdAt: 1, hostId: 'me', creatorId: 'me', targetScore: 75, phase, roundNumber: 1 },
     players: { me: { name: 'D', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, awayAt, score: 0 } },
     round: { spaces: Array.from({ length: 16 }, () => ({ stack: [], history: [] })),
-             tableaus: {}, blitzedBy: null, scores: null, races: null, duels: null,
+             tableaus: { me: deal(buildDeck('me'), 3) },
+             blitzedBy: null, scores: null, races: null, duels: null,
              endedAt: null, stuckRounds: 0, startedAt: 1 },
   });
 
@@ -857,6 +863,8 @@ describe('away players', () => {
     for (const id of ['bot_one', 'bot_two']) {
       room.players[id] = { name: id, badgeId: 'star', joinedAt: 2, connected: true,
                            stuckAt: 500, awayAt: null, score: 0, isBot: true, botLevel: 'medium' };
+      // Dealt in, like startRound deals every non-sitting-out player in.
+      room.round!.tableaus[id] = deal(buildDeck(id), 3);
     }
     cb(room);
     expect(deps.incrementStuckRounds).toHaveBeenCalledTimes(1);

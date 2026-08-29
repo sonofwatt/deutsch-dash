@@ -98,15 +98,19 @@ export async function joinRoom(code: string, name: string, badgeId: BadgeId): Pr
   if (Date.now() - room.meta.createdAt > ROOM_TTL_MS) return { ok: false, reason: 'expired' };
   const rejoining = uid in room.players;
   if (!rejoining) {
-    if (room.meta.phase !== 'lobby') return { ok: false, reason: 'started' };
+    // A game in progress is no longer a closed door. Somebody arriving mid-round
+    // is admitted as a spectator: they get a player record and no tableau, watch
+    // the board live, and startRound deals them in with everybody else at the
+    // next deal. The rules file dropped its lobby-only validate to allow it - the
+    // 8-seat cap is untouched, because that was never what enforced it.
     if (Object.keys(room.players).length >= MAX_PLAYERS) return { ok: false, reason: 'full' };
     if (Object.values(room.players).some(p => p.badgeId === badgeId)) {
       return { ok: false, reason: 'badge-taken' };
     }
     // Atomic: the player record, the badge claim, and the playerCount bump
     // must land together, and the checks above are only a fast/friendly
-    // pre-check - database.rules.json enforces the 8-player cap, lobby-only
-    // join, and badge uniqueness for real, so a rejection here means another
+    // pre-check - database.rules.json enforces the 8-player cap and badge
+    // uniqueness for real, so a rejection here means another
     // client won the race (see database.rules.json for why playerCount is a
     // tracked counter rather than a live child count).
     //

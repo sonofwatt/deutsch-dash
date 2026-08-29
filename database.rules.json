@@ -16,8 +16,7 @@
         },
         "players": {
           "$uid": {
-            ".write": "auth != null && (auth.uid === $uid || root.child('rooms').child($code).child('meta').child('hostId').val() === auth.uid)",
-            ".validate": "data.exists() || root.child('rooms').child($code).child('meta').child('phase').val() === 'lobby'"
+            ".write": "auth != null && (auth.uid === $uid || root.child('rooms').child($code).child('meta').child('hostId').val() === auth.uid)"
           }
         },
         "badges": {

@@ -31,9 +31,20 @@ export function pickNextHost(players: Record<string, PlayerInfo>): string | null
  * They still HAVE a hand - it is what they rejoin with - so the hand is no proof
  * either way. The flag is.
  */
-export function allConnectedStuck(players: Record<string, PlayerInfo>): boolean {
-  const present = Object.values(players)
-    .filter(p => p.connected && p.awayAt == null && !p.sittingOut);
+/**
+ * `tableaus`, when given, is who is actually IN this round - and it has to be
+ * given wherever a round exists. A spectator who joined mid-game has a player
+ * record and no hand, so they can never be stuck; counted as present they are one
+ * more player the table waits on forever. This is the same trap as sitting out
+ * and as being away, arriving by a third route.
+ */
+export function allConnectedStuck(
+  players: Record<string, PlayerInfo>, tableaus?: Record<string, unknown>,
+): boolean {
+  const present = Object.entries(players)
+    .filter(([uid, p]) => p.connected && p.awayAt == null && !p.sittingOut
+      && (!tableaus || uid in tableaus))
+    .map(([, p]) => p);
   return present.length > 0 && present.every(p => p.stuckAt != null);
 }
 

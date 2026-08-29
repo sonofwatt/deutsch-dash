@@ -243,17 +243,35 @@ emu('server-side player cap and badge uniqueness (database.rules.json)', () => {
     expect(badgeSnap.val()).toBe(room.meta.hostId);
   });
 
-  it('rejects a brand-new player write once the room has left lobby, at the rules level', async () => {
-    const code = 'PHASEGATE';
+  it('admits a brand-new player into a game already in progress', async () => {
+    // This used to be refused at the rules level: a new player record was
+    // lobby-only. A game in progress now takes spectators - they get a record and
+    // no hand, watch the board live, and startRound deals them in at the next
+    // round. Pinned here because it is a DELIBERATE loosening of the rules and
+    // the only thing standing between the feature and a silent refusal is this
+    // file being deployed.
+    const code = 'MIDGAME';
     await seedRoom(code, 0);
     await assertSucceeds(hostCtx.database().ref(`rooms/${code}/meta/phase`).set('playing'));
-    // A correctly-shaped playerCount (2) isolates the phase gate itself as
-    // the reason for rejection, not an incidental counter mismatch.
-    await assertFails(racerCtx.database().ref(`rooms/${code}`).update({
+    await assertSucceeds(racerCtx.database().ref(`rooms/${code}`).update({
       [`players/${RACER}`]: {
         name: 'Racer', badgeId: 'bicycle', joinedAt: Date.now(), connected: true, stuckAt: null, score: 0,
       },
       'meta/playerCount': 2,
+    }));
+  });
+
+  it('still caps the room at 8 mid-game - the seat limit was never the phase gate', async () => {
+    // The counter is what enforces the cap, which is why it is tracked rather
+    // than counted live. Removing the phase gate must not have loosened it.
+    const code = 'MIDGAMEFULL';
+    await seedRoom(code, 7); // HOST + seed-0..6 = 8 players
+    await assertSucceeds(hostCtx.database().ref(`rooms/${code}/meta/phase`).set('playing'));
+    await assertFails(racerCtx.database().ref(`rooms/${code}`).update({
+      [`players/${RACER}`]: {
+        name: 'Racer', badgeId: 'bicycle', joinedAt: Date.now(), connected: true, stuckAt: null, score: 0,
+      },
+      'meta/playerCount': 9,
     }));
   });
 
