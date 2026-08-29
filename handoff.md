@@ -1443,7 +1443,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `8ed3a45` → `94569c5` | The round-end gate, the near-miss race, spectators, and the wood-cycle stuck rule |
 | `84da728` | The bot ladder down a rung, Genius, and a wood turn that deals three |
 | `64e2c7c` | A version at the foot of the home and lobby screens |
-| _(this one)_ | The version as v1.2.41, derived from two counters |
+| `1b28628` | The version as v1.2.41, derived from two counters |
 | `c7a1da9` | The flick aimed by direction; the whole space above the hand |
 
 Earlier history, the approved design spec and the original 15-task execution
