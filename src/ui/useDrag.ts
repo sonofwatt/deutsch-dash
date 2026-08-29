@@ -218,7 +218,15 @@ function handTop(): number {
   return el ? el.getBoundingClientRect().top : Infinity;
 }
 
-export function useDrag(onDrop: (source: PlaySource, target: DropTarget, at: Point) => void) {
+/**
+ * `fling` is the host's room option (RoomMeta.flingOn). Off, a card has to be
+ * carried into the drop area and let go there, which is what the gesture was
+ * before throwing existed and still works exactly as it did. The throw is read
+ * either way - it costs nothing - and simply not acted on.
+ */
+export function useDrag(
+  onDrop: (source: PlaySource, target: DropTarget, at: Point) => void, fling = true,
+) {
   const [drag, setDrag] = useState<DragState | null>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
 
@@ -255,7 +263,7 @@ export function useDrag(onDrop: (source: PlaySource, target: DropTarget, at: Poi
       cleanup();
       setDrag(null);
       if (ev.type === 'pointerup') sample(ev.clientX, ev.clientY);
-      const thrown = throwOf(samples);
+      const thrown = fling ? throwOf(samples) : null;
       if (ev.type === 'pointerup') {
         const target = parseDrop(document.elementFromPoint(ev.clientX, ev.clientY));
         const at = { x: ev.clientX, y: ev.clientY };

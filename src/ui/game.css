@@ -284,12 +284,17 @@
 .race-flash { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center;
   font-size: calc(var(--card-w) * .62); pointer-events: none; opacity: 0; }
 /* Winner: floats off the top of the card. Rise scales with the card so it clears
-   the same amount of it on a phone as on a desktop. */
-.race-angel { animation: race-angel 1s ease-out forwards; }
+   the same amount of it on a phone as on a desktop.
+   1.5s rather than 1s - half as long again on screen - and the rise itself is
+   gentler than that alone would make it: the face now HOLDS at rest until nearly
+   half way through and drifts up over the rest, so the extra time goes into
+   being readable rather than into a longer glide. */
+.race-angel { animation: race-angel 1.5s ease-out forwards; }
 @keyframes race-angel {
   0%   { opacity: 0; transform: translateY(15%) scale(.7); }
-  18%  { opacity: 1; transform: translateY(0) scale(1.05); }
-  30%  { transform: translateY(0) scale(1); }
+  12%  { opacity: 1; transform: translateY(0) scale(1.05); }
+  20%  { transform: translateY(0) scale(1); }
+  45%  { opacity: 1; transform: translateY(-6%) scale(1); }
   100% { opacity: 0; transform: translateY(-55%) scale(1); }
 }
 /* Loser: a short sideways shake, then gone. Percentages are of the slot, so the
@@ -308,7 +313,8 @@
 /* Reduced motion keeps both faces and drops the movement - which one you got is
    the information here, the moving is only how it carries. */
 @media (prefers-reduced-motion: reduce) {
-  .race-angel, .race-angry { animation: race-flash-still 1s ease-out forwards; }
+  .race-angry { animation: race-flash-still 1s ease-out forwards; }
+  .race-angel { animation: race-flash-still 1.5s ease-out forwards; }
   @keyframes race-flash-still { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
 }
 

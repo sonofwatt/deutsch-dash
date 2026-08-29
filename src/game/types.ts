@@ -48,6 +48,21 @@ export interface RoomMeta {
    */
   paleCards?: boolean;
   /**
+   * Whether a card can be FLUNG at the board rather than carried to it. A host
+   * option so a table can agree on it, and normalizeRoom defaults it ON: it is
+   * the faster way to play and the one the table asked for, and a room that
+   * predates the field should get it. Off falls back to carrying a card into the
+   * drop area, which still works and always did. See flickOf in ui/useDrag.ts.
+   */
+  flingOn?: boolean;
+  /**
+   * The stuck-table rescue: while this is set, every player's wood turns over
+   * ONE card at a time instead of three, which reaches cards the usual cycle
+   * never exposes. Host-set, and cleared automatically the moment somebody plays
+   * - it is a way out of a deadlock, not a mode. See wood.ts and store.ts.
+   */
+  singleFlip?: boolean;
+  /**
    * The lobby countdown: 3, 2, 1, then 0 which reads "GO!", then absent again.
    *
    * A NUMBER the host writes, not a deadline every client races its own clock

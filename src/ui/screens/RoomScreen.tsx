@@ -8,6 +8,13 @@ import { splashVariant, type SplashVariant } from '../splashVariant';
 import { RoundEndOverlay } from '../components/RoundEndOverlay';
 import { GameOverOverlay } from '../components/GameOverOverlay';
 
+/**
+ * How long the blitz splash holds the screen. The particles have to finish inside
+ * it - see ui.css, where the slowest faller runs 3.4s - and it was 1600ms, which
+ * cut the celebration off before most of it had crossed the screen.
+ */
+const SPLASH_MS = 3600;
+
 export function RoomScreen({ code }: { code: string }) {
   const joinPhase = useGameStore(s => s.joinPhase);
   const room = useGameStore(s => s.room);
@@ -15,7 +22,7 @@ export function RoomScreen({ code }: { code: string }) {
   const blitzedBy = room?.round?.blitzedBy ?? null;
   // Frozen at the blitz, deliberately. The host commits the round's totals within a
   // few hundred ms of the phase turning, so a variant recomputed on every render
-  // can change glyph halfway through its own 1.6s animation - tears turning to
+  // can change glyph halfway through its own animation - tears turning to
   // something worse as the new totals land. The splash is a snapshot of the moment
   // it fired, and the sheet behind it carries the new numbers.
   const [splash, setSplash] = useState<{ until: number; variant: SplashVariant } | null>(null);
@@ -26,7 +33,7 @@ export function RoomScreen({ code }: { code: string }) {
     // wants the totals as they stood AT THE BLITZ, and must not re-run when they
     // change a moment later. Taking them as deps would do exactly that.
     const at = gameStore.getState();
-    if (at.room) setSplash({ until: Date.now() + 1600, variant: splashVariant(at.room.players, blitzedBy, at.uid) });
+    if (at.room) setSplash({ until: Date.now() + SPLASH_MS, variant: splashVariant(at.room.players, blitzedBy, at.uid) });
   }, [phase, blitzedBy]);
   const [, force] = useState(0);
   useEffect(() => {

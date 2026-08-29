@@ -1,7 +1,7 @@
 import { createStore, type StoreApi } from 'zustand/vanilla';
 import { useStore } from 'zustand';
 import type { BadgeId } from '../game/badges';
-import type { Card, CenterSpace, PlayerInfo, PlaySource, Room, Tableau } from '../game/types';
+import { cardId, type Card, type CenterSpace, type PlayerInfo, type PlaySource, type Room, type Tableau } from '../game/types';
 import { canBuildOnPost, canPlayToSpace, isStuck, placeOnPost, sourceTop, takeCard } from '../game/rules';
 import { flipWood, rotateWood } from '../game/wood';
 import { reconcileTableau } from '../game/center';
@@ -27,6 +27,21 @@ export const HOST_AWAY_MS = 30000;
 // not about the table.
 export const AWAY_MS = 45000;
 
+/**
+ * How long after somebody else lands on a space a play aimed at it still counts
+ * as having LOST a race to them rather than as nothing at all.
+ *
+ * A genuine collision - two transactions, one aborted - is the only race the
+ * server can see, and it needs the two plays to overlap inside one round trip.
+ * Miss by a tenth of a second more than that and the loser's own snapshot has
+ * already caught up, so the play is refused locally by canPlayToSpace and
+ * nothing happens: no scowl, no halo, no sign the race was ever run. That is
+ * exactly the case the table complained about, because it is the case that
+ * feels most unfair. Inside this window the near miss is treated as the race it
+ * was.
+ */
+export const RACE_GRACE_MS = 1000;
+
 export interface Deps {
   ensureSignedIn(): Promise<string>;
   watchRoom(code: string, cb: (room: Room | null) => void): () => void;
@@ -36,6 +51,8 @@ export interface Deps {
   setReady(code: string, uid: string, on: boolean): Promise<void>;
   setSittingOut(code: string, uid: string, on: boolean): Promise<void>;
   setPaleCards(code: string, on: boolean): Promise<void>;
+  setFling(code: string, on: boolean): Promise<void>;
+  setSingleFlip(code: string, on: boolean): Promise<void>;
   setCountdown(code: string, n: number | null): Promise<void>;
   setIdentity(code: string, uid: string, name: string, badgeId: BadgeId, wasBadgeId: BadgeId): Promise<void>;
   setHints(code: string, on: boolean): Promise<void>;
@@ -94,6 +111,9 @@ export interface GameStore {
   setSittingOut(on: boolean): void;
   setIdentity(name: string, badgeId: BadgeId): void;
   setPaleCards(on: boolean): void;
+  setFling(on: boolean): void;
+  /** Host-only, and only meaningful while the table is deadlocked. */
+  setSingleFlip(on: boolean): void;
   setHints(on: boolean): void;
   setOrderly(on: boolean): void;
   start(): void;
@@ -181,6 +201,11 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
   // renders meta.countdown. See RoomMeta.countdown for why it is a digit rather
   // than a deadline.
   let countdownTimer: ReturnType<typeof setTimeout> | null = null;
+  // When each centre space last changed hands, and to whom. Kept from snapshots
+  // rather than read off the board, because the board only says who owns a space
+  // NOW - never when they took it. `reported` makes one near miss one race, so
+  // somebody jabbing at a space that has just filled reports it once.
+  const spaceTouched = new Map<number, { at: number; by: string; reported: boolean }>();
 
   const store = createStore<GameStore>((set, get) => {
 
@@ -421,6 +446,19 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
 
     function onSnapshot(room: Room | null) {
       const s = get();
+      // Before the state swap, while `s.room` is still the board as it was: note
+      // every space whose top card has changed, and who put it there. Runs on
+      // re-entrant snapshots too - this is a record of what the board did, not a
+      // side effect, and missing one would lose a race.
+      if (room?.round && s.room?.round) {
+        const was = s.room.round.spaces, now = room.round.spaces;
+        for (let i = 0; i < now.length; i++) {
+          const before = was[i]?.stack?.[was[i].stack.length - 1];
+          const after = now[i]?.stack?.[now[i].stack.length - 1];
+          if (!after || (before && cardId(before) === cardId(after))) continue;
+          spaceTouched.set(i, { at: Date.now(), by: after.owner, reported: false });
+        }
+      }
       set({ room });
       if (!room || !s.uid) return;
       // Firebase raises local onValue events SYNCHRONOUSLY from inside set()/update(),
@@ -635,7 +673,23 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
 
         const card = sourceTop(tableau, selection);
         const spaceState = room?.round?.spaces[target.space];
-        if (!card || !spaceState || !canPlayToSpace(card, spaceState)) return;
+        if (!card || !spaceState || !canPlayToSpace(card, spaceState)) {
+          // Refused locally, which is usually just a wrong card on a wrong pile.
+          // But if somebody else landed on that space within RACE_GRACE_MS, this
+          // play was aimed at the board as it stood before their card arrived,
+          // and losing by a hair should look like losing rather than like
+          // nothing happening at all. Scowl for the slower player, and the race
+          // is reported once so the winner gets their halo.
+          const touch = spaceTouched.get(target.space);
+          if (card && touch && touch.by !== uid && Date.now() - touch.at <= RACE_GRACE_MS) {
+            set({ lastRejected: { card, at: Date.now(), space: target.space } });
+            if (!touch.reported) {
+              touch.reported = true;
+              void deps.reportRace(code, target.space, uid, touch.by).catch(() => {});
+            }
+          }
+          return;
+        }
         const taken = takeCard(tableau, selection);
         if (!taken) return;
         set({ tableau: taken.next }); // optimistic
@@ -706,6 +760,8 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         hostAction(deps.setSittingOut(code, uid, on), 'change whether you are sitting out');
       },
       setPaleCards(on) { const c = get().code; if (c) void deps.setPaleCards(c, on); },
+      setFling(on) { const c = get().code; if (c) void deps.setFling(c, on); },
+      setSingleFlip(on) { const c = get().code; if (c) void deps.setSingleFlip(c, on); },
       setIdentity(name, badgeId) {
         const { code, uid, room } = get();
         const me = uid ? room?.players[uid] : null;
@@ -756,6 +812,8 @@ const realDeps: Deps = {
   setReady: netRooms.setReady,
   setSittingOut: netRooms.setSittingOut,
   setPaleCards: netRooms.setPaleCards,
+  setFling: netRooms.setFling,
+  setSingleFlip: netRooms.setSingleFlip,
   setCountdown: netRooms.setCountdown,
   setIdentity: netRooms.setIdentity,
   setHints: netRooms.setHints,

@@ -35,6 +35,7 @@ export function Lobby({ code }: { code: string }) {
   const setReady = useGameStore(s => s.setReady);
   const setSittingOut = useGameStore(s => s.setSittingOut);
   const setPaleCards = useGameStore(s => s.setPaleCards);
+  const setFling = useGameStore(s => s.setFling);
   const setIdentity = useGameStore(s => s.setIdentity);
   const start = useGameStore(s => s.start);
   const addBot = useGameStore(s => s.addBot);
@@ -174,11 +175,21 @@ export function Lobby({ code }: { code: string }) {
         {/* Host-wide rather than per-device, unlike the theme toggle in the
             corner: it changes how the CARDS read, and two players describing the
             same board to each other should be looking at the same thing. Does
-            nothing for a player already in a light theme. */}
+            nothing for a player already in a light theme.
+            Defaults ON (normalizeRoom), which is why the fallback here is true. */}
         <label className="muted" htmlFor="pale">White cards in dark mode</label>
         <span className="spacer" />
         <input id="pale" type="checkbox" className="toggle" disabled={!host}
-          checked={room.meta.paleCards ?? false} onChange={e => setPaleCards(e.target.checked)} />
+          checked={room.meta.paleCards ?? true} onChange={e => setPaleCards(e.target.checked)} />
+      </div>
+      <div className="row">
+        {/* Also on by default: flinging is simply the faster way to play, and
+            carrying a card into the drop area still works either way. Off is for
+            a table that finds cards leaving their hand unbidden. */}
+        <label className="muted" htmlFor="fling">Fling cards at the board</label>
+        <span className="spacer" />
+        <input id="fling" type="checkbox" className="toggle" disabled={!host}
+          checked={room.meta.flingOn ?? true} onChange={e => setFling(e.target.checked)} />
       </div>
       {/* Not a host option and not disabled for anybody: this one is about the
           phone in your hand, so every player sets their own (see prefs.ts). The

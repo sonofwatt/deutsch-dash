@@ -32,7 +32,18 @@ export function normalizeRoom(raw: unknown): Room | null {
     players[uid] = { ...p, stuckAt: p.stuckAt ?? null, awayAt: p.awayAt ?? null,
                      connected: p.connected ?? false, score: p.score ?? 0 };
   }
-  const meta: RoomMeta = { ...r.meta, creatorId: r.meta.creatorId ?? r.meta.hostId };
+  // Both of these default ON rather than off, which is the opposite of every
+  // other host option here. They are what the table wants by default - flinging
+  // is simply the faster way to play, and pale cards is the fix for a real
+  // legibility complaint in dark mode - so a room that predates either field
+  // should come up with it. `false` is stored as false, never absent, so turning
+  // one off survives; only genuine absence reads as on.
+  const meta: RoomMeta = {
+    ...r.meta,
+    creatorId: r.meta.creatorId ?? r.meta.hostId,
+    flingOn: r.meta.flingOn ?? true,
+    paleCards: r.meta.paleCards ?? true,
+  };
   const playerCount = Object.keys(players).length;
   const postCount = postCountForPlayers(playerCount);
   const orderly = meta.orderlyGrid ?? false;
@@ -260,6 +271,19 @@ export function setHints(code: string, on: boolean): Promise<void> {
 
 export function setOrderly(code: string, on: boolean): Promise<void> {
   return set(ref(db, `rooms/${code}/meta/orderlyGrid`), on);
+}
+
+/**
+ * Flinging, on or off for the whole table. Written as a literal false rather than
+ * removed, because normalizeRoom reads ABSENT as on - see there for why.
+ */
+export function setFling(code: string, on: boolean): Promise<void> {
+  return set(ref(db, `rooms/${code}/meta/flingOn`), on);
+}
+
+/** The stuck-table rescue: one card per wood turn instead of three. */
+export function setSingleFlip(code: string, on: boolean): Promise<void> {
+  return set(ref(db, `rooms/${code}/meta/singleFlip`), on ? true : null);
 }
 
 export function setPaleCards(code: string, on: boolean): Promise<void> {

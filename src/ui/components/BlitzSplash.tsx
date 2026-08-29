@@ -2,8 +2,12 @@ import { motion } from 'framer-motion';
 import { EMOJI } from '../../game/badges';
 import type { SplashVariant } from '../splashVariant';
 
-const SPARKS = 14;
-const FALLERS = 10;
+const SPARKS = 22;
+/**
+ * A downpour rather than a drizzle. At ten, on a phone, most of the screen was
+ * empty most of the time and the joke landed as a couple of glyphs drifting past.
+ */
+const FALLERS = 26;
 
 /** Emoji radiating from the middle, each staying upright as it flies. */
 function Glitter() {
@@ -13,7 +17,7 @@ function Glitter() {
         <span key={i} className="spark" style={{
           ['--a' as string]: `${(i * 360) / SPARKS}deg`,
           ['--d' as string]: `${[42, 30, 36][i % 3]}vmin`,
-          ['--delay' as string]: `${(i % 5) * 70}ms`,
+          ['--delay' as string]: `${(i % 7) * 90}ms`,
         }}>{'✨' + EMOJI}</span>
       ))}
     </div>
@@ -26,9 +30,12 @@ function Rain({ glyph }: { glyph: string }) {
     <div className="splash-fx" aria-hidden="true">
       {Array.from({ length: FALLERS }, (_, i) => (
         <span key={i} className="faller" style={{
-          left: `${4 + i * 9.6}%`,
-          ['--delay' as string]: `${(i % 5) * 80}ms`,
-          ['--dur' as string]: `${1150 + (i % 4) * 150}ms`,
+          // Two passes across the width rather than one row of lanes, so twice
+          // the glyphs do not mean twice the columns - they overlap and read as
+          // weather instead of as a picket fence.
+          left: `${(i % 13) * 7.7 + (i < 13 ? 1 : 4.5)}%`,
+          ['--delay' as string]: `${(i % 9) * 130}ms`,
+          ['--dur' as string]: `${2600 + (i % 5) * 200}ms`,
           ['--spin' as string]: `${i % 2 ? 24 : -24}deg`,
         }}>{glyph + EMOJI}</span>
       ))}

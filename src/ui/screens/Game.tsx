@@ -106,7 +106,7 @@ export function Game() {
       return;
     }
     void playTo(target);                       // playTo consumes the selection
-  });
+  }, room.meta.flingOn ?? true);
 
   // The store drops our hand the moment the phase leaves 'playing' (store.ts, the
   // clear that makes the next round adopt a fresh one). The round is still on
