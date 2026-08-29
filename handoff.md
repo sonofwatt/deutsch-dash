@@ -5,7 +5,7 @@ suite. A commit sitting unpushed has already invalidated one playtest — what
 people are playing is whatever last reached Pages — so check `git status -sb`
 before trusting what a table reports._
 
-_**308 tests green** (285 unit + 23 emulator). This is the only place in the repo
+_**320 tests green** (296 unit + 24 emulator). This is the only place in the repo
 that quotes a count — it drifted three separate ways when it lived in four
 places, so keep it here and nowhere else._
 
@@ -136,6 +136,16 @@ skipped deploy makes race flashes and rivalry commentary silently vanish.
   `database.rules.json`. Change both or client and server disagree.
 - **RTDB does not run validate rules on a delete.** That is what lets a player
   release a claimed badge with no rules change (see the lobby identity editor).
+- **`players/$uid` no longer has a `.validate`.** It used to gate a brand-new
+  player record on `meta/phase === 'lobby'`; a game in progress admits spectators
+  now (see below), so that clause is gone and **deployed**. The 8-seat cap is
+  untouched - `meta/playerCount`'s own validate is what enforces it, which is why
+  it is a tracked counter rather than a live child count. Both halves are pinned
+  in `rooms.emu.test.ts`: a mid-game join succeeds, a ninth player still fails.
+- `createRoom`'s two sequential writes are kept. The reason given here used to be
+  that `players/$uid`'s validate read `meta/phase`; with that gone, what remains
+  is `meta/hostId`'s validate reading `players`. The shape is what the emulator
+  tests seed against, so leave it alone unless you are prepared to re-prove it.
 
 ### CI runs the emulator suite — keep it that way
 
@@ -236,6 +246,15 @@ lobby it is **the tab is hidden**, which the browser reports instantly, and
 > behalf of a table of stuck bots"). Anything newly gated on `allConnectedStuck`
 > must say what it wants about the caller explicitly.
 
+**There are now THREE ways to be present and not in the round**, and every one of
+them found this trap independently: sitting out, being away, and - since a game in
+progress admits spectators - having no hand at all. A player with no tableau can
+never be stuck, so counted as present they are one more player the table waits on
+forever. `allConnectedStuck` takes the round's `tableaus` and skips anybody who is
+not in it. **Pass them wherever a round exists.** Two store fixtures had to grow
+hands when this landed, which they should always have had - `startRound` deals one
+to every player who is not sitting out.
+
 **Sitting out** is `players/$uid/sittingOut`, owner-written like `ready` and
 `awayAt`, so no rules change. It ejects the player from the round **in progress**,
 forfeiting that round's arithmetic in both directions: no penalty for the Blitz
@@ -259,10 +278,17 @@ button says which case they are in. `tableReady` must then also check that at
 least two players are actually left: a table of one plus three spectators is not a
 game.
 
-The board is still sized on the WHOLE room, deliberately. Every client derives the
-grid shape from the player count independently (`normalizeRoom`), so sizing it on
-who is dealt in would resize the grid under a hand somebody is holding the moment
-anyone sat down. A couple of spare spaces costs nothing.
+The board is sized on the WHOLE room, deliberately - sizing it on who is dealt in
+would resize the grid under a hand somebody is holding the moment anyone sat down,
+and a couple of spare spaces costs nothing.
+
+**But the size is now fixed at the DEAL, not derived per client.** `startRound`
+writes `round.spaceCount` and `normalizeRoom` reads it. Deriving it from the live
+player count was safe only while that count could not change mid-round, and it can
+now: a spectator joining a four-player game grew the board from 16 spaces to 20
+under everybody's hands, which is exactly what sizing on the whole room was chosen
+to avoid. A round dealt before the field existed falls back to the old derivation,
+which is correct for it - nobody could join one of those late.
 
 **A React trap this uncovered.** `useOpenings` used to be called AFTER the "no
 board" early return, on the reasoning that a round either has a board for its
@@ -323,8 +349,17 @@ render, and it sets state.
   Both of those were real bugs; both are pinned by tests now.
 - **`ENABLE_STUCK_BUTTON` is `false`** and the whole stuck path still runs
   underneath. Being stuck is *detected* by `isStuck` + `syncStuck`, not declared.
-  `isStuck` needs more than "no legal move": either zero wood, or
-  `flipsSinceProgress >= ceil(wood.length / 3)`.
+- **Stuck is judged on what the wood can REACH, not on what is face up.** Turning
+  three at a time only ever exposes every third card, and which third depends on
+  where the index happens to sit - so a hand can be full of playable cards none of
+  which can be reached. `woodCycleTops` walks the cycle from where the pile
+  actually stands and `hasReachableMove` asks the question that matters. A move
+  three turns down is a move this player has, and telling them they have none was
+  simply wrong. `hasLegalMove` still answers "right now, with what is face up" and
+  is what highlighting and the bots use; do not swap one for the other.
+- Below that, `isStuck` still needs either zero wood or
+  `flipsSinceProgress >= ceil(wood.length / step)` - a full cycle without progress.
+  **The step is 1 while the host's rescue is on**, so that bar moves with it.
 - That flip counter is a closure-scoped `Map` in `createGameStore`, never
   persisted — **it resets to zero on any page reload**.
 - Tableau order is Blitz | posts | wood. Wood sits under the right thumb because
@@ -686,6 +721,111 @@ space it can follow rigged into place:
 | 70px flick aimed 90° away | nothing |
 | the same 70px at 400ms - a reposition, not a throw | nothing |
 | slow drag let go over the opponent strip | lands (signal 3) |
+
+### The round-end sheet _(#29-#34)_
+
+**It is a gate now, the same shape as the lobby.** Everyone says when they have
+finished reading their score; the host's button is primary once the table is with
+them and **"Next round anyway (n/m ready)"** before that, because a dead phone
+must not be able to strand a table between rounds either. Readying also calls
+`noteActivity`, which clears an `awayAt` left over from a round somebody sat
+quietly through - without that they would ready up and still block their own
+count. `startRound` already cleared `ready` for everybody, so the gate re-arms
+each round for free.
+
+**"Ready?" then "Ready!"**, on both screens. "I'm Ready" then "Ready" were the
+same word twice and nobody could tell which state they were looking at; the colour
+was carrying the whole message on its own.
+
+**The rule between the total and the round's arithmetic existed and could not be
+seen** - a 1px hairline in `--line`, lost against the row's own border. It is full
+height, in ink rather than furniture, with room on both sides. The **blitz bolt**
+sits right of the total in a column that is reserved whether or not it holds one,
+so the totals stay in a line down the sheet instead of the blitzer's row shunting
+left.
+
+**The carousel** dwelt 4.2s at 13px, which read as a slideshow being rushed past
+you: 7s at 15px now, with arrows either side. Stepping bumps a counter the timer
+depends on, so a manual step **restarts the dwell** - otherwise the next
+auto-advance arrives a moment later and snatches back the line somebody just asked
+for. Every remark has a third and sharper variant; `pick` hashes
+`id:roundNumber:subject`, so the meanest phrasing is a third of the rounds rather
+than every round.
+
+### Losing a race you did not know you were in _(#35)_
+
+A race was only ever visible when two plays collided inside one round trip, so the
+server could see the abort. Miss by a tenth of a second more and the loser's own
+snapshot has already caught up: `canPlayToSpace` refuses locally and **nothing
+happens at all** - no scowl, no halo, no sign the race was run. That is the case
+the table complained about, because it is the one that feels most unfair.
+
+The store keeps `spaceTouched`: when each centre space last changed hands and to
+whom, taken from snapshots because the board only ever says who owns a space *now*
+and never when they took it. A play aimed at a space somebody took within
+`RACE_GRACE_MS` (1s) is treated as the race it was - the scowl and the shake for
+the slower player, and the race reported **once** (`reported`) so jabbing at a
+space that has just filled does not report it repeatedly.
+
+The angry face already shook side to side and still does. The angel holds at rest
+until nearly half way through and drifts up over the rest of 1.5s: half as long
+again on screen, with the extra going into being readable rather than a longer
+glide.
+
+### The splash _(#36)_
+
+Ten glyphs at 24px on a 393px screen, gone in 1.15s, read as a drizzle of specks.
+Twenty-six at twice the size now, falling over 2.6-3.4s in **two overlapping
+passes across the width** rather than one row of lanes - twice the glyphs in one
+row of lanes reads as a picket fence. `SPLASH_MS` went to 3.6s to match; every
+animation in `ui.css` has to finish inside it, which is the one thing to check
+before changing either number.
+
+### Flinging and pale cards default ON _(#37, #38)_
+
+Both are host options and both are the opposite of every other one here in that
+absent means **on**. `normalizeRoom` defaults them and `setFling`/`setPaleCards`
+write a deliberate `false`, so a room that predates either field gets the feature
+and turning it off still survives. `useDrag` takes `fling` and simply does not act
+on a throw when it is off - the throw is still read, because reading it costs
+nothing and the alternative is two code paths.
+
+### Joining a game in progress _(#39)_
+
+A game in progress used to be a closed door, refused by the client and by the
+rules. It admits **spectators**: a player record, no hand, the live board, and
+`startRound` deals them in at the next deal. The banner takes the opponent strip's
+**place** rather than sitting above it - that row is a fixed track in `.game`'s
+grid, so a second thing in it would come straight off the board they are here to
+watch - and `.standby-hand` holds the tableau's track open for the same reason.
+
+Two things fell out of it that did not look related, and both are above: the
+rules' lobby-only validate had to go **and be deployed**, and `allConnectedStuck`
+had to learn about a third kind of absent player.
+
+### A table that has stopped, and the way out _(#40, #41)_
+
+When every present player is stuck the board says so **across itself**, because a
+stopped table is a fact about the game and not about one hand. The host is offered
+**one card per wood turn** (`meta.singleFlip`), which reaches the two cards in
+three the usual cycle never exposes.
+
+**It is a way out, not a mode.** The first card anybody plays clears it
+(`endRescue`, called from both play paths), a fresh deal clears it (`startRound`),
+and any client may clear it because `meta` is writable by anyone in the room and
+the write is idempotent. The overlay is `pointer-events: none` with the button
+opted back in, so it can never be the thing that blocks a play.
+
+### The no-moves note stopped moving the board _(#42, #43)_
+
+Its track was `auto`, so it was 0px until there was something to say and then
+jumped to its content - which took that height off the row above and slid the
+centred grid up **under the player's hands at the exact moment they needed the
+board to hold still**. The track is a fixed `--note-h`, declared once on
+`.grid-wrap` and used by both the reserve and `--fit-h`'s slot arithmetic so the
+two cannot drift. Measured: the grid is at the same top and the same height with
+the note and without it. The note itself went 12px to 14px - it was the smallest
+type on the screen and carrying the most weight.
 
 ### Hints and openings — one switch over two nudges _(#6, #9)_
 
@@ -1107,6 +1247,13 @@ assuming a code fault.
   round end), but a two-bot table now reaches a normal blitz rather than the stall
   path, so that repro stopped reaching it.
 - The drop zone by touch drag, and by tap.
+- **The stall overlay and the single-card rescue on a real table** (#40, #41). The
+  overlay cannot be rigged into view from outside: writing `stuckAt` for everybody
+  is undone by `syncStuck` on the next snapshot, correctly, because those hands
+  are not actually stuck. It needs a genuinely deadlocked board, which means
+  rigging every hand and the whole centre - or a real table.
+- **The 1-second race window** (#35) with two humans racing for real. The path is
+  exercised, but the timing that makes it fire is a human timing.
 - **The flick on real glass** (#27, #28). Driven and measured on both device
   profiles in headless Chromium, which is neither Safari nor a thumb. Note that
   `page.mouse` CANNOT express a flick at all - one CDP round trip per move puts
@@ -1226,6 +1373,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `9d72d8b` | Columns from the shape of the box; the iOS and Android edge guards |
 | `7a90afc` | The Android edge guard raised to 40dp, the widest the gesture reaches |
 | `01a4e99` | Flicking a card at the board, judged on the throw and not the release |
+| `8ed3a45` → `94569c5` | The round-end gate, the near-miss race, spectators, and the wood-cycle stuck rule |
 | `c7a1da9` | The flick aimed by direction; the whole space above the hand |
 
 Earlier history, the approved design spec and the original 15-task execution
