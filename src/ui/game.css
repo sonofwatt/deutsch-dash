@@ -68,17 +68,23 @@
    as its width (see --fit-h), and only a size container exposes cqh. Its own
    height is definite - .game is a fixed 100dvh grid and this is inside one of its
    tracks - so containing the size costs nothing. */
-.grid-wrap { container-type: size; display: grid; min-height: 0; min-width: 0; }
+/* The caption row's height, in ONE place. .drop-zone reserves it as a fixed track
+   and .game-grid subtracts it when sizing a slot; when those two disagreed, a note
+   appearing shunted the whole board up by half its height as the 1fr row shrank
+   under a centred grid. It is a constant, not a leftover - reserving it always is
+   what stops the board moving the moment somebody picks a card up. */
+.grid-wrap { container-type: size; display: grid; min-height: 0; min-width: 0;
+  position: relative; --note-h: 40px; }
 /* The largest slot that fits the space the board actually has, in BOTH axes,
    rather than a flat fraction of the viewport. At four players that was leaving
    most of the board empty and the cards at their small-phone size on a screen
    with room for half again as much.
-   The 34px is the drop zone's caption row, reserved whether or not it is showing:
+   --note-h is the drop zone's caption row, reserved whether or not it is showing:
    sizing against the leftover would shrink every card the moment somebody picked
    one up, which is precisely when they must not move. */
 .game-grid { --gap: clamp(4px, 1.4vw, 10px);
   --fit-w: calc((100cqw - (var(--cols) - 1) * var(--gap)) / var(--cols));
-  --fit-h: calc((100cqh - 34px - (var(--rows) - 1) * var(--gap)) / var(--rows) / 1.4);
+  --fit-h: calc((100cqh - var(--note-h) - (var(--rows) - 1) * var(--gap)) / var(--rows) / 1.4);
   --slot: clamp(34px, min(var(--fit-w), var(--fit-h)), 96px);
   display: grid; grid-template-columns: repeat(var(--cols), var(--slot));
   gap: var(--gap); justify-content: center; align-self: center; }
@@ -93,13 +99,18 @@
    min-height keeps it a usable thumb target on a short screen where the grid has
    eaten most of the column. */
 .drop-zone { border-radius: var(--radius); min-height: 0; min-width: 0;
-  display: grid; grid-template-rows: 1fr auto; justify-items: center;
+  /* A FIXED second track, not `auto`. With auto the row was 0 until there was
+     something to say and then jumped to its content, which took that height off
+     the 1fr row above and slid the centred grid up under the player's hands at
+     the exact moment they needed the board to hold still. */
+  display: grid; grid-template-rows: 1fr var(--note-h); justify-items: center;
   font-size: 11px; color: var(--ink-soft);
   transition: background-color .15s ease, color .15s ease; }
 .drop-zone.on { color: var(--ink); background: rgb(34 197 94 / .07); }
 /* The zone's own caption, in the second row so it sits at the tableau end and
    can never land on the grid. Reserves nothing when there is nothing to say. */
-.drop-note { padding: 6px 8px; text-align: center; }
+/* Centred in the track it is given rather than padded into one it creates. */
+.drop-note { display: grid; place-items: center; padding: 0 8px; text-align: center; }
 /* The helper hint: a slow violet breath around the space a card could go into.
    Violet and not green, because green on this board means one specific thing -
    "the card in your hand lands here" - and a second green would erode it. */
@@ -127,8 +138,27 @@
    work" (the rejected-play shake, the negative score column), and having nothing
    to play is not an error the player has made. Amber is the right register - it
    is a wait, not a fault. */
-.drop-zone.stuck { color: var(--warn-ink); font-weight: 700; font-size: 12px;
+/* 14px, up from 12. This is the line that tells somebody why nothing they do is
+   working, read at arm's length on a board being played at speed - it was the
+   smallest type on the screen and carrying the most weight. */
+.drop-zone.stuck { color: var(--warn-ink); font-weight: 700; font-size: 14px;
   background: color-mix(in srgb, var(--warn) 8%, transparent); }
+
+/* The table has stopped. Across the board, because it is not about one hand.
+   Transparent to the pointer so it can never be the thing that blocks a play;
+   only the button inside it takes taps. */
+.stall-note { position: absolute; inset: 0; z-index: 4; pointer-events: none;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; padding: 12px; text-align: center; font-size: 14px;
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  color: var(--ink); }
+.stall-note strong { font-size: 17px; }
+.stall-note .btn { pointer-events: auto; }
+/* The rescue is a state, not an alarm: quieter than the stall it answers, and it
+   lets the board through so people can see the cards they are being offered. */
+.stall-rescue { background: color-mix(in srgb, var(--bg) 55%, transparent);
+  color: var(--ink-soft); }
 
 /* Completed piles, stacked down each side of the board. */
 .done-rail { --rail-w: clamp(16px, 4.5vw, 26px); width: var(--rail-w);

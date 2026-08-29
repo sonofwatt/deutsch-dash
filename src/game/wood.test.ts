@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { flipWood, rotateWood } from './wood';
+import { flipWood, rotateWood, woodCycleTops } from './wood';
 import type { Card, Suit, Tableau } from './types';
 
 const c = (v: number, suit: Suit): Card => ({ v, suit, owner: 'me' });
@@ -43,5 +43,36 @@ describe('rotateWood', () => {
     const t = woodTab([c(1, 'red')], 1);
     expect(rotateWood(t)).toEqual(t);
     expect(rotateWood(woodTab([]))).toEqual(woodTab([]));
+  });
+});
+
+describe('woodCycleTops', () => {
+  it('reaches only every third card at three a turn - which is the whole problem', () => {
+    // Nine cards, turned three at a time: 3, 6, 9, then back to 3. Six of the
+    // nine are never the top card at any point in the cycle, however long a
+    // player keeps turning, and that is what "no moves" used to be blind to.
+    const t = woodTab(cards(9));
+    const tops = woodCycleTops(t).map(x => x.v);
+    expect(tops).toEqual([3, 6, 9]);
+  });
+
+  it('reaches every card at one a turn, which is what the rescue buys', () => {
+    const t = woodTab(cards(9));
+    expect(woodCycleTops(t, 1).map(x => x.v)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  });
+
+  it('starts from where the pile actually stands, not from the top', () => {
+    // Mid-cycle the reachable set is the same three, just found in another order.
+    expect(woodCycleTops(woodTab(cards(9), 6)).map(x => x.v)).toEqual([6, 9, 3]);
+  });
+
+  it('picks up the short last turn', () => {
+    // Seven cards: 3, 6, then 7 rather than 9. The tail card IS reachable.
+    expect(woodCycleTops(woodTab(cards(7))).map(x => x.v)).toEqual([3, 6, 7]);
+  });
+
+  it('terminates on an empty or single-card pile', () => {
+    expect(woodCycleTops(woodTab([]))).toEqual([]);
+    expect(woodCycleTops(woodTab(cards(1))).map(x => x.v)).toEqual([1]);
   });
 });

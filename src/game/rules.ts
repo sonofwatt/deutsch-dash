@@ -1,5 +1,6 @@
 import type { Card, CenterSpace, FaceGroup, PlaySource, Suit, Tableau } from './types';
 import { SUITS } from './deck';
+import { WOOD_STEP, woodCycleTops } from './wood';
 
 export function faceGroup(suit: Suit): FaceGroup {
   return suit === 'red' || suit === 'blue' ? 'boy' : 'girl';
@@ -153,10 +154,35 @@ export function placeOnPost(t: Tableau, source: PlaySource, postIndex: number): 
  *    have nothing. Only a rotation, which changes which third of the pile is
  *    reachable, can help.
  */
-export function isStuck(t: Tableau, spaces: CenterSpace[], flipsSinceProgress: number): boolean {
-  if (hasLegalMove(t, spaces)) return false;
+export function isStuck(
+  t: Tableau, spaces: CenterSpace[], flipsSinceProgress: number, step: number = WOOD_STEP,
+): boolean {
+  // Reachable, not merely playable. A card three turns down the wood is a move
+  // this player has, and telling them they have none while they can still turn
+  // the pile over to it is simply wrong - which is what the table reported.
+  if (hasReachableMove(t, spaces, step)) return false;
   if (t.wood.length === 0) return true;
-  return flipsSinceProgress >= Math.ceil(t.wood.length / 3);
+  return flipsSinceProgress >= Math.ceil(t.wood.length / step);
+}
+
+/**
+ * Can this player move AT ALL, counting what turning the wood over would bring
+ * them? `hasLegalMove` answers "right now, with what is face up"; this answers
+ * "at any point in the cycle, without anybody else doing anything".
+ *
+ * The gap between the two is the whole point: at three cards a turn only every
+ * third card is ever exposed, so a hand can be full of moves none of which can be
+ * reached. That gap is also what the host's single-card rescue closes.
+ */
+export function hasReachableMove(
+  t: Tableau, spaces: CenterSpace[], step: number = WOOD_STEP,
+): boolean {
+  if (hasLegalMove(t, spaces)) return true;
+  for (const card of woodCycleTops(t, step)) {
+    if (spaces.some(sp => canPlayToSpace(card, sp))) return true;
+    if (t.post.some(stack => canBuildOnPost(card, stack))) return true;
+  }
+  return false;
 }
 
 export function hasLegalMove(t: Tableau, spaces: CenterSpace[]): boolean {

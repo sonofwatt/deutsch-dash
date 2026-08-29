@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { useGameStore, legalTargets, gameStore } from '../../state/store';
+import { useGameStore, legalTargets, gameStore, isHost } from '../../state/store';
+import { allConnectedStuck } from '../../net/plays';
 import { hasLegalMove } from '../../game/rules';
 import { HINT_DELAY_MS, HINT_REPEAT_MS, HINT_SHOW_MS, hintSpace } from '../../game/hint';
 import type { BadgeId } from '../../game/badges';
@@ -42,6 +43,7 @@ export function Game() {
   const actionError = useGameStore(s => s.actionError);
   const noteActivity = useGameStore(s => s.noteActivity);
   const setSittingOut = useGameStore(s => s.setSittingOut);
+  const setSingleFlip = useGameStore(s => s.setSingleFlip);
   const [woodSide, swapSides] = useWoodSide();
 
   // The helper hint waits for the player to go quiet, so it never fires under
@@ -166,6 +168,15 @@ export function Game() {
   // points at the board as it is now - which is the case that matters most, a
   // player who WAS stuck and has just had a move opened up for them.
   const hint = hintsOn && showing === activity ? hintSpace(hand, round.spaces) : null;
+  // A stopped table is a fact about the GAME, not about one hand, so it is said
+  // across the board rather than under the tableau. The rescue reads the same way
+  // for everybody; only the host is offered the button that starts it.
+  const stall = room.meta.singleFlip
+    ? { mode: 'rescue' as const, canRescue: false, onRescue: () => {} }
+    : allConnectedStuck(room.players)
+      ? { mode: 'stalled' as const, canRescue: isHost({ uid, room }),
+          onRescue: () => setSingleFlip(true) }
+      : undefined;
 
   return (
     // Every tap and every drag on this screen is a sign of life, which is a wider
@@ -214,7 +225,7 @@ export function Game() {
       <CenterGrid spaces={round.spaces} highlight={targets.spaces} badgeOf={badgeOf}
         onTap={i => void playTo({ space: i })} races={races}
         snapping={targets.spaces.length > 0} stuck={me.stuckAt != null} hint={hint}
-        openings={openings}
+        openings={openings} stall={stall}
         onSnapTap={() => { if (targets.spaces.length) void playTo({ space: targets.spaces[0] }); }} />
       <div>
         <motion.div key={lastRejected?.at ?? 0}

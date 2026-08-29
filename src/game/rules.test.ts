@@ -3,7 +3,7 @@ import {
   faceGroup, postCountForPlayers, canPlayToCenter, canBuildOnPost,
   refillPosts, sourceTop, takeCard, placeOnPost, hasLegalMove,
   canPlayToSpace, spaceCountForPlayers, isStuck, MAX_SPACES,
-  orderlyColumns, suitForSpace,
+  orderlyColumns, suitForSpace, hasReachableMove,
 } from './rules';
 import type { Card, Suit, Tableau, CenterSpace } from './types';
 
@@ -279,5 +279,51 @@ describe('hasLegalMove', () => {
     const t = tab({ blitz: [c(9, 'blue')], post: [[c(8, 'blue')], [c(4, 'yellow')], [c(3, 'green')]],
                     wood: [c(10, 'green')], woodIndex: 1 });
     expect(hasLegalMove(t, [space([c(1, 'red')])])).toBe(false);
+  });
+});
+
+describe('hasReachableMove and being stuck', () => {
+  const card = (v: number, suit: Suit = 'red'): Card => ({ v, suit, owner: 'me' });
+  const empty = (n: number): CenterSpace[] => Array.from({ length: n }, () => ({ stack: [], history: [] }));
+  // Nothing face up can go anywhere: no Ace on top of anything, and the posts are
+  // empty so nothing can be built on them either.
+  const hand = (wood: Card[]): Tableau =>
+    ({ blitz: [card(7)], post: [[], [], []], wood, woodIndex: 0 });
+
+  it('sees a move that is only reachable by turning the wood over', () => {
+    // The Ace is first in the pile, so at three a turn it is NEVER the top card:
+    // the cycle shows 3, 6, 9 and this sits at 1. The player is not stuck - they
+    // simply cannot get to it - and telling them they have no moves is wrong.
+    const wood = [card(1), card(5), card(6), card(8), card(9), card(4)];
+    const t = hand(wood);
+    expect(hasLegalMove(t, empty(8))).toBe(false);
+    expect(hasReachableMove(t, empty(8), 3)).toBe(false);
+    expect(hasReachableMove(t, empty(8), 1)).toBe(true);
+  });
+
+  it('is not stuck when the cycle itself reaches a move', () => {
+    // Same hand with the Ace at position 3, which the three-a-turn cycle DOES
+    // land on. hasLegalMove still says no - it is not face up yet.
+    const t = hand([card(5), card(6), card(1), card(8), card(9), card(4)]);
+    expect(hasLegalMove(t, empty(8))).toBe(false);
+    expect(hasReachableMove(t, empty(8))).toBe(true);
+    // ...and being unable to play RIGHT NOW is therefore not being stuck, however
+    // many times they have already been round the pile.
+    expect(isStuck(t, empty(8), 99)).toBe(false);
+  });
+
+  it('still calls a genuinely dead hand stuck once the pile has been round', () => {
+    const t = hand([card(5), card(6), card(7), card(8), card(9), card(4)]);
+    expect(hasReachableMove(t, empty(8))).toBe(false);
+    expect(isStuck(t, empty(8), 0)).toBe(false);   // give them the cycle first
+    expect(isStuck(t, empty(8), 2)).toBe(true);
+  });
+
+  it('counts the cycle in single-card turns while the rescue is on', () => {
+    // Six cards is two turns at three and six at one, so the bar for "been all
+    // the way round without progress" has to move with the step size.
+    const t = hand([card(5), card(6), card(7), card(8), card(9), card(4)]);
+    expect(isStuck(t, empty(8), 3, 1)).toBe(false);
+    expect(isStuck(t, empty(8), 6, 1)).toBe(true);
   });
 });

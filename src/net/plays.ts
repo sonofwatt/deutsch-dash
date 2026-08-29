@@ -68,6 +68,9 @@ export async function startRound(code: string, room: Room, rng?: Rng): Promise<v
     // in the same write that starts the round so no client can be left holding a
     // digit over a board.
     'meta/countdown': null,
+    // The deadlock rescue belongs to the round it rescued. A fresh deal is a
+    // fresh chance for everybody, so the table goes back to three a turn.
+    'meta/singleFlip': null,
   };
   // Ready is a lobby fact too: cleared here so a rematch comes back to a lobby
   // nobody has readied in, rather than one that starts again immediately.

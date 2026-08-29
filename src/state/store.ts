@@ -3,7 +3,7 @@ import { useStore } from 'zustand';
 import type { BadgeId } from '../game/badges';
 import { cardId, type Card, type CenterSpace, type PlayerInfo, type PlaySource, type Room, type Tableau } from '../game/types';
 import { canBuildOnPost, canPlayToSpace, isStuck, placeOnPost, sourceTop, takeCard } from '../game/rules';
-import { flipWood, rotateWood } from '../game/wood';
+import { flipWood, rotateWood, WOOD_STEP } from '../game/wood';
 import { reconcileTableau } from '../game/center';
 import { botDelay, chooseBotAction, type BotLevel } from '../game/bot';
 import * as netRooms from '../net/rooms';
@@ -220,6 +220,22 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
      * and the claim is withdrawn the moment somebody else's play frees them.
      * Writes only on a transition, so a steady state costs nothing.
      */
+    /** Three cards a turn, or one while the host's deadlock rescue is on. */
+    function woodStep(room: Room | null | undefined): number {
+      return room?.meta.singleFlip ? 1 : WOOD_STEP;
+    }
+
+    /**
+     * The rescue is a way OUT of a deadlock, not a mode: the first card anybody
+     * manages to play is proof the table is moving again, so it turns itself off.
+     * Any client may clear it - meta is writable by anyone in the room - and the
+     * write is idempotent, so several players landing at once is harmless.
+     */
+    function endRescue() {
+      const { code, room } = get();
+      if (code && room?.meta.singleFlip) void deps.setSingleFlip(code, false);
+    }
+
     function syncStuck(id: string, t: Tableau | null | undefined) {
       const { room, code, online } = get();
       if (!room || !code || !t || !online) return;
@@ -229,7 +245,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
       // A player sitting out still HAS a hand (it is what they rejoin with), so
       // without this they would be declared stuck for a round they are not in.
       if (p.sittingOut) return;
-      const stuck = isStuck(t, room.round.spaces, flips.get(id) ?? 0);
+      const stuck = isStuck(t, room.round.spaces, flips.get(id) ?? 0, woodStep(room));
       if (stuck && p.stuckAt == null) void deps.declareStuck(code, id);
       else if (!stuck && p.stuckAt != null) void deps.clearStuck(code, id);
     }
@@ -667,6 +683,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
           void persist(next);
           flips.set(uid, 0); // progress: the wood cycle counts from here again
           void deps.clearStuck(code, uid);
+          endRescue();
           if (next.blitz.length === 0) void deps.announceBlitz(code, uid);
           return;
         }
@@ -703,6 +720,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         void persist(taken.next);
         flips.set(uid, 0);
         void deps.clearStuck(code, uid);
+        endRescue();
         if (taken.next.blitz.length === 0) void deps.announceBlitz(code, uid);
       },
 
@@ -711,7 +729,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         const { tableau: t, uid } = get();
         if (!t || !uid) return;
         noteActivity();
-        const next = flipWood(t);
+        const next = flipWood(t, woodStep(get().room));
         set({ tableau: next, selection: null });
         void persist(next);
         flips.set(uid, (flips.get(uid) ?? 0) + 1);
@@ -723,7 +741,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         const { code, uid, tableau, room } = get();
         if (!code || !uid || !tableau || !room?.round) return;
         // The button is a claim; hold it to the same bar the automatic check uses.
-        if (!isStuck(tableau, room.round.spaces, flips.get(uid) ?? 0)) return;
+        if (!isStuck(tableau, room.round.spaces, flips.get(uid) ?? 0, woodStep(room))) return;
         void deps.declareStuck(code, uid);
       },
 

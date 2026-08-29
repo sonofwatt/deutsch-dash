@@ -155,6 +155,17 @@ export function CenterGrid(props: {
   orderly?: boolean;
   // Spaces somebody else just played to that this player can use. See openings.ts.
   openings?: Record<number, Opening>;
+  /**
+   * The table has stopped, or is being got going again. Optional like everything
+   * else here - render.test.ts builds these props as complete literals and tsc -b
+   * typechecks it, so a REQUIRED prop breaks the build rather than just the tests.
+   */
+  stall?: {
+    mode: 'stalled' | 'rescue';
+    /** Only the host is offered the way out; everybody else is told to wait. */
+    canRescue: boolean;
+    onRescue: () => void;
+  };
 }) {
   // Above every early return there could ever be, and before anything that could
   // become one: this is a hook, and the board vanishing under a player who sits
@@ -233,6 +244,29 @@ export function CenterGrid(props: {
             );
           })}
         </div>
+        {/* Across the board, because a table that has stopped is not a fact about
+            one player's hand - it is a fact about the game, and it wants saying
+            where everyone is already looking. Transparent to the pointer except
+            for the button, so it can never be the thing that stops a play. */}
+        {props.stall && (
+          <div className={`stall-note stall-${props.stall.mode}`} role="status">
+            {props.stall.mode === 'stalled' ? (
+              <>
+                <strong>Nobody can move.</strong>
+                {props.stall.canRescue
+                  ? <button className="btn btn-slim" onClick={props.stall.onRescue}>
+                      Turn wood one card at a time
+                    </button>
+                  : <span>Waiting for the host to open the wood up…</span>}
+              </>
+            ) : (
+              <>
+                <strong>One card at a time.</strong>
+                <span>The wood turns over singly until somebody plays.</span>
+              </>
+            )}
+          </div>
+        )}
         {/* Down at the tableau end of the zone, where the old band used to be, so
             a stuck player reads it without looking away from their own cards -
             and so it never lands on top of the grid. */}
