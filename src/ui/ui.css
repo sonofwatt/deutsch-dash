@@ -265,3 +265,9 @@
                rotate(calc(-1 * var(--a))); }
   .faller { animation: none; opacity: .9; top: 16vh; }
 }
+
+/* The build, at the foot of the home and lobby screens. Deliberately the
+   quietest thing on either: it is there to be read out when something goes
+   wrong, not to be looked at the rest of the time. */
+.version { margin: 4px 0 0; text-align: center; font-size: 11px;
+  color: var(--ink-soft); opacity: .65; font-variant-numeric: tabular-nums; }

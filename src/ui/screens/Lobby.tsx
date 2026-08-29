@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useGameStore, isHost, tableReady } from '../../state/store';
 import { BADGES, BADGE_IDS, type BadgeId } from '../../game/badges';
 import { BOT_LABELS, BOT_LEVELS, type BotLevel } from '../../game/bot';
+import { APP_VERSION } from '../../version';
 import { MAX_PLAYERS } from '../../net/rooms';
 import { ShareInvite } from '../components/ShareInvite';
 import { BadgePicker } from '../components/BadgePicker';
@@ -249,6 +250,7 @@ export function Lobby({ code }: { code: string }) {
       {/* A lobby nobody ever starts is a dead end too - most often a room whose
           host wandered off before pressing anything. */}
       <a className="muted keep-back" href="#/">Home</a>
+      <p className="version">{APP_VERSION}</p>
 
       {countdown != null && (
         <div className="overlay countdown-overlay">

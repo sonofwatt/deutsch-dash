@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useGameStore } from '../../state/store';
 import { BadgePicker } from '../components/BadgePicker';
 import { JOIN_REASONS } from '../joinReasons';
+import { APP_VERSION } from '../../version';
 import type { BadgeId } from '../../game/badges';
 
 export function Home() {
@@ -63,6 +64,10 @@ export function Home() {
           a real table - so it is set well below the two buttons that start an
           online game rather than sitting between them. */}
       <a className="btn keep-link keep-entry" href="#/keeper">Keep score for meat space</a>
+      {/* Quiet, and last. It is here so a report from a table can be tied to a
+          build - "it did X" is a different bug depending on what they were
+          running - not because anybody needs to read it. */}
+      <p className="version">{APP_VERSION}</p>
     </div>
   );
 }

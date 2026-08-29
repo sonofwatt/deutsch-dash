@@ -5,9 +5,16 @@ suite. A commit sitting unpushed has already invalidated one playtest — what
 people are playing is whatever last reached Pages — so check `git status -sb`
 before trusting what a table reports._
 
-_**327 tests green** (303 unit + 24 emulator). This is the only place in the repo
+_**328 tests green** (304 unit + 24 emulator). This is the only place in the repo
 that quotes a count — it drifted three separate ways when it lived in four
 places, so keep it here and nowhere else._
+
+**The version is `src/version.ts` and nowhere else** — the same one-place rule the
+test count above keeps. From a v1.00 baseline at the Deutsch Dash rename, a batch
+of feature work is **+0.10** and a small change is **+0.01**; it is shown at the
+foot of the home and lobby screens so a report from a table can be tied to a
+build. Bump it in the commit that earns it, or it will drift the way the test
+count did.
 
 A mobile-first multiplayer Dutch Blitz game for 2–8 players, plus AI opponents.
 Host creates a room, texts the invite link, everyone plays in their phone
@@ -1431,6 +1438,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `01a4e99` | Flicking a card at the board, judged on the throw and not the release |
 | `8ed3a45` → `94569c5` | The round-end gate, the near-miss race, spectators, and the wood-cycle stuck rule |
 | `84da728` | The bot ladder down a rung, Genius, and a wood turn that deals three |
+| _(this one)_ | A version at the foot of the home and lobby screens |
 | `c7a1da9` | The flick aimed by direction; the whole space above the hand |
 
 Earlier history, the approved design spec and the original 15-task execution
