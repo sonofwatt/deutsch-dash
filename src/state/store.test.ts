@@ -354,6 +354,44 @@ describe('the lobby ready gate', () => {
     store.getState().leave();
   });
 
+  it('a scowl does not follow the player into the next round', async () => {
+    // Reported as an angry face on an empty space, round 1, before anybody had
+    // played a card. lastRejected has no expiry and raceFlashes renders it every
+    // render, so the span mounts fresh with the next board and replays its
+    // animation over a space nothing has ever been played to.
+    let cb!: (room: Room | null) => void;
+    const deps = fakeDeps({
+      watchRoom: vi.fn((_c: string, f: (room: Room | null) => void) => { cb = f; return () => {}; }),
+      playToCenter: vi.fn(async () => ({ committed: false, winner: 'you' })),
+    });
+    const store = createGameStore(deps);
+    await store.getState().enterRoom('ABCDEF', 'D', 'tulip');
+    const t = deal(buildDeck('me'), 3);
+    const playing = (roundNumber: number): Room => ({
+      meta: { createdAt: 1, hostId: 'me', creatorId: 'me', targetScore: 75, phase: 'playing', roundNumber },
+      players: { me: human({ ready: true }), you: human({ ready: true }) },
+      round: { spaces: Array.from({ length: 16 }, () => ({ stack: [], history: [] })),
+               tableaus: { me: t, you: deal(buildDeck('you'), 3) },
+               blitzedBy: null, scores: null, races: null, duels: null,
+               endedAt: null, stuckRounds: 0, startedAt: 1 },
+    });
+    cb(playing(1));
+    // Lose a race for a space: the scowl is the point of this state existing.
+    const ace = t.post.flat().concat(t.blitz[t.blitz.length - 1]).find(c => c.v === 1)!;
+    const src = t.blitz[t.blitz.length - 1] === ace
+      ? { kind: 'blitz' as const }
+      : { kind: 'post' as const, index: t.post.findIndex(p => p.includes(ace)) };
+    store.getState().select(src);
+    await store.getState().playTo({ space: 4 });
+    expect(store.getState().lastRejected?.space).toBe(4);
+
+    // The next deal wipes it. Without this the next board opens with a scowl on
+    // space 4 and no card anywhere near it.
+    cb(playing(2));
+    expect(store.getState().lastRejected).toBeNull();
+    store.getState().leave();
+  });
+
   it('refuses to change identity once the player has readied', async () => {
     const deps = fakeDeps();
     const store = createGameStore(deps);

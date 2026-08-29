@@ -279,3 +279,15 @@
    wrong, not to be looked at the rest of the time. */
 .version { margin: 4px 0 0; text-align: center; font-size: 11px;
   color: var(--ink-soft); opacity: .65; font-variant-numeric: tabular-nums; }
+
+/* The ready button, with the host's override sharing its row rather than sitting
+   under it as a second full-width slab. A third and two thirds: the override is
+   the rarer thing to want and must not be the half a thumb finds by accident,
+   but it still clears the 44px touch floor at every phone width. */
+.ready-row { display: grid; }
+.ready-row.with-override { grid-template-columns: 1fr 2fr; gap: 8px; }
+.ready-row > .btn { width: 100%; }
+/* A third of a phone's width is about 118px, and "Start anyway" does not fit that
+   on one line at the button's usual padding. Let it take two lines instead of
+   shrinking the type below what is comfortable to read at a glance. */
+.ready-row .start-anyway { padding: 0 8px; font-size: 14px; line-height: 1.15; }

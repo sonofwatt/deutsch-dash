@@ -415,14 +415,19 @@
 
 /* A wood turn brings three cards over, so it looks like three cards being dealt
    rather than one card flipping. They sit in the same cell and arrive one after
-   another, ~70ms apart, which is what dealing onto a spot looks like at speed.
+   another, which is what dealing onto a spot looks like at speed.
+
+   Doubled from the first cut, both halves of it: each card takes 380ms rather
+   than 190, and they land 140ms apart rather than 70, so the whole turn runs
+   660ms against the 330 it did - twice the time, at the same rhythm. Halving
+   only the per-card duration would have made them overlap instead of deal.
 
    Keyed by card in TableauView, so only the cards that actually just arrived
    animate - the ones already face up hold still. */
 .wood-deal { display: grid; }
-.wood-deal > * { grid-area: 1 / 1; animation: wood-deal 190ms ease-out var(--d, 0ms) both; }
-.wood-deal > *:nth-child(2) { --d: 70ms; }
-.wood-deal > *:nth-child(3) { --d: 140ms; }
+.wood-deal > * { grid-area: 1 / 1; animation: wood-deal 380ms ease-out var(--d, 0ms) both; }
+.wood-deal > *:nth-child(2) { --d: 140ms; }
+.wood-deal > *:nth-child(3) { --d: 280ms; }
 @keyframes wood-deal {
   0%   { opacity: 0; transform: translate(14%, -22%) rotate(7deg) scale(.94); }
   100% { opacity: 1; transform: translate(0, 0) rotate(0) scale(1); }

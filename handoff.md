@@ -5,7 +5,7 @@ suite. A commit sitting unpushed has already invalidated one playtest — what
 people are playing is whatever last reached Pages — so check `git status -sb`
 before trusting what a table reports._
 
-_**333 tests green** (309 unit + 24 emulator). This is the only place in the repo
+_**334 tests green** (310 unit + 24 emulator). This is the only place in the repo
 that quotes a count — it drifted three separate ways when it lived in four
 places, so keep it here and nowhere else._
 
@@ -738,6 +738,27 @@ space it can follow rigged into place:
 | the same 70px at 400ms - a reposition, not a throw | nothing |
 | slow drag let go over the opponent strip | lands (signal 3) |
 
+### A scowl that outlived its round _(#49)_
+
+Reported as **an angry face on an empty space, round 1, before anybody had played
+a card**. Nothing was wrong with the race code that put it there; what was wrong
+is that nothing ever took it away.
+
+`lastRejected` has **no expiry** and `raceFlashes` renders it on every render. The
+CSS animation ends at `opacity: 0` and no timer clears the element, which is fine
+while the board stays mounted - but a new round mounts a new board, the span
+mounts fresh, and the animation **replays** over a space nothing has ever been
+played to. It leaked across rounds and, because `leave()` did not clear it either,
+across games in the same tab.
+
+`spaceTouched` leaked exactly the same way, and worse: a stale entry inside
+`RACE_GRACE_MS` would have blamed the wrong player for a race in a different
+round. Both are cleared when `meta.roundNumber` changes, and both in `leave()`.
+
+**The thing to take from it:** anything keyed by a nonce so it can replay is
+per-round state by construction, and per-round state needs somewhere that clears
+it. There was no such place; there is now, at the top of `onSnapshot`.
+
 ### The bot ladder moved down a rung _(#44)_
 
 Easy was still beating a casual human after two tunings, so the third one moved
@@ -1450,6 +1471,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `64e2c7c` | A version at the foot of the home and lobby screens |
 | `1b28628` | The version as v1.2.41, derived from two counters |
 | `85705c4` | The host can cancel a countdown and keep the lobby |
+| _(this one)_ | Start anyway shares the ready button's row; the stale scowl cleared |
 | `c7a1da9` | The flick aimed by direction; the whole space above the hand |
 
 Earlier history, the approved design spec and the original 15-task execution

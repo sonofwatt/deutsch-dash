@@ -67,7 +67,10 @@ export function Lobby({ code }: { code: string }) {
   const takenByOthers = players.filter(([id]) => id !== uid).map(([, p]) => p.badgeId);
   const countdown = room.meta.countdown;
   const inPlay = players.filter(([, p]) => !p.sittingOut);
-  const readyCount = inPlay.filter(([, p]) => p.isBot || p.ready).length;
+  // The override appears only for a host who has readied and is waiting on
+  // somebody else, and it needs a table worth starting. Once everyone is ready
+  // the countdown has it from there and this is gone.
+  const showOverride = host && iAmReady && !tableReady(room) && inPlay.length >= 2;
 
   function add() {
     if (!freeBadge) return;
@@ -214,14 +217,24 @@ export function Lobby({ code }: { code: string }) {
         ? <button className="btn ready-btn" onClick={() => setSittingOut(false)}>
             I'm back — deal me in
           </button>
-        : <button className={`btn ready-btn${iAmAway ? ' away' : iAmReady ? ' on' : ''}`}
-            onClick={toggleReady}>
-            {/* A question when it is asking and a statement when it is answered.
-                "I'm Ready" then "Ready" read as the same word twice, and people
-                could not tell which state they were looking at - the colour was
-                carrying the whole message on its own. */}
-            {iAmAway ? 'Away' : iAmReady ? 'Ready!' : 'Ready?'}
-          </button>}
+        /* The host's override shares the ready button's row rather than sitting
+           under it as a second full-width slab. It only appears once the host is
+           READY, which is the whole point: before that the count it used to show
+           could never be complete, because the host was one of the players it was
+           counting. Ready first, then "everyone else can catch up". */
+        : <div className={`ready-row${showOverride ? ' with-override' : ''}`}>
+            {showOverride && (
+              <button className="btn start-anyway" onClick={start}>Start anyway</button>
+            )}
+            <button className={`btn ready-btn${iAmAway ? ' away' : iAmReady ? ' on' : ''}`}
+              onClick={toggleReady}>
+              {/* A question when it is asking and a statement when it is answered.
+                  "I'm Ready" then "Ready" read as the same word twice, and people
+                  could not tell which state they were looking at - the colour was
+                  carrying the whole message on its own. */}
+              {iAmAway ? 'Away' : iAmReady ? 'Ready!' : 'Ready?'}
+            </button>
+          </div>}
       {/* Quiet, and below the ready button: stepping away is the rarer thing to
           want, and it must not be the button a thumb finds by accident. */}
       {!iAmOut && (
@@ -238,10 +251,8 @@ export function Lobby({ code }: { code: string }) {
           one is a fixed dark slab in both themes, like the ready button above it
           is a fixed white one: the two are read together, and they must not swap
           relative weight because one player's phone is in dark mode. */}
-      {host && !tableReady(room) && (
-        <button className="btn start-anyway" disabled={inPlay.length < 2} onClick={start}>
-          {inPlay.length < 2 ? 'Waiting for players…' : `Start anyway (${readyCount}/${inPlay.length} ready)`}
-        </button>
+      {host && !tableReady(room) && inPlay.length < 2 && (
+        <p className="muted">Waiting for players…</p>
       )}
       {!host && !tableReady(room) && (
         <p className="muted">

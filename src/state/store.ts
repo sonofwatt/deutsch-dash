@@ -464,6 +464,15 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
 
     function onSnapshot(room: Room | null) {
       const s = get();
+      // A scowl, and the record of who took which space, are facts about ONE
+      // round. Neither was ever cleared, and both leaked: `lastRejected` has no
+      // expiry and `raceFlashes` renders it every render, so the span mounts
+      // fresh with the next round's board and REPLAYS its animation - an angry
+      // face over an empty space on a board nobody has played to yet, which is
+      // exactly how it was reported. spaceTouched leaked the same way, and a
+      // stale entry inside RACE_GRACE_MS would have blamed the wrong player.
+      const newRound = room?.meta.roundNumber !== s.room?.meta.roundNumber;
+      if (newRound) spaceTouched.clear();
       // Before the state swap, while `s.room` is still the board as it was: note
       // every space whose top card has changed, and who put it there. Runs on
       // re-entrant snapshots too - this is a record of what the board did, not a
@@ -477,7 +486,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
           spaceTouched.set(i, { at: Date.now(), by: after.owner, reported: false });
         }
       }
-      set({ room });
+      set(newRound && s.lastRejected ? { room, lastRejected: null } : { room });
       if (!room || !s.uid) return;
       // Firebase raises local onValue events SYNCHRONOUSLY from inside set()/update(),
       // so the side effects below can re-enter this handler before it returns.
@@ -653,10 +662,13 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         stopBots();
         stopCountdown();
         flips.clear();
+        spaceTouched.clear();
         commitFailedFor = null;
         deps.stopPresence();
+        // lastRejected too: it outlived the room it belonged to, so the next
+        // game's first board inherited somebody else's scowl.
         set({ code: null, room: null, tableau: null, selection: null, joinPhase: 'idle',
-              botTableaus: {}, actionError: null });
+              botTableaus: {}, actionError: null, lastRejected: null });
       },
 
       select(source) {
