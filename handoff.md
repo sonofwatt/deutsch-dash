@@ -5,7 +5,7 @@ suite. A commit sitting unpushed has already invalidated one playtest — what
 people are playing is whatever last reached Pages — so check `git status -sb`
 before trusting what a table reports._
 
-_**303 tests green** (280 unit + 23 emulator). This is the only place in the repo
+_**308 tests green** (285 unit + 23 emulator). This is the only place in the repo
 that quotes a count — it drifted three separate ways when it lived in four
 places, so keep it here and nowhere else._
 
@@ -624,44 +624,68 @@ back-gesture sensitivity rather than the default. **Neither has been on a real
 phone**: what is proved is the geometry, not that the geometry is enough to stop
 the gesture. That needs a thumb.
 
-### Flicking a card at the board _(#27)_
+### Flicking a card at the board _(#27, #28)_
 
 **The gesture is judged on the movement, not on where the finger came off the
-glass.** That is the whole change. Dragging a card into the drop zone still
-works and is untouched; what was broken is that a *throw* at the board had to
-also happen to end inside it, and a fast one usually does not - it ends past the
-top of the board, on the opponent strip, or on a pixel the page does not own,
-and then nothing happened at all. Reported from an iPhone, reproduced on both
-platforms.
+glass.** A throw at the board is over long before the pointer is released, and a
+fast one ends wherever it ends - short of the board, past the top of it, or on a
+pixel the page does not own. Making the card go where it was *aimed* is what lets
+a 30px flick place a card 400px away, which is the whole point of a flick.
 
-`flickOf` (`useDrag.ts`) reads the last `FLICK_WINDOW_MS` (120ms) of pointer
-samples and returns where the card was **aimed** - the release point projected
-`FLICK_PROJECT_MS` (90ms) further along the throw - or null if the gesture was
-not a throw. `Game.tsx` needed no new branch: a flick arrives as the `nearest`
-target it already handles, with `at` set to the aim instead of to the release.
+Three signals, tried in this order (`useDrag.ts`, then the `nearest` branch of
+`Game.tsx`):
 
-- **The window is the last fraction of the gesture, not the whole of it.**
-  Picking a card up, hesitating and then throwing it is still a throw, and
-  averaging in the hesitation loses it. Pinned by a test.
-- **Upward only** (`dy < 0`). The board is above the hand on every screen, so a
-  flick down or sideways is somebody moving a card between their own piles or
-  thinking better of it, and neither should throw it into the middle.
-- **`FLICK_MIN_TRAVEL` (24px) guards a fast tap** with a jittery finger.
-- **`FLICK_MIN_SPEED` is 0.45 px/ms** - about 450px/s, above a deliberate drag
-  and well under a real thumb flick. It is the number to tune if the gesture
-  feels too eager or too deaf; nothing else in the rule is a judgement call.
+1. **An explicit pile under the finger wins**, at any speed. That is somebody
+   placing a card on a square they chose, and it must not be overruled by how
+   fast they got there.
+2. **The LINE of the throw** (`throwOf` → `aimedAt`). A flick says a direction
+   and nothing dependable about distance, so the card goes to the legal space
+   nearest the line of the throw. Aim at nothing and it does nothing - that is
+   the wild-flick case, and it is deliberate, or the gesture becomes "shake the
+   phone to play a card".
+3. **Where they let go**, but only if that point means "the middle": over the
+   board, or anywhere above the player's own hand (`[data-hand]`). This is what
+   catches a throw that OVERSHOT - aim from a release point past the board points
+   back down at it, so the aim finds nothing and the release decides instead.
 
-**An explicit pile under the finger still wins.** Releasing on a space or a post
-plays there whatever the speed: that is somebody placing a card on a square they
-chose, and it must not be overruled by how fast they got there.
+**The candidates are always the LEGAL spaces**, which is what makes it forgiving
+in the way the table asked for: aim at a space that is full, or at a pile this
+card cannot follow, and it lands on a playable one rather than coming back.
+Nothing is returned while there is anywhere for it to go.
 
-**A cancelled pointer now commits the throw, and this is the half that matters.**
-`pointercancel` fires when the OS takes the gesture away mid-air - an iOS home
-swipe, an Android back swipe, a second finger landing - and the old handler
-discarded the drop outright, so the one gesture most likely to be stolen was
-also the one that silently did nothing. The throw was already over and already
-unambiguous by then, so it counts. Verified by dispatching a real
-`pointercancel` mid-throw against the running app.
+Three things about `throwOf` that are not obvious:
+
+- **It reads the FASTEST stretch in the window, not the average across it.** A
+  thumb decelerates before it leaves the glass, so the last 120ms of a real flick
+  is its slowest part - averaging it is what made a short flick fail while a long
+  drag succeeded, which is exactly how it was reported.
+- **`FLICK_MIN_TRAVEL` is checked once over the whole window, never per stretch.**
+  Per stretch it discards the short fast ones at the end - the throw itself - and
+  leaves only the long slow ones reaching back into the wind-up. That bug was in
+  the first cut of this and it made the whole thing look like a threshold problem.
+- **`FLICK_MIN_SPEED` (0.3 px/ms) sits nearer a drag than a flick on purpose.** A
+  careful drag runs at 100-400px/s and a thumb flick at 1000px/s and up. The
+  direction test is what rejects a wild throw; this only has to tell a throw from
+  a reposition. `FLICK_MAX_AIM_DEG` (55°) is the other knob, and the only one in
+  here that is a matter of feel rather than geometry.
+
+**A cancelled pointer commits the throw.** `pointercancel` fires when the OS takes
+the gesture away mid-air - an iOS home swipe, an Android back swipe, a second
+finger - and the old handler discarded the drop outright, so the gesture most
+likely to be stolen was also the one that silently did nothing. There is no
+trustworthy release point in that case, so only signal 2 applies.
+
+Measured against the emulator on both device profiles, with the card and the one
+space it can follow rigged into place:
+
+| gesture | result |
+|---|---|
+| 70px flick aimed at a space 391px away | lands there |
+| 30px flick, same target | lands there |
+| the same throw stolen by `pointercancel` | lands there |
+| 70px flick aimed 90° away | nothing |
+| the same 70px at 400ms - a reposition, not a throw | nothing |
+| slow drag let go over the opponent strip | lands (signal 3) |
 
 ### Hints and openings — one switch over two nudges _(#6, #9)_
 
@@ -1033,7 +1057,8 @@ takes it as real data, because it is.
 `roundEnd` and `scores` is absent, so write the scores you want FIRST or it will
 compute its own from the live round.
 
-**Watch, harder: the bots are playing while you measure.** Counting cards in the
+**Watch, hardest of all: the bots are playing while you measure**, and they will
+fool two different checks in a row if you let them. Counting cards in the
 centre before and after a gesture proves nothing - a bot playing inside the same
 second is indistinguishable from the thing you were testing, and it read as a
 pass twice before it was noticed. Every card carries its owner's badge, so count
@@ -1044,8 +1069,21 @@ only the ones bearing YOUR glyph:
   .filter(c => c.querySelector('.card-badge')?.textContent.trim() === myGlyph).length
 ```
 
-The same applies to anything else timed against a live table. If a measurement
-cannot tell your own action apart from a bot's, it is not a measurement.
+The badge alone is not enough either, and neither is the card's value. Every
+player holds their OWN copy of every card, so a bot can legally play the same
+number onto the same space a moment after you do - and `badgeOf` falls back to
+**your** badge for an owner who is not a player, so a card rigged in with a made
+up owner renders as yours. Both of those read as a pass. Check the value AND the
+badge, and rig with a real player's uid:
+
+```js
+const c = document.querySelector('[data-drop="space:4"] .card');
+({ v: +c.querySelector('.card-v').textContent, badge: c.querySelector('.card-badge').textContent })
+```
+
+If a measurement cannot tell your own action apart from a bot's, it is not a
+measurement - and a bot taking the rigged space first makes a trial inconclusive
+rather than failed, so a single red run is worth repeating before believing.
 
 ### Check the URL first if something looks broken
 
@@ -1069,12 +1107,12 @@ assuming a code fault.
   round end), but a two-bot table now reaches a normal blitz rather than the stall
   path, so that repro stopped reaching it.
 - The drop zone by touch drag, and by tap.
-- **The flick on real glass** (#27). It is driven and measured on both device
-  profiles in headless Chromium, which is not Safari and not a thumb: the speed
-  threshold in particular has only ever been crossed by a synthetic pointer, and
-  a synthetic one occasionally comes in slow enough to miss it. A real flick is
-  several times faster than the threshold, so the risk is the opposite one - a
-  deliberate drag reading as a throw.
+- **The flick on real glass** (#27, #28). Driven and measured on both device
+  profiles in headless Chromium, which is neither Safari nor a thumb. Note that
+  `page.mouse` CANNOT express a flick at all - one CDP round trip per move puts
+  its fastest gesture at about 0.3px/ms, which is a slow drag - so the gestures
+  are dispatched from inside the page where the pacing is real milliseconds. Any
+  future test of this has to do the same or it will measure the driver.
 - Wood recycle: the `↻` empty draw slot.
 - One-tap join from the home page, including the badge-taken fallback.
 - Opponent strip mini-cards updating live.
@@ -1188,6 +1226,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `9d72d8b` | Columns from the shape of the box; the iOS and Android edge guards |
 | `7a90afc` | The Android edge guard raised to 40dp, the widest the gesture reaches |
 | `01a4e99` | Flicking a card at the board, judged on the throw and not the release |
+| _(this one)_ | The flick aimed by direction; the whole space above the hand |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.

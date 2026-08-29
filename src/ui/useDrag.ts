@@ -2,7 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import type React from 'react'; // React.PointerEvent type only (new-JSX files do not auto-import React)
 import type { Card, PlaySource } from '../game/types';
 
-export type DropTarget = { space: number } | { post: number } | { nearest: true };
+export type DropTarget =
+  | { space: number }
+  | { post: number }
+  // No particular square. Two independent signals, and the caller tries them in
+  // order: `aim` is the line of a throw, present when the card was thrown rather
+  // than let go; `loose` says the release point ITSELF means "into the middle",
+  // which it does over the board and anywhere above the player's own hand.
+  | { nearest: true; aim?: Throw; loose: boolean };
 export interface Point { x: number; y: number }
 
 export interface DragState { card: Card; source: PlaySource; x: number; y: number }
@@ -45,53 +52,117 @@ export function ghostFix(
 /** One pointer position and when it was there. `t` is milliseconds, any origin. */
 export interface Sample extends Point { t: number }
 
-/**
- * A flick is a throw at the board, and it is judged on the LAST fraction of the
- * gesture rather than on the whole of it: picking a card up, hesitating, and then
- * throwing it is still a throw, and averaging the hesitation in would lose it.
- */
-export const FLICK_WINDOW_MS = 120;
-/** px per ms. About 450px/s - well above a deliberate drag, well under a real throw. */
-export const FLICK_MIN_SPEED = 0.45;
-/** Guards against a fast tap with a jittery finger reading as a throw. */
-export const FLICK_MIN_TRAVEL = 24;
-/**
- * How far ahead of the release point the card is taken to be going. Long enough
- * that a flick from the bottom of the screen reaches the board and picks the
- * space it was aimed at, short enough that it does not sail past everything into
- * the far corner.
- */
-export const FLICK_PROJECT_MS = 90;
+/** A throw at the board: where it left from, and which way it was going. */
+export interface Throw { from: Point; dx: number; dy: number; speed: number }
 
 /**
- * Where a flick was AIMED, or null if the gesture was not one.
- *
- * This is what makes the gesture independent of where the finger happened to
- * come off the glass. A throw at the board is over long before the pointer is
- * released, and on a fast one the release lands wherever it lands - past the top
- * of the board, on the opponent strip, or nowhere the page owns at all. Reading
- * the intent out of the movement means the card goes where it was thrown rather
- * than where the finger stopped.
- *
- * Pure, and takes its own samples, so the whole rule is testable without a DOM.
+ * The tail of a real flick is its SLOWEST part - a thumb decelerates before it
+ * leaves the glass - so the throw is read as the fastest stretch inside this
+ * window rather than as the average across it. Judging the last fraction alone
+ * is what made a short flick fail while a long drag succeeded.
  */
-export function flickOf(samples: Sample[]): Point | null {
+export const FLICK_WINDOW_MS = 160;
+/** The shortest stretch worth measuring a speed over; below this it is jitter. */
+const MIN_SEGMENT_MS = 20;
+/** And the shortest worth taking a DIRECTION from. */
+const MIN_SEGMENT_PX = 10;
+/**
+ * px per ms. 300px/s sits in the gap between the two gestures: a careful drag
+ * runs at 100-400px/s and a thumb flick at 1000px/s and up, so this is nearer a
+ * drag than a flick on purpose - the direction test below is what rejects a wild
+ * throw, and this only has to separate a throw from a reposition.
+ */
+export const FLICK_MIN_SPEED = 0.3;
+/** Guards against a fast tap with an unsteady finger reading as a throw. */
+export const FLICK_MIN_TRAVEL = 18;
+/**
+ * How far off the line of the throw a space may sit and still count as aimed at.
+ * Generous on purpose - "the general direction of the pile they want" - and it
+ * is the one number in here that is a matter of feel rather than of geometry.
+ */
+export const FLICK_MAX_AIM_DEG = 55;
+/** Two spaces this close in bearing are both "aimed at"; the nearer one wins. */
+const AIM_TIE_DEG = 8;
+
+/**
+ * The throw a gesture was, or null if it was not one.
+ *
+ * This is what makes the flick independent of where the finger came off the
+ * glass. A throw at the board is over long before the pointer is released, and
+ * on a fast one the release lands wherever it lands - short of the board, past
+ * the top of it, or nowhere the page owns at all. Reading the throw out of the
+ * movement means the card goes where it was aimed rather than where the finger
+ * stopped, and it means a SHORT flick in the right direction is as good as a
+ * long one, which is the whole point of a flick.
+ *
+ * Pure, and takes its own samples, so the rule is testable without a DOM.
+ */
+export function throwOf(samples: Sample[]): Throw | null {
   const last = samples[samples.length - 1];
   if (!last || samples.length < 2) return null;
-  // The oldest sample still inside the window, so the velocity is the throw and
-  // not the approach to it.
-  const first = samples.find(s => last.t - s.t <= FLICK_WINDOW_MS) ?? samples[0];
-  const dt = last.t - first.t;
-  if (dt <= 0) return null;
-  const dx = last.x - first.x, dy = last.y - first.y;
-  const travel = Math.hypot(dx, dy);
-  if (travel < FLICK_MIN_TRAVEL) return null;
-  if (travel / dt < FLICK_MIN_SPEED) return null;
-  // Upward only. The board is above the hand on every screen, and a flick down or
-  // sideways is a player moving a card between their own piles or thinking better
-  // of it - neither should throw the card into the middle.
-  if (dy >= 0) return null;
-  return { x: last.x + (dx / dt) * FLICK_PROJECT_MS, y: last.y + (dy / dt) * FLICK_PROJECT_MS };
+  const window = samples.filter(s => last.t - s.t <= FLICK_WINDOW_MS);
+  // How far the gesture went, across the whole window. This is the tap guard, and
+  // it belongs HERE and not on each stretch below: applied per stretch it threw
+  // away the short fast ones at the end - the throw itself - and left only the
+  // long slow ones that reach back into the wind-up.
+  if (Math.hypot(last.x - window[0].x, last.y - window[0].y) < FLICK_MIN_TRAVEL) return null;
+  // Every stretch ending at the release, and the fastest of them is the throw.
+  // Averaging the whole window instead takes in the deceleration a thumb makes
+  // before it leaves the glass; the last pair alone reads noise.
+  let best: Throw | null = null;
+  for (const s of window) {
+    const dt = last.t - s.t;
+    if (dt < MIN_SEGMENT_MS) continue;
+    const dx = last.x - s.x, dy = last.y - s.y;
+    const travel = Math.hypot(dx, dy);
+    if (travel < MIN_SEGMENT_PX) continue;   // too small to carry a direction
+    const speed = travel / dt;
+    if (!best || speed > best.speed) best = { from: last, dx, dy, speed };
+  }
+  if (!best || best.speed < FLICK_MIN_SPEED) return null;
+  // Upward only. The board is above the hand on every screen, so a throw down or
+  // flat is a player moving a card between their own piles or thinking better of
+  // it, and neither should send it into the middle.
+  if (best.dy >= 0) return null;
+  return best;
+}
+
+/**
+ * Which of these candidates the throw was aimed at, or null if none of them was.
+ *
+ * Bearing, not distance. A flick says a DIRECTION and nothing reliable about how
+ * far - the same thumb movement means "over there" whether the space is 100px
+ * away or 600 - so the card goes to the legal space lying nearest the line of the
+ * throw. Candidates are already filtered to legal ones by the caller, which is
+ * what makes this forgiving in the way it needs to be: aim at a space that is
+ * full, or at a pile the card cannot follow, and it lands on the playable one
+ * closest to the line rather than coming back.
+ *
+ * Returning null is the wild-flick case, and it is deliberate. A throw at nothing
+ * in particular should do nothing, or the gesture becomes "shake the phone to
+ * play a card".
+ */
+export function aimedAt(
+  candidates: { index: number; cx: number; cy: number }[], t: Throw,
+): number | null {
+  const aim = Math.atan2(t.dy, t.dx);
+  const scored = candidates.flatMap(c => {
+    const dx = c.cx - t.from.x, dy = c.cy - t.from.y;
+    const d = Math.hypot(dx, dy);
+    if (d < 1) return [];
+    // Signed difference folded into 0..180, so a bearing either side of the throw
+    // is off by the same amount.
+    let off = Math.abs(Math.atan2(dy, dx) - aim) * 180 / Math.PI;
+    if (off > 180) off = 360 - off;
+    return [{ index: c.index, off, d }];
+  });
+  const inCone = scored.filter(c => c.off <= FLICK_MAX_AIM_DEG);
+  if (inCone.length === 0) return null;
+  const bestAngle = Math.min(...inCone.map(c => c.off));
+  // Among the ones aimed at equally well - a column of spaces straight ahead is
+  // the case - the nearest is the one meant.
+  return inCone.filter(c => c.off <= bestAngle + AIM_TIE_DEG)
+    .sort((a, b) => a.d - b.d)[0].index;
 }
 
 export function parseDrop(el: Element | null): DropTarget | null {
@@ -101,7 +172,9 @@ export function parseDrop(el: Element | null): DropTarget | null {
   const [kind, n] = v.split(':');
   if (kind === 'space') return { space: Number(n) };
   if (kind === 'post') return { post: Number(n) };
-  if (kind === 'nearest') return { nearest: true };
+  // The zone element only says WHERE, never how it was thrown - useDrag fills
+  // the rest in from the gesture.
+  if (kind === 'nearest') return { nearest: true, loose: true };
   return null;
 }
 
@@ -118,15 +191,31 @@ export function nearestOf(
   return best;
 }
 
-/** Which of these centre spaces is nearest the point, by where they are on screen. */
-export function nearestSpace(indices: number[], x: number, y: number): number | null {
-  const candidates = indices.flatMap(index => {
+/** Where these centre spaces are on screen right now. */
+export function spaceCentres(indices: number[]) {
+  return indices.flatMap(index => {
     const el = document.querySelector(`[data-drop="space:${index}"]`);
     if (!el) return [];
     const r = el.getBoundingClientRect();
     return [{ index, cx: r.left + r.width / 2, cy: r.top + r.height / 2 }];
   });
-  return nearestOf(candidates, x, y);
+}
+
+/** Which of these centre spaces is nearest the point, by where they are on screen. */
+export function nearestSpace(indices: number[], x: number, y: number): number | null {
+  return nearestOf(spaceCentres(indices), x, y);
+}
+
+/**
+ * The top of the player's own hand. Everything above it is board - the grid, the
+ * gaps around it, the opponent strip, the head - and letting go anywhere up there
+ * means "into the middle", which is what it looks like to the player holding the
+ * card. Below it they are over their own piles, where a release means a post play
+ * or a change of mind.
+ */
+function handTop(): number {
+  const el = document.querySelector('[data-hand]');
+  return el ? el.getBoundingClientRect().top : Infinity;
 }
 
 export function useDrag(onDrop: (source: PlaySource, target: DropTarget, at: Point) => void) {
@@ -139,13 +228,16 @@ export function useDrag(onDrop: (source: PlaySource, target: DropTarget, at: Poi
   function startDrag(e: React.PointerEvent, card: Card, source: PlaySource) {
     e.preventDefault();
     cleanupRef.current?.(); // a second pointer starting a drag tears down the first
-    (e.target as Element).setPointerCapture?.(e.pointerId);
+    // Best effort. Safari throws NotFoundError here if the pointer is no longer
+    // active by the time this runs, and losing capture costs us nothing that the
+    // window listeners below do not already cover.
+    try { (e.target as Element).setPointerCapture?.(e.pointerId); } catch { /* no capture */ }
     const pointerId = e.pointerId;
     setDrag({ card, source, x: e.clientX, y: e.clientY });
 
     // Kept in a ref rather than in state: every pointermove appends one, and the
     // ghost's own re-render is already paying for the position. Trimmed to the
-    // window flickOf reads, so a long drag cannot grow it without bound.
+    // window throwOf reads, so a long drag cannot grow it without bound.
     const samples: Sample[] = [{ x: e.clientX, y: e.clientY, t: performance.now() }];
     const sample = (x: number, y: number) => {
       const t = performance.now();
@@ -163,7 +255,7 @@ export function useDrag(onDrop: (source: PlaySource, target: DropTarget, at: Poi
       cleanup();
       setDrag(null);
       if (ev.type === 'pointerup') sample(ev.clientX, ev.clientY);
-      const flick = flickOf(samples);
+      const thrown = throwOf(samples);
       if (ev.type === 'pointerup') {
         const target = parseDrop(document.elementFromPoint(ev.clientX, ev.clientY));
         const at = { x: ev.clientX, y: ev.clientY };
@@ -171,9 +263,12 @@ export function useDrag(onDrop: (source: PlaySource, target: DropTarget, at: Poi
         // on a square they chose, and it must not be overruled by how fast they
         // happened to get there.
         if (target && !('nearest' in target)) { onDrop(source, target, at); return; }
-        // Then the throw, aimed where it was going rather than where it stopped.
-        if (flick) { onDrop(source, { nearest: true }, flick); return; }
-        if (target) { onDrop(source, target, at); return; }
+        // Did they let go somewhere that means "the middle"? The drop zone element
+        // covers the board; the rest is everything above their own hand - the gaps
+        // beside the grid, the opponent strip, the head - which is all board as far
+        // as somebody holding a card is concerned.
+        const loose = target != null || at.y < handTop();
+        if (thrown || loose) onDrop(source, { nearest: true, aim: thrown ?? undefined, loose }, at);
         return;
       }
       // pointercancel: the OS took the gesture off us mid-throw - an iOS home
@@ -181,7 +276,8 @@ export function useDrag(onDrop: (source: PlaySource, target: DropTarget, at: Poi
       // already happened and was already unambiguous, so it still counts. This is
       // the half of the fix that matters: before it, the one gesture most likely
       // to be stolen was also the one that silently did nothing.
-      if (flick) onDrop(source, { nearest: true }, flick);
+      // No release to trust, so the throw is the only signal there is.
+      if (thrown) onDrop(source, { nearest: true, aim: thrown, loose: false }, thrown.from);
     };
     const cleanup = () => {
       window.removeEventListener('pointermove', move);

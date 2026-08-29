@@ -10,7 +10,7 @@ import { TableauView } from '../components/TableauView';
 import { OpponentStrip } from '../components/OpponentStrip';
 import { ConnectionPill } from '../components/ConnectionPill';
 import { ThemeToggle } from '../components/ThemeToggle';
-import { nearestSpace, useDrag, type DropTarget, type Point } from '../useDrag';
+import { aimedAt, nearestSpace, spaceCentres, useDrag, type DropTarget, type Point } from '../useDrag';
 import { raceFlashes } from '../raceFlash';
 import { useOpenings } from '../openings';
 import { useWoodSide } from '../prefs';
@@ -87,13 +87,20 @@ export function Game() {
   const { drag, startDrag } = useDrag((source: PlaySource, target: DropTarget, at: Point) => {
     gameStore.setState({ selection: source }); // direct set - select() would TOGGLE an already-selected source off
     if ('nearest' in target) {
-      // No particular square was chosen: either the card was let go over the drop
-      // zone, or it was FLICKED at the board and never had to arrive. Send it to
-      // whichever space it can legally land in that is closest to `at` - which is
-      // where they let go in the first case and where the throw was aimed in the
-      // second (see flickOf). For an Ace that is just the nearest free space.
+      // No particular square was chosen. The candidates are the spaces this card
+      // can LEGALLY land in, and that is what makes the gesture forgiving: aim at
+      // a space that is full, or at a pile this card cannot follow, and it goes to
+      // a playable one rather than coming back. Nothing is ever returned while
+      // there is somewhere for it to go.
       const legal = round ? legalTargets(tableau!, source, round.spaces).spaces : [];
-      const best = nearestSpace(legal, at.x, at.y);
+      // Two signals, tried in order. The LINE of a throw comes first, because a
+      // flick says a direction and nothing dependable about distance - that is
+      // what lets a 30px flick reach a space 400px away. Where they let go comes
+      // second, and covers the throw that overshot: aim from a release point past
+      // the board points back down at it, so the aim finds nothing and the
+      // release - which is over the board, where they meant it - decides instead.
+      const best = (target.aim ? aimedAt(spaceCentres(legal), target.aim) : null)
+        ?? (target.loose ? nearestSpace(legal, at.x, at.y) : null);
       if (best == null) { gameStore.setState({ selection: null }); return; }
       void playTo({ space: best });
       return;

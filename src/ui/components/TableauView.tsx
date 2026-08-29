@@ -101,5 +101,9 @@ export function TableauView(props: {
     : [blitzGroup, ...postGroups, woodGroup];
   // The pile count and its gap are set on .game (Game.tsx), because --hand-card
   // is defined there - the drag ghost is a sibling of this and needs the same one.
-  return <div className="tableau-zone">{ends}</div>;
+  // data-hand marks where the player's own cards start. useDrag reads it to
+  // decide what counts as letting go "into the middle": everything above this
+  // row is board as far as the player is concerned, whether or not the drop
+  // zone element reaches that far.
+  return <div className="tableau-zone" data-hand>{ends}</div>;
 }

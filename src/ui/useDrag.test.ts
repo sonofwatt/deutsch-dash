@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { parseDrop, nearestOf, ghostFix, GHOST_ANCHOR, flickOf, FLICK_PROJECT_MS } from './useDrag';
+import { parseDrop, nearestOf, ghostFix, GHOST_ANCHOR, throwOf, aimedAt, FLICK_MAX_AIM_DEG } from './useDrag';
 
 describe('parseDrop', () => {
   it('reads the three drop kinds off the attribute', () => {
     const el = (v: string) => ({ closest: () => ({ getAttribute: () => v }) }) as unknown as Element;
     expect(parseDrop(el('space:7'))).toEqual({ space: 7 });
     expect(parseDrop(el('post:2'))).toEqual({ post: 2 });
-    expect(parseDrop(el('nearest'))).toEqual({ nearest: true });
+    expect(parseDrop(el('nearest'))).toEqual({ nearest: true, loose: true });
     expect(parseDrop(null)).toBeNull();
   });
 });
@@ -56,52 +56,101 @@ describe('ghostFix', () => {
   });
 });
 
-describe('flickOf', () => {
-  // A throw upward: 200px in 200ms is 1px/ms, comfortably over the threshold.
-  const throwUp = (steps = 5, ms = 200, dy = -200) =>
-    Array.from({ length: steps + 1 }, (_, i) => ({ x: 100, y: 500 + (dy * i) / steps, t: 1000 + (ms * i) / steps }));
+describe('throwOf', () => {
+  /** A throw of `dist` px in `ms`, in `steps`, at the given angle (0 = straight up). */
+  const thrown = (dist: number, ms: number, steps = 5, deg = 0) =>
+    Array.from({ length: steps + 1 }, (_, i) => ({
+      x: 200 + Math.sin((deg * Math.PI) / 180) * (dist * i) / steps,
+      y: 700 - Math.cos((deg * Math.PI) / 180) * (dist * i) / steps,
+      t: 1000 + (ms * i) / steps,
+    }));
 
-  it('reads a fast upward throw and aims it ahead of the release', () => {
-    const aim = flickOf(throwUp());
-    expect(aim).not.toBeNull();
-    expect(aim!.x).toBeCloseTo(100);
-    // Released at y=300 travelling 1px/ms upward, so it is aimed a further
-    // FLICK_PROJECT_MS worth of travel up the board.
-    expect(aim!.y).toBeCloseTo(300 - FLICK_PROJECT_MS);
+  it('reads a SHORT fast flick, which is the one that used to be missed', () => {
+    // 60px in 90ms: nothing like far enough to reach the board, and the whole
+    // point is that it does not have to be.
+    const t = throwOf(thrown(60, 90));
+    expect(t).not.toBeNull();
+    expect(t!.dy).toBeLessThan(0);
+    expect(t!.from.y).toBeCloseTo(640);
+  });
+
+  it('finds the throw inside a gesture that slows down before letting go', () => {
+    // A thumb decelerates before it leaves the glass. Averaging the whole window
+    // loses the throw; the fastest stretch in it does not.
+    const fast = [
+      { x: 200, y: 700, t: 0 }, { x: 200, y: 640, t: 30 }, { x: 200, y: 580, t: 60 },
+      { x: 200, y: 574, t: 100 }, { x: 200, y: 572, t: 140 },
+    ];
+    expect(throwOf(fast)).not.toBeNull();
   });
 
   it('ignores a deliberate drag, however far it goes', () => {
-    // The same 200px, taken two seconds over it.
-    expect(flickOf(throwUp(20, 2000))).toBeNull();
+    expect(throwOf(thrown(400, 2000, 20))).toBeNull();
   });
 
   it('ignores a fast twitch that goes nowhere', () => {
-    // Quick, but under FLICK_MIN_TRAVEL - a tap with an unsteady finger.
-    expect(flickOf(throwUp(3, 20, -10))).toBeNull();
+    expect(throwOf(thrown(8, 20, 3))).toBeNull();
   });
 
-  it('ignores downward and sideways throws', () => {
-    // The board is above the hand on every screen, so only up is a throw at it.
-    expect(flickOf(throwUp(5, 200, 200))).toBeNull();
-    const sideways = [
-      { x: 100, y: 500, t: 1000 }, { x: 200, y: 500, t: 1050 }, { x: 300, y: 500, t: 1100 },
-    ];
-    expect(flickOf(sideways)).toBeNull();
+  it('ignores downward and flat throws', () => {
+    expect(throwOf(thrown(200, 200, 5, 180))).toBeNull();   // straight down
+    expect(throwOf(thrown(200, 200, 5, 90))).toBeNull();    // straight sideways
   });
 
-  it('judges the throw, not the hesitation before it', () => {
-    // Card picked up, held still for a second, then thrown. The whole gesture
-    // averages out slow; the last FLICK_WINDOW_MS of it does not.
-    const dawdle = [
-      { x: 100, y: 500, t: 0 }, { x: 102, y: 498, t: 500 }, { x: 100, y: 500, t: 1000 },
-      { x: 100, y: 440, t: 1040 }, { x: 100, y: 380, t: 1080 }, { x: 100, y: 320, t: 1120 },
-    ];
-    expect(flickOf(dawdle)).not.toBeNull();
+  it('has nothing to say about a gesture too short to have a speed', () => {
+    expect(throwOf([])).toBeNull();
+    expect(throwOf([{ x: 1, y: 1, t: 0 }])).toBeNull();
+    expect(throwOf([{ x: 200, y: 700, t: 0 }, { x: 200, y: 500, t: 2 }])).toBeNull();
+  });
+});
+
+describe('aimedAt', () => {
+  // Released at (200, 700). A board above it: two spaces up-left, one up-right.
+  const from = { x: 200, y: 700 };
+  const spaces = [
+    { index: 0, cx: 60, cy: 300 },   // up and well to the left
+    { index: 1, cx: 120, cy: 200 },  // up, a little to the left, further away
+    { index: 2, cx: 340, cy: 300 },  // up and to the right
+  ];
+  const aim = (dx: number, dy: number) => ({ from, dx, dy, speed: 1 });
+
+  it('sends the card along the line of the throw, not to whatever is nearest', () => {
+    // Thrown up-left. Space 2 is a similar distance away on the other side, and
+    // must not win: this is the case that made a flick feel arbitrary.
+    expect(aimedAt(spaces, aim(-140, -400))).toBe(0);
+    expect(aimedAt(spaces, aim(140, -400))).toBe(2);
   });
 
-  it('has nothing to say about a gesture with one sample or no time in it', () => {
-    expect(flickOf([{ x: 1, y: 1, t: 0 }])).toBeNull();
-    expect(flickOf([])).toBeNull();
-    expect(flickOf([{ x: 1, y: 500, t: 5 }, { x: 1, y: 300, t: 5 }])).toBeNull();
+  it('takes the nearer of two spaces along the same bearing', () => {
+    // 0 and 1 are within a few degrees of each other from here.
+    expect(aimedAt(spaces, aim(-100, -420))).toBe(0);
+  });
+
+  it('refuses a wild throw that is aimed at nothing', () => {
+    // Hard left, along the bottom of the screen: no space is in that direction.
+    expect(aimedAt(spaces, aim(-400, -20))).toBeNull();
+    expect(aimedAt([], aim(0, -400))).toBeNull();
+  });
+
+  it('lands on a legal space even when the throw was aimed between them', () => {
+    // The caller only ever passes spaces this card can legally land in, so a throw
+    // aimed at a full space or an unfollowable pile arrives at a playable one
+    // rather than coming back. Straight up, with nothing straight up: 1 is the
+    // closest to the line and inside the cone.
+    const aimed = aimedAt(spaces, aim(0, -400));
+    expect(aimed).toBe(1);
+  });
+
+  it('measures the cone off the line of the throw, either side alike', () => {
+    // A space exactly on the cone edge is in; one past it is out.
+    const edge = (deg: number) => [{
+      index: 9,
+      cx: from.x + Math.sin((deg * Math.PI) / 180) * 400,
+      cy: from.y - Math.cos((deg * Math.PI) / 180) * 400,
+    }];
+    const up = aim(0, -400);
+    expect(aimedAt(edge(FLICK_MAX_AIM_DEG - 2), up)).toBe(9);
+    expect(aimedAt(edge(-(FLICK_MAX_AIM_DEG - 2)), up)).toBe(9);
+    expect(aimedAt(edge(FLICK_MAX_AIM_DEG + 4), up)).toBeNull();
   });
 });
