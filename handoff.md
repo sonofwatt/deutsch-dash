@@ -1430,7 +1430,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `7a90afc` | The Android edge guard raised to 40dp, the widest the gesture reaches |
 | `01a4e99` | Flicking a card at the board, judged on the throw and not the release |
 | `8ed3a45` → `94569c5` | The round-end gate, the near-miss race, spectators, and the wood-cycle stuck rule |
-| _(this one)_ | The bot ladder down a rung, Genius, and a wood turn that deals three |
+| `84da728` | The bot ladder down a rung, Genius, and a wood turn that deals three |
 | `c7a1da9` | The flick aimed by direction; the whole space above the hand |
 
 Earlier history, the approved design spec and the original 15-task execution
