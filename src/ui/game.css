@@ -412,3 +412,22 @@
    shrink back the moment their cards arrive. */
 .standby-hand { min-height: calc(var(--hand-card) * 2); display: grid;
   place-items: center; margin: 0; font-size: 13px; }
+
+/* A wood turn brings three cards over, so it looks like three cards being dealt
+   rather than one card flipping. They sit in the same cell and arrive one after
+   another, ~70ms apart, which is what dealing onto a spot looks like at speed.
+
+   Keyed by card in TableauView, so only the cards that actually just arrived
+   animate - the ones already face up hold still. */
+.wood-deal { display: grid; }
+.wood-deal > * { grid-area: 1 / 1; animation: wood-deal 190ms ease-out var(--d, 0ms) both; }
+.wood-deal > *:nth-child(2) { --d: 70ms; }
+.wood-deal > *:nth-child(3) { --d: 140ms; }
+@keyframes wood-deal {
+  0%   { opacity: 0; transform: translate(14%, -22%) rotate(7deg) scale(.94); }
+  100% { opacity: 1; transform: translate(0, 0) rotate(0) scale(1); }
+}
+/* The cards still arrive and still land in order; they just stop travelling. */
+@media (prefers-reduced-motion: reduce) {
+  @keyframes wood-deal { 0% { opacity: 0; } 100% { opacity: 1; } }
+}

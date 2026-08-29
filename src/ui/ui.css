@@ -174,7 +174,12 @@
   border: 1px solid var(--line); }
 .keep-toggle { align-items: center; gap: 10px; }
 .keep-toggle input { width: 22px; height: 22px; }
-.keep-back { text-align: center; font-size: 13px; }
+/* Double the height it had. It was a bare 13px line - about 20px of target - at
+   the bottom of a sheet, which is a long way to reach for something that has to
+   be hit exactly. 44px is the touch floor everything else on this board keeps to,
+   and it costs a sheet nothing to give it. */
+.keep-back { text-align: center; font-size: 13px;
+  min-height: 44px; display: grid; place-items: center; }
 .keep-card { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface);
   padding: 10px 12px; display: grid; gap: 8px; }
 .keep-card-head { display: flex; align-items: center; gap: 8px; }

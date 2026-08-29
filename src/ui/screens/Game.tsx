@@ -4,7 +4,7 @@ import { useGameStore, legalTargets, gameStore, isHost } from '../../state/store
 import { allConnectedStuck } from '../../net/plays';
 import { hasLegalMove } from '../../game/rules';
 import { HINT_DELAY_MS, HINT_REPEAT_MS, HINT_SHOW_MS, hintSpace } from '../../game/hint';
-import type { BadgeId } from '../../game/badges';
+import { EMOJI, type BadgeId } from '../../game/badges';
 import { DragGhost } from '../components/DragGhost';
 import { CenterGrid } from '../components/CenterGrid';
 import { TableauView } from '../components/TableauView';
@@ -222,7 +222,7 @@ export function Game() {
             ? <button className="side-swap arming" onClick={() => { setArming(false); setSittingOut(true); }}
                 aria-label="Confirm sitting out of this round">out?</button>
             : <button className="side-swap" onClick={() => setArming(true)}
-                aria-label="Sit out" title="Sit out of the round">‖</button>}
+                aria-label="Sit out" title="Sit out of the round">{'\u{1f6aa}' + EMOJI}</button>}
           <ThemeToggle />
         </span>
       </div>

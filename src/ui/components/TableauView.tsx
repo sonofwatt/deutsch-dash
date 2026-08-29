@@ -3,6 +3,7 @@ import { CardBack, CardView } from './CardView';
 import { PileStack, depthLayers } from './PileStack';
 import type { BadgeId } from '../../game/badges';
 import type { WoodSide } from '../prefs';
+import { WOOD_STEP } from '../../game/wood';
 import { cardId, type Card, type PlaySource, type Tableau } from '../../game/types';
 
 export function TableauView(props: {
@@ -20,6 +21,10 @@ export function TableauView(props: {
 
   const faceDown = t.wood.length - t.woodIndex; // still to be turned over
   const faceUp = t.woodIndex;                   // already turned over, top is playable
+  // The cards this turn brought over, oldest first, with the playable one last.
+  // Capped at WOOD_STEP because that is the most a turn can ever deal - a shorter
+  // last turn, or the host's single-card rescue, simply deals fewer.
+  const dealt = t.wood.slice(Math.max(0, t.woodIndex - WOOD_STEP), t.woodIndex);
   // Every wood card has been turned over at least once: the next flip recycles the
   // pile from the start and deals 3 again (or whatever is left, see flipWood).
   // Tapping the empty draw slot is the recycle. It carries no glyph: a ↻ on the
@@ -85,9 +90,21 @@ export function TableauView(props: {
                 thumb reaches for, covering .card-badge entirely at every card size,
                 and the empty draw slot beside it already carries the ↻. */}
             {woodTop ? (
-              <div onClick={() => props.onSelect({ kind: 'wood' })}
+              <div className="wood-deal"
+                onClick={() => props.onSelect({ kind: 'wood' })}
                 onPointerDown={e => props.startDrag(e, woodTop, { kind: 'wood' })}>
-                <CardView card={woodTop} badgeId={badgeId} selected={isSel({ kind: 'wood' })} flipKey={t.woodIndex} />
+                {/* A turn brings three cards over, so it should look like three
+                    cards being dealt - not one card flipping. They are stacked in
+                    the same place and animate in one after another, which is what
+                    dealing onto a spot looks like. Keyed by the card, so only the
+                    ones that just arrived animate: the two under the top card sit
+                    still if a later turn brought fewer.
+                    The last is the one that is playable, and the only one that
+                    ever wears the selection ring. */}
+                {dealt.map((card, i) => (
+                  <CardView key={cardId(card)} card={card} badgeId={badgeId}
+                    selected={i === dealt.length - 1 && isSel({ kind: 'wood' })} />
+                ))}
               </div>
             ) : <div className="pile-space" />}
           </PileStack>

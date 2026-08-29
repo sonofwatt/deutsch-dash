@@ -327,3 +327,34 @@ describe('hasReachableMove and being stuck', () => {
     expect(isStuck(t, empty(8), 6, 1)).toBe(true);
   });
 });
+
+describe('post piles build DOWN and only down', () => {
+  const card = (v: number, suit: Suit): Card => ({ v, suit, owner: 'me' });
+  // Reported as "the game lets you stack ascending and descending". It does not,
+  // and never has - this pins it so the claim can be settled by running the tests
+  // rather than by reading the rule.
+  it('takes a card one LOWER of the other gender, and nothing else', () => {
+    const eight = [card(8, 'red')];      // red is a boy
+    expect(canBuildOnPost(card(7, 'green'), eight)).toBe(true);   // girl, one down
+    expect(canBuildOnPost(card(9, 'green'), eight)).toBe(false);  // girl, one UP
+    expect(canBuildOnPost(card(7, 'blue'), eight)).toBe(false);   // boy on boy
+    expect(canBuildOnPost(card(6, 'green'), eight)).toBe(false);  // two down
+    expect(canBuildOnPost(card(8, 'green'), eight)).toBe(false);  // level
+  });
+
+  it('refuses everything on an empty post - the Blitz pile refills those', () => {
+    // This is the likeliest thing behind the report: refillPosts drops the Blitz
+    // top into an empty post, so a card of any value can APPEAR on a post pile
+    // without anybody having built it there.
+    expect(canBuildOnPost(card(5, 'red'), [])).toBe(false);
+  });
+
+  it('placeOnPost enforces it too, not just the highlighting', () => {
+    const t: Tableau = { blitz: [card(3, 'red')], post: [[card(8, 'red')], [card(9, 'green')], []],
+                         wood: [], woodIndex: 0 };
+    // The 9 of green cannot go up onto the 8 of red...
+    expect(placeOnPost(t, { kind: 'post', index: 1 }, 0)).toBeNull();
+    // ...but the 8 of red can go down onto the 9 of green.
+    expect(placeOnPost(t, { kind: 'post', index: 0 }, 1)).not.toBeNull();
+  });
+});

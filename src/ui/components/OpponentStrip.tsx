@@ -1,4 +1,4 @@
-import { BADGES, type BadgeId } from '../../game/badges';
+import { BADGES, EMOJI, type BadgeId } from '../../game/badges';
 import { CardView } from './CardView';
 import type { WoodSide } from '../prefs';
 import type { Card, PlayerInfo, Tableau } from '../../game/types';
@@ -61,7 +61,13 @@ export function OpponentStrip(props: {
                   name says nothing about which pile it belongs to. */}
               {p.sittingOut
                 ? <span className="opp-out" title="sitting out">out</span>
-                : p.stuckAt != null && <span title="stuck">⏳</span>}
+                : p.stuckAt != null && (
+                    /* The same state your own board calls "No moves left", said
+                       in the space a name leaves. It had only a title, which a
+                       phone never shows, so nobody could find out what it meant. */
+                    <span className="opp-stuck" title="No moves left"
+                      aria-label="No moves left">{'\u23f3' + EMOJI}</span>
+                  )}
             </div>
             {/* Same left-to-right order as your own tableau, so a glance across
                 the table reads the same way: Blitz, posts, wood. */}

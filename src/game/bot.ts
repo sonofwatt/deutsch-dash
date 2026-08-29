@@ -1,11 +1,11 @@
 import type { CenterSpace, PlaySource, Tableau } from './types';
 import { canBuildOnPost, canPlayToSpace, sourceTop } from './rules';
 
-export type BotLevel = 'easy' | 'medium' | 'hard';
+export type BotLevel = 'easy' | 'medium' | 'hard' | 'genius';
 
-export const BOT_LEVELS: BotLevel[] = ['easy', 'medium', 'hard'];
+export const BOT_LEVELS: BotLevel[] = ['easy', 'medium', 'hard', 'genius'];
 export const BOT_LABELS: Record<BotLevel, string> = {
-  easy: 'Easy', medium: 'Medium', hard: 'Hard',
+  easy: 'Easy', medium: 'Medium', hard: 'Hard', genius: 'Genius',
 };
 
 export interface BotProfile {
@@ -20,21 +20,27 @@ export interface BotProfile {
 }
 
 /**
- * Tuned down across the board after the first game against them (2026-08-25):
- * Easy was still beating a casual human. The reason a bot punches above its
- * settings is that it never makes an ILLEGAL move and never loses track of the
- * board, so the only honest handicaps are speed and attention - hence every knob
- * here being slower and more distractible than the first cut.
+ * Tuned down TWICE, and the second time by moving the whole ladder rather than
+ * by nudging numbers. Easy was still beating a casual human after the first pass
+ * (2026-08-25) and again after a real game (2026-08-29), so every level now
+ * inherits the settings of the level below it: medium is the old easy, hard is
+ * the old medium, and a genuinely feeble easy was written underneath them all.
  *
- * What matters is the effective rate, delay divided by (1 - dither):
- *   easy ~4.9s per action, medium ~2.3s, hard ~1.1s.
- * The old numbers were 3.3s / 1.3s / 0.5s, so hard is now roughly where medium
- * used to be, and easy genuinely dawdles.
+ * A bot punches above its settings because it never makes an ILLEGAL move and
+ * never loses track of the board, so the only honest handicaps are speed and
+ * attention - which is why the knobs here are all rate and distraction and none
+ * of them is "plays worse cards".
+ *
+ * What matters is the effective rate, delay / (1 - dither):
+ *   easy ~9.2s per action, medium ~4.9s, hard ~2.3s, genius ~0.5s.
+ * Genius is deliberately about twice the old hard (~1.1s) and takes the best
+ * move it can see nearly every time - it is meant to be unpleasant.
  */
 export const BOT_PROFILES: Record<BotLevel, BotProfile> = {
-  easy:   { minDelay: 2600, maxDelay: 4800, sloppiness: 0.9,  dither: 0.25, distracted: 0.45 },
-  medium: { minDelay: 1400, maxDelay: 2600, sloppiness: 0.5,  dither: 0.12, distracted: 0.25 },
-  hard:   { minDelay: 650,  maxDelay: 1400, sloppiness: 0.15, dither: 0.03, distracted: 0.1 },
+  easy:   { minDelay: 4200, maxDelay: 7200, sloppiness: 0.97, dither: 0.38, distracted: 0.6 },
+  medium: { minDelay: 2600, maxDelay: 4800, sloppiness: 0.9,  dither: 0.25, distracted: 0.45 },
+  hard:   { minDelay: 1400, maxDelay: 2600, sloppiness: 0.5,  dither: 0.12, distracted: 0.25 },
+  genius: { minDelay: 320,  maxDelay: 700,  sloppiness: 0.02, dither: 0,    distracted: 0 },
 };
 
 export type BotAction =

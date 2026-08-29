@@ -5,7 +5,7 @@ suite. A commit sitting unpushed has already invalidated one playtest — what
 people are playing is whatever last reached Pages — so check `git status -sb`
 before trusting what a table reports._
 
-_**320 tests green** (296 unit + 24 emulator). This is the only place in the repo
+_**327 tests green** (303 unit + 24 emulator). This is the only place in the repo
 that quotes a count — it drifted three separate ways when it lived in four
 places, so keep it here and nowhere else._
 
@@ -722,6 +722,62 @@ space it can follow rigged into place:
 | the same 70px at 400ms - a reposition, not a throw | nothing |
 | slow drag let go over the opponent strip | lands (signal 3) |
 
+### The bot ladder moved down a rung _(#44)_
+
+Easy was still beating a casual human after two tunings, so the third one moved
+the whole ladder rather than nudging numbers: **medium inherited easy's settings,
+hard inherited medium's**, and a genuinely feeble easy was written underneath.
+**Genius** is new and is about twice the bot Hard used to be.
+
+Effective rate is `delay / (1 - dither)`: easy ~9.2s per action, medium ~4.9s,
+hard ~2.3s, genius ~0.5s. `bot.test.ts` pins the ORDER rather than the numbers,
+so the next retune cannot put a level out of sequence by accident.
+
+A bot punches above its settings because it never makes an illegal move and never
+loses track of the board, so **the only honest handicaps are speed and
+attention** - which is why none of the knobs is "plays worse cards".
+
+### A wood turn deals three cards _(#45)_
+
+It used to be one card flipping (`flipKey` on the top card). A turn brings three
+cards over, so it now looks like three: `dealt` is the last `WOOD_STEP` face-up
+cards, stacked in one grid cell and animated in 70ms apart. **Keyed by card**, so
+only the ones that actually just arrived animate - after a short last turn, or a
+single-card turn under the host's rescue, the cards already face up hold still and
+one card lands on them.
+
+Dropping `flipKey` also removed the static-render artifact it caused: a headless
+shot no longer leaves the wood card frozen edge-on at `rotateY(90)`.
+
+### Two small ones _(#46, #47)_
+
+- **`.keep-back` is 44px tall.** It was a bare 13px line - about 20px of target -
+  at the bottom of a sheet, which is a long way to reach for something that has to
+  be hit exactly. Every other control on this board keeps to the touch floor.
+- **Sitting out is a door** (🚪), not `‖`. The armed second tap still reads
+  "out?", because that is the one that costs a round.
+
+### What the hourglass means, and what the post piles allow
+
+Two questions from the table, answered here because they will be asked again.
+
+**⏳ beside a player in the opponent strip means STUCK** - the same state your own
+board calls "No moves left". It had only a `title`, which a phone never shows, so
+it now carries an `aria-label` with the board's own wording.
+
+**Post piles build DOWN only**, and always have: `canBuildOnPost` takes a card one
+lower of the other gender and nothing else. Reported as allowing both directions;
+it does not, and `rules.test.ts` now pins every rejected case so the claim can be
+settled by running the tests. **The likeliest thing behind the report is
+`refillPosts`**: when a post empties, the Blitz top drops into it automatically, so
+a card of any value can APPEAR on a post pile without anybody having built it
+there. That is the rule, not a bug.
+
+Terminology, since it has caused confusion: the **wood pile** is the face-down
+draw pile turned over in threes, and the **post piles** are the three (or five, at
+two players) build piles between Blitz and wood. The code has always used those
+names.
+
 ### The round-end sheet _(#29-#34)_
 
 **It is a gate now, the same shape as the lobby.** Everyone says when they have
@@ -1374,6 +1430,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `7a90afc` | The Android edge guard raised to 40dp, the widest the gesture reaches |
 | `01a4e99` | Flicking a card at the board, judged on the throw and not the release |
 | `8ed3a45` → `94569c5` | The round-end gate, the near-miss race, spectators, and the wood-cycle stuck rule |
+| _(this one)_ | The bot ladder down a rung, Genius, and a wood turn that deals three |
 | `c7a1da9` | The flick aimed by direction; the whole space above the hand |
 
 Earlier history, the approved design spec and the original 15-task execution

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { BOT_PROFILES, botDelay, botId, botMoves, chooseBotAction, isBotId, rankMove } from './bot';
+import { BOT_PROFILES, botDelay, botId, botMoves, chooseBotAction, isBotId, rankMove,
+  type BotLevel } from './bot';
 import type { Card, CenterSpace, Suit, Tableau } from './types';
 
 const c = (v: number, suit: Suit, owner = 'bot'): Card => ({ v, suit, owner });
@@ -105,5 +106,45 @@ describe('bot ids', () => {
     expect(botId('star')).toBe('bot_star');
     expect(isBotId('bot_star')).toBe(true);
     expect(isBotId('kR3xAbC')).toBe(false);
+  });
+});
+
+describe('the difficulty ladder', () => {
+  // The whole ladder moved down: medium inherited easy's settings and hard
+  // inherited medium's, because Easy was still beating a casual human. Pinned as
+  // an ORDER rather than as numbers, so the next retune cannot accidentally put a
+  // level out of sequence.
+  const rate = (l: BotLevel) => {
+    const p = BOT_PROFILES[l];
+    return ((p.minDelay + p.maxDelay) / 2) / (1 - p.dither);
+  };
+
+  it('gets strictly faster the harder it gets', () => {
+    expect(rate('easy')).toBeGreaterThan(rate('medium'));
+    expect(rate('medium')).toBeGreaterThan(rate('hard'));
+    expect(rate('hard')).toBeGreaterThan(rate('genius'));
+  });
+
+  it('gets strictly more attentive the harder it gets', () => {
+    const levels: BotLevel[] = ['easy', 'medium', 'hard', 'genius'];
+    for (let i = 1; i < levels.length; i++) {
+      expect(BOT_PROFILES[levels[i]].sloppiness).toBeLessThan(BOT_PROFILES[levels[i - 1]].sloppiness);
+      expect(BOT_PROFILES[levels[i]].dither).toBeLessThanOrEqual(BOT_PROFILES[levels[i - 1]].dither);
+    }
+  });
+
+  it('makes Genius about twice the bot Hard used to be', () => {
+    // Hard was ~1.1s per action before the ladder moved; Genius is the level that
+    // was asked for as "twice as good as the current Hard".
+    expect(rate('genius')).toBeGreaterThan(400);
+    expect(rate('genius')).toBeLessThan(700);
+  });
+
+  it('never dithers or wanders as Genius - it simply takes the best move', () => {
+    const t = tab({ blitz: [c(1, 'red')] });
+    const spaces = [{ stack: [], history: [] }];
+    // rng at its most unhelpful: any sloppiness or dither would show here.
+    const action = chooseBotAction(t, spaces, 'genius', () => 0.5);
+    expect(action).toEqual({ kind: 'center', source: { kind: 'blitz' }, space: 0 });
   });
 });
