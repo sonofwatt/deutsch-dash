@@ -51,7 +51,10 @@ export function normalizeRoom(raw: unknown): Room | null {
   if (r.round && typeof r.round === 'object') {
     const rr = r.round as Partial<RoundState> & { tableaus?: Record<string, unknown> };
     round = {
-      spaces: normalizeSpaces(rr.spaces, spaceCountForPlayers(playerCount, orderly), orderly),
+      // The size this round was dealt with, not the size the room implies now: a
+      // spectator arriving mid-round must not grow the board under everybody.
+      spaces: normalizeSpaces(
+        rr.spaces, rr.spaceCount ?? spaceCountForPlayers(playerCount, orderly), orderly),
       tableaus: Object.fromEntries(
         Object.entries(rr.tableaus ?? {}).map(([uid, t]) => [uid, normalizeTableau(t, postCount)]),
       ),
@@ -59,6 +62,7 @@ export function normalizeRoom(raw: unknown): Room | null {
       scores: rr.scores ?? null,
       races: rr.races ?? null,
       duels: rr.duels ?? null,
+      spaceCount: rr.spaceCount,
       stuckRounds: rr.stuckRounds ?? 0,
       startedAt: rr.startedAt ?? 0,
       endedAt: rr.endedAt ?? null,

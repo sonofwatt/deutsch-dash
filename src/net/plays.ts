@@ -71,6 +71,10 @@ export async function startRound(code: string, room: Room, rng?: Rng): Promise<v
   const patch: Record<string, unknown> = {
     round: {
       tableaus, stuckRounds: 0, blitzedBy: null, scores: null, startedAt: serverTimestamp(),
+      // Fixed here rather than derived per client, because the player count can
+      // change mid-round now that a game in progress admits spectators - and a
+      // board that changes shape under a hand somebody is holding costs the round.
+      spaceCount: spaceCountForPlayers(uids.length, orderly),
       ...(spaces ? { spaces } : {}),
     },
     'meta/phase': 'playing',

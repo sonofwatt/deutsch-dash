@@ -130,8 +130,13 @@ export function Game() {
   // hand at all means the deal happened without you, and no button can undo that
   // - the cards are dealt - so that one waits for the next round.
   const out = me?.sittingOut === true;
-  if (out || !hand) {
-    const canRejoin = out && hand != null;
+  // No hand and not sitting out: either they joined a game already in progress,
+  // or the deal happened while they were away. Either way they watch this round
+  // and are dealt in at the next one - and watching means the BOARD, live, not a
+  // waiting-room screen. The standby banner stands in for the opponent strip.
+  const watching = !out && !hand;
+  if (out) {
+    const canRejoin = hand != null;
     return (
       <div className="screen stack">
         <h1 className="title">{out ? 'Sitting out' : 'Back next round'}</h1>
@@ -160,14 +165,14 @@ export function Game() {
 
   const races = raceFlashes({ races: round.races, spaces: round.spaces, uid, lastRejected });
   const active = drag ? drag.source : selection;
-  const targets = active ? legalTargets(hand, active, round.spaces) : { spaces: [], posts: [] };
-  const stuckAvailable = !hasLegalMove(hand, round.spaces);
+  const targets = hand && active ? legalTargets(hand, active, round.spaces) : { spaces: [], posts: [] };
+  const stuckAvailable = hand ? !hasLegalMove(hand, round.spaces) : false;
   // Recomputed every render rather than stored, so it can never point at a space
   // somebody else has since filled.
   // Recomputed every render rather than stored, so a re-fire ten seconds later
   // points at the board as it is now - which is the case that matters most, a
   // player who WAS stuck and has just had a move opened up for them.
-  const hint = hintsOn && showing === activity ? hintSpace(hand, round.spaces) : null;
+  const hint = hand && hintsOn && showing === activity ? hintSpace(hand, round.spaces) : null;
   // A stopped table is a fact about the GAME, not about one hand, so it is said
   // across the board rather than under the tableau. The rescue reads the same way
   // for everybody; only the host is offered the button that starts it.
@@ -191,8 +196,8 @@ export function Game() {
       // tighter gap is needed; every other size deals three.
       style={{
         opacity: online ? 1 : 0.6,
-        ['--piles' as string]: String(hand.post.length + 2),
-        ['--tgap' as string]: hand.post.length >= 5 ? '6px' : '10px',
+        ['--piles' as string]: String((hand?.post.length ?? 3) + 2),
+        ['--tgap' as string]: (hand?.post.length ?? 3) >= 5 ? '6px' : '10px',
       }}
       onPointerDown={() => { noteActivity(); setActivity(n => n + 1); }}>
       <div className="game-head">
@@ -221,7 +226,15 @@ export function Game() {
           <ThemeToggle />
         </span>
       </div>
-      <OpponentStrip me={uid} players={room.players} tableaus={round.tableaus} woodSide={woodSide} />
+      {/* The banner takes the opponent strip's PLACE rather than sitting above it:
+          that row is a fixed track in .game's grid, so a second thing in it would
+          come straight off the board this player is here to watch. */}
+      {watching
+        ? <div className="standby-banner" role="status">
+            <strong>Standby. Game in progress.</strong>
+            <span>You are dealt in at the start of the next round.</span>
+          </div>
+        : <OpponentStrip me={uid} players={room.players} tableaus={round.tableaus} woodSide={woodSide} />}
       <CenterGrid spaces={round.spaces} highlight={targets.spaces} badgeOf={badgeOf}
         onTap={i => void playTo({ space: i })} races={races}
         snapping={targets.spaces.length > 0} stuck={hand != null && me.stuckAt != null} hint={hint}

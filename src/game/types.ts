@@ -138,6 +138,19 @@ export interface RoundState {
   // first: duels[loser][winner]. Only the commentary reads it.
   duels: Record<string, Record<string, number>> | null;
   stuckRounds: number; startedAt: number;
+  /**
+   * How many centre spaces this round was DEALT with, fixed at startRound.
+   *
+   * The size used to be derived from the live player count on every client. That
+   * was safe only while the count could not change mid-round - and it can now,
+   * because somebody may join a game in progress. Without this, their arrival
+   * grows the board from 16 spaces to 20 under everybody's hands, mid-round,
+   * which is the exact thing sizing on the whole room was chosen to avoid.
+   *
+   * Optional: a round dealt before this field existed falls back to the old
+   * derivation, which is correct for it because nobody could join it late.
+   */
+  spaceCount?: number;
   // Stamped when the host commits the scores, so the round has a length.
   endedAt: number | null;
 }
