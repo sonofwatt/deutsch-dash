@@ -1,21 +1,33 @@
 /**
  * The build a player is looking at, shown at the foot of the home and lobby
- * screens so a playtest report can be tied to a build. **This is the only place
- * in the app that states a version** - the same rule the test count in the
- * handoff keeps, and for the same reason.
+ * screens so a report from a table can be tied to one. **This is the only place
+ * in the app that states a version** - the same one-place rule the handoff's test
+ * count keeps, and for the same reason: it drifted three ways when it lived in
+ * four places.
  *
- * How to bump it, from a v1.00 baseline at the Deutsch Dash rename (`1529330`),
- * which is where the handoff already starts counting:
+ * `v<major>.<minor>.<patch>`, and the last two are DERIVED rather than typed, so
+ * bumping this is incrementing one of the two counters below and nothing else.
  *
- * - **A batch of feature work is +0.10.** One round of requests from the table,
- *   however many items it turns out to contain - the twenty-item batch and the
- *   three-item one each moved it by the same tenth, because a batch is a thing
- *   the table asked for and got, not a line count.
- * - **A small change is +0.01.** A tuning pass, a tweak, a fix on its own, a
- *   documentation sweep.
+ * - **MAJOR is manual.** It moves when the table says a release is major, never
+ *   by arithmetic. Everything else can accumulate underneath it indefinitely.
+ * - **A batch of feature work is worth 10**, however many items it holds. The
+ *   twenty-item batch and the three-item one earned the same, because a batch is
+ *   a thing the table asked for and got, not a line count.
+ * - **A small change is worth 1**: a tuning pass, a lone fix, a docs sweep.
+ * - The running total splits at 100, so the patch field is exactly "feature
+ *   batches this hundred, then small changes" - tens digit and units digit - and
+ *   ten batches carry into the minor.
  *
- * At v3.41 that is 23 feature batches and 11 small changes, counted off the
- * handoff's own History table, which is the curated record of what actually
- * shipped rather than of what was committed.
+ * The counts came off the handoff's History table rather than the commit log,
+ * because that table is the curated record of what actually shipped.
  */
-export const APP_VERSION = 'v3.41';
+const MAJOR = 1;
+/** Rounds of feature work since the Deutsch Dash rename (`1529330`). */
+const FEATURE_BATCHES = 23;
+/** Tweaks, lone fixes and documentation passes over the same stretch. */
+const SMALL_CHANGES = 11;
+
+const COUNT = FEATURE_BATCHES * 10 + SMALL_CHANGES;
+
+export const APP_VERSION =
+  `v${MAJOR}.${Math.floor(COUNT / 100)}.${String(COUNT % 100).padStart(2, '0')}`;
