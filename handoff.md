@@ -5,7 +5,7 @@ suite. A commit sitting unpushed has already invalidated one playtest — what
 people are playing is whatever last reached Pages — so check `git status -sb`
 before trusting what a table reports._
 
-_**329 tests green** (305 unit + 24 emulator). This is the only place in the repo
+_**333 tests green** (309 unit + 24 emulator). This is the only place in the repo
 that quotes a count — it drifted three separate ways when it lived in four
 places, so keep it here and nowhere else._
 
@@ -14,11 +14,16 @@ test count above keeps. `v<major>.<minor>.<patch>`, shown at the foot of the hom
 and lobby screens so a report from a table can be tied to a build.
 
 The minor and patch are **derived from two counters**, so bumping is incrementing
-one number: a batch of feature work is worth **10** however many items it holds, a
-small change is worth **1**, and the running total splits at 100 — which makes the
-patch field exactly "feature batches this hundred, then small changes". **MAJOR is
-manual** and moves only when the table calls a release major, never by arithmetic.
-Bump it in the commit that earns it, or it will drift the way the test count did.
+one number: a batch of feature work is worth **10** however many items it holds
+(a one-item request the table asked for and got is still a batch), a small change
+is worth **1**, and the running total splits at 100 — which makes the patch field
+exactly "feature batches this hundred, then small changes". **MAJOR is manual**
+and moves only when the table calls a release major, never by arithmetic.
+
+`formatVersion` is pure and tested by worked example, so a bump never means
+editing a test to match — a version whose test has to be re-pinned every time is
+one somebody will eventually bump without running them. Bump it in the commit that
+earns it, or it will drift the way the test count did.
 
 A mobile-first multiplayer Dutch Blitz game for 2–8 players, plus AI opponents.
 Host creates a room, texts the invite link, everyone plays in their phone
@@ -1444,6 +1449,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `84da728` | The bot ladder down a rung, Genius, and a wood turn that deals three |
 | `64e2c7c` | A version at the foot of the home and lobby screens |
 | `1b28628` | The version as v1.2.41, derived from two counters |
+| _(this one)_ | The host can cancel a countdown and keep the lobby |
 | `c7a1da9` | The flick aimed by direction; the whole space above the hand |
 
 Earlier history, the approved design spec and the original 15-task execution

@@ -23,11 +23,19 @@
  */
 const MAJOR = 1;
 /** Rounds of feature work since the Deutsch Dash rename (`1529330`). */
-const FEATURE_BATCHES = 23;
+const FEATURE_BATCHES = 24;
 /** Tweaks, lone fixes and documentation passes over the same stretch. */
 const SMALL_CHANGES = 11;
 
-const COUNT = FEATURE_BATCHES * 10 + SMALL_CHANGES;
+/**
+ * Pure, and tested by worked example, so bumping the counters above never means
+ * editing a test to match. That mattered enough to be worth the extra function:
+ * a version whose test has to be re-pinned on every bump is a version somebody
+ * will eventually bump without running the tests.
+ */
+export function formatVersion(major: number, batches: number, small: number): string {
+  const count = batches * 10 + small;
+  return `v${major}.${Math.floor(count / 100)}.${String(count % 100).padStart(2, '0')}`;
+}
 
-export const APP_VERSION =
-  `v${MAJOR}.${Math.floor(COUNT / 100)}.${String(COUNT % 100).padStart(2, '0')}`;
+export const APP_VERSION = formatVersion(MAJOR, FEATURE_BATCHES, SMALL_CHANGES);

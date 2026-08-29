@@ -37,6 +37,7 @@ export function Lobby({ code }: { code: string }) {
   const setSittingOut = useGameStore(s => s.setSittingOut);
   const setPaleCards = useGameStore(s => s.setPaleCards);
   const setFling = useGameStore(s => s.setFling);
+  const cancelCountdown = useGameStore(s => s.cancelCountdown);
   const setIdentity = useGameStore(s => s.setIdentity);
   const start = useGameStore(s => s.start);
   const addBot = useGameStore(s => s.addBot);
@@ -255,6 +256,15 @@ export function Lobby({ code }: { code: string }) {
       {countdown != null && (
         <div className="overlay countdown-overlay">
           <div className="countdown-num" key={countdown}>{countdown === 0 ? 'GO!' : countdown}</div>
+          {/* Only the host, and not at GO: by then startRound is a few hundred
+              milliseconds away and a tap would be racing the deal. Three seconds
+              is long enough to notice somebody walk off with their phone, which
+              is the whole reason this is here. */}
+          {host && countdown > 0 && (
+            <button className="btn countdown-cancel" onClick={cancelCountdown}>
+              Cancel — back to lobby
+            </button>
+          )}
         </div>
       )}
     </div>

@@ -315,6 +315,45 @@ describe('the lobby ready gate', () => {
     store.getState().leave();
   });
 
+  it('the host cancelling a countdown un-readies them, which is what makes it stick', async () => {
+    let cb!: (room: Room | null) => void;
+    const deps = fakeDeps({
+      watchRoom: vi.fn((_c: string, f: (room: Room | null) => void) => { cb = f; return () => {}; }),
+    });
+    const store = createGameStore(deps);
+    await store.getState().enterRoom('ABCDEF', 'D', 'tulip');
+    const ready = { me: human({ ready: true }), you: human({ ready: true }) };
+    cb(lobby(ready));
+    expect(deps.setCountdown).toHaveBeenLastCalledWith('ABCDEF', 3);
+
+    store.getState().cancelCountdown();
+    // Un-ready, not "clear the digit". Clearing it alone does not last: the very
+    // next snapshot would find no digit and a ready table and start again.
+    expect(deps.setReady).toHaveBeenCalledWith('ABCDEF', 'me', false);
+
+    // And the snapshot that write raises is what takes the digit off every
+    // screen - by the one path that has already seen the table is not ready.
+    cb(lobby({ me: human({ ready: false }), you: human({ ready: true }) }, 2));
+    expect(deps.setCountdown).toHaveBeenLastCalledWith('ABCDEF', null);
+    expect(deps.startRound).not.toHaveBeenCalled();
+    store.getState().leave();
+  });
+
+  it('only the host may cancel a countdown', async () => {
+    let cb!: (room: Room | null) => void;
+    const deps = fakeDeps({
+      watchRoom: vi.fn((_c: string, f: (room: Room | null) => void) => { cb = f; return () => {}; }),
+    });
+    const store = createGameStore(deps);
+    await store.getState().enterRoom('ABCDEF', 'D', 'tulip');
+    const room = lobby({ me: human({ ready: true }), you: human({ ready: true }) }, 2);
+    room.meta.hostId = 'you';
+    cb(room);
+    store.getState().cancelCountdown();
+    expect(deps.setReady).not.toHaveBeenCalledWith('ABCDEF', 'me', false);
+    store.getState().leave();
+  });
+
   it('refuses to change identity once the player has readied', async () => {
     const deps = fakeDeps();
     const store = createGameStore(deps);

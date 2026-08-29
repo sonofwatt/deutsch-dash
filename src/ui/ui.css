@@ -64,7 +64,15 @@
 .chip-btn { cursor: pointer; border: 1px solid var(--badge); }
 
 /* 3, 2, 1, GO! - the digit is whatever the host last wrote (see RoomMeta.countdown). */
-.countdown-overlay { background: rgb(0 0 0 / .62); pointer-events: none; }
+/* Transparent to the pointer so it cannot swallow a tap meant for the lobby
+   underneath - the cancel button opts itself back in below, the same way the
+   stall note's button does. */
+.countdown-overlay { background: rgb(0 0 0 / .62); pointer-events: none;
+  display: grid; align-content: center; justify-items: center; gap: 24px; }
+/* Fixed dark-on-pale rather than themed, like every other control that is read
+   against the countdown's own black wash whichever theme the phone is in. */
+.countdown-cancel { pointer-events: auto; background: #f4f2ec; color: #171613;
+  border-color: #f4f2ec; font-weight: 600; }
 .countdown-num { font-size: clamp(96px, 46vw, 240px); font-weight: 800; color: #fff;
   line-height: 1; animation: count-pop .45s ease-out; }
 @keyframes count-pop {

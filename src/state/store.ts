@@ -114,6 +114,8 @@ export interface GameStore {
   setFling(on: boolean): void;
   /** Host-only, and only meaningful while the table is deadlocked. */
   setSingleFlip(on: boolean): void;
+  /** Host-only: stop a countdown in progress and leave the table in its lobby. */
+  cancelCountdown(): void;
   setHints(on: boolean): void;
   setOrderly(on: boolean): void;
   start(): void;
@@ -780,6 +782,25 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
       setPaleCards(on) { const c = get().code; if (c) void deps.setPaleCards(c, on); },
       setFling(on) { const c = get().code; if (c) void deps.setFling(c, on); },
       setSingleFlip(on) { const c = get().code; if (c) void deps.setSingleFlip(c, on); },
+      /**
+       * Cancel by UN-READYING, not by clearing the digit.
+       *
+       * Clearing it alone does nothing that lasts: syncCountdown starts a fresh
+       * countdown on the very next snapshot for as long as tableReady is true,
+       * so the digit would blink and come straight back. The host saying "wait"
+       * IS the host not being ready, so that is what gets written - and
+       * syncCountdown then takes the digit off every screen itself, on the same
+       * round trip, by the one path that has already seen the table is no longer
+       * ready. Doing it the other way round leaves a window where a snapshot
+       * finds no digit and a ready table and starts counting again.
+       */
+      cancelCountdown() {
+        const s = get();
+        const { code, uid, room } = s;
+        if (!code || !uid || !room || !isHost(s)) return;
+        stopCountdown();   // our own tick must not fire between here and the write
+        hostAction(deps.setReady(code, uid, false), 'cancel the countdown');
+      },
       setIdentity(name, badgeId) {
         const { code, uid, room } = get();
         const me = uid ? room?.players[uid] : null;
