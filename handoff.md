@@ -1607,7 +1607,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `406bbad` | Start anyway shares the ready button's row; the stale scowl cleared |
 | `e2e61e1` | Start anyway counts down; the players it deals around can deal themselves in |
 | `b6e058a` | The host can sit a round out, and the table starts without them |
-| _(this one)_ | A stale Away that locked a host out; glitz, card flips and badge jokes |
+| `9f1a634` | A stale Away that locked a host out; glitz, card flips and badge jokes |
 | `c7a1da9` | The flick aimed by direction; the whole space above the hand |
 
 Earlier history, the approved design spec and the original 15-task execution
