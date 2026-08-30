@@ -1546,7 +1546,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `85705c4` | The host can cancel a countdown and keep the lobby |
 | `406bbad` | Start anyway shares the ready button's row; the stale scowl cleared |
 | `e2e61e1` | Start anyway counts down; the players it deals around can deal themselves in |
-| _(this one)_ | The host can sit a round out, and the table starts without them |
+| `b6e058a` | The host can sit a round out, and the table starts without them |
 | `c7a1da9` | The flick aimed by direction; the whole space above the hand |
 
 Earlier history, the approved design spec and the original 15-task execution
