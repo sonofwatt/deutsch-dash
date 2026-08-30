@@ -1687,7 +1687,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `b6e058a` | The host can sit a round out, and the table starts without them |
 | `9f1a634` | A stale Away that locked a host out; glitz, card flips and badge jokes |
 | `9bb1ba8` | Fireworks, four losing faces, an opaque card turn, and the AI overlords |
-| _(this one)_ | Ten times the fireworks; a louder hint; the wood shows what is under |
+| `c2640b7` | Ten times the fireworks; a louder hint; the wood shows what is under |
 | `c7a1da9` | The flick aimed by direction; the whole space above the hand |
 
 Earlier history, the approved design spec and the original 15-task execution
