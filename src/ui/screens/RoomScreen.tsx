@@ -4,7 +4,7 @@ import { Join } from './Join';
 import { Lobby } from './Lobby';
 import { Game } from './Game';
 import { BlitzSplash } from '../components/BlitzSplash';
-import { splashVariant, type SplashVariant } from '../splashVariant';
+import { splashVariant, type Splash } from '../splashVariant';
 import { RoundEndOverlay } from '../components/RoundEndOverlay';
 import { GameOverOverlay } from '../components/GameOverOverlay';
 
@@ -25,7 +25,7 @@ export function RoomScreen({ code }: { code: string }) {
   // can change glyph halfway through its own animation - tears turning to
   // something worse as the new totals land. The splash is a snapshot of the moment
   // it fired, and the sheet behind it carries the new numbers.
-  const [splash, setSplash] = useState<{ until: number; variant: SplashVariant } | null>(null);
+  const [splash, setSplash] = useState<{ until: number; variant: Splash } | null>(null);
 
   useEffect(() => {
     if (phase !== 'roundEnd' || !blitzedBy) return;
@@ -33,7 +33,8 @@ export function RoomScreen({ code }: { code: string }) {
     // wants the totals as they stood AT THE BLITZ, and must not re-run when they
     // change a moment later. Taking them as deps would do exactly that.
     const at = gameStore.getState();
-    if (at.room) setSplash({ until: Date.now() + SPLASH_MS, variant: splashVariant(at.room.players, blitzedBy, at.uid) });
+    if (at.room) setSplash({ until: Date.now() + SPLASH_MS,
+      variant: splashVariant(at.room.players, blitzedBy, at.uid, at.room.round) });
   }, [phase, blitzedBy]);
   const [, force] = useState(0);
   useEffect(() => {
@@ -53,7 +54,7 @@ export function RoomScreen({ code }: { code: string }) {
     <>
       <Game />
       {splashing && blitzerName && splash &&
-        <BlitzSplash name={blitzerName} variant={splash.variant} />}
+        <BlitzSplash name={blitzerName} splash={splash.variant} />}
       {!splashing && phase === 'roundEnd' && <RoundEndOverlay />}
       {!splashing && phase === 'gameOver' && <GameOverOverlay />}
     </>

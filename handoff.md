@@ -5,7 +5,7 @@ suite. A commit sitting unpushed has already invalidated one playtest — what
 people are playing is whatever last reached Pages — so check `git status -sb`
 before trusting what a table reports._
 
-_**343 tests green** (319 unit + 24 emulator). This is the only place in the repo
+_**348 tests green** (324 unit + 24 emulator). This is the only place in the repo
 that quotes a count — it drifted three separate ways when it lived in four
 places, so keep it here and nowhere else._
 
@@ -737,6 +737,51 @@ space it can follow rigged into place:
 | 70px flick aimed 90° away | nothing |
 | the same 70px at 400ms - a reposition, not a throw | nothing |
 | slow drag let go over the opponent strip | lands (signal 3) |
+
+### The splash says what the round DID to you _(#57)_
+
+`splashVariant` returns `{ base, trophy }` now, and the losing faces are tested
+in this order:
+
+| | when |
+|---|---|
+| 🚽 | they have just **dropped into** last place |
+| 🥹 | they were last and are **not any more** |
+| 💩 | still holding the worst total, at 3+ players |
+| 😢 | everybody else |
+| 🏆 | falls **with** whichever of those, if they lead the table after this round |
+
+**The standings are PROJECTED, and they have to be.** The splash fires the moment
+blitz is announced, before the host has committed anything, so `player.score` is
+still last round's total - and "dropped into last" is a question about this round.
+`scoreRound` is the same pure function the host is about to run on the same board,
+so this is the host's arithmetic done early rather than a guess. It can differ
+only where a play is still being reconciled.
+
+"Last" is **strictly** last throughout: on a level table nobody has dropped
+anywhere, and handing every tied player a toilet would be a lie about a change
+that did not happen. Same reasoning as `basement` in the commentary.
+
+### The blitzer gets fireworks _(#58)_
+
+Three glyphs (😎🥳🔥) rather than eight - a burst reads as a celebration when the
+eye takes it in at once, and eight faces at forty copies read as a pile of
+stickers - over five CSS firework shells staggered across the splash. Each shell
+is a point; its sparks are children that know only a bearing, fly out along it and
+take a little gravity at the end, which is the whole difference between a firework
+and a starburst.
+
+**Three layers, and the order is the point.** Fireworks at `z-index: 1`, the emoji
+at 2, and `.blitz-say` at 3 - the name is the one piece of information the splash
+carries and `.splash-fx` was painting straight over it.
+
+### The wood flip stopped being watchable _(#59)_
+
+The first cut cross-faded each card in as it turned, so three half-transparent
+cards overlapped each other in a row. It was reported as hard to watch, and it
+was. It is **fully opaque** now: hinged at the top edge (`transform-origin: 50%
+0%`), `rotateX(90deg)` to `0` over 200ms on an ease that front-loads the
+movement. A real card does not fade.
 
 ### Away outlived the tab that set it _(#52)_
 
@@ -1608,6 +1653,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `e2e61e1` | Start anyway counts down; the players it deals around can deal themselves in |
 | `b6e058a` | The host can sit a round out, and the table starts without them |
 | `9f1a634` | A stale Away that locked a host out; glitz, card flips and badge jokes |
+| _(this one)_ | Fireworks, four losing faces, an opaque card turn, and the AI overlords |
 | `c7a1da9` | The flick aimed by direction; the whole space above the hand |
 
 Earlier history, the approved design spec and the original 15-task execution

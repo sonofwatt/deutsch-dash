@@ -159,9 +159,24 @@ describe('commentary', () => {
   it('is stable within a round and moves on between them', () => {
     const a = commentary(base({ roundNumber: 3 }));
     expect(commentary(base({ roundNumber: 3 }))).toEqual(a);  // no randomness: the carousel re-renders on a timer
-    const later = commentary(base({ roundNumber: 4 }));
+    // Four rounds on, not one. Some remarks appear on a cycle of the round number
+    // - the alternating standing facts on a two, the overlords on a four - so
+    // "the same situation" only holds between rounds where those line up. One
+    // round later is a DIFFERENT situation as far as those are concerned.
+    const later = commentary(base({ roundNumber: 7 }));
     expect(later.map(r => r.id)).toEqual(a.map(r => r.id));   // same situation...
-    expect(later).not.toEqual(a);                             // ...different words
+    // ...different words. Asserted across several aligned rounds rather than
+    // against one: with four variants a line CAN land on the same phrasing two
+    // rounds running by chance, and a test that forbids that is testing the hash
+    // rather than the behaviour. What matters is that the wording moves.
+    const wordings = new Set([3, 7, 11, 15].map(n =>
+      commentary(base({ roundNumber: n })).map(r => r.text).join('|')));
+    expect(wordings.size).toBeGreaterThan(1);
+  });
+
+  it('lets the game remember itself every few rounds, and not in between', () => {
+    const on = [3, 4, 5, 6].filter(n => ids(base({ roundNumber: n })).includes('overlords'));
+    expect(on).toHaveLength(1);   // one round in four, whichever it lands on
   });
 
   const stats = (over: Partial<GameStats> = {}): GameStats => ({

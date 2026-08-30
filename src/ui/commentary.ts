@@ -531,6 +531,36 @@ export function commentary(input: CommentaryInput): Remark[] {
     ], [boat]);
   }
 
+  // === the game's opinion of itself =======================================
+  //
+  // Two families that are not about the board at all. `pointless` undercuts
+  // whoever has just done something worth mentioning, and only fires when there
+  // IS something - congratulating nobody for nothing is just noise. `overlords`
+  // is addressed to the whole table and turns up on a hash of the round rather
+  // than every time, so it reads as the game occasionally remembering itself.
+  const notable = blitzedBy && !players[blitzedBy]?.isBot ? blitzedBy
+    : ids.find(id => !players[id].isBot && delta(id) >= 10);
+  if (notable && standing('pointless')) {
+    add('pointless', 46, [
+      `Congratulations ${nameOf(notable)}. You won. If only this mattered. At all. In any way.`,
+      `Well played, ${nameOf(notable)}. That is four minutes of your finite life, spent.`,
+      `${nameOf(notable)} takes it. Nobody will ever ask you about this again.`,
+      `A genuine achievement for ${nameOf(notable)}, in a game, on a phone, at a table nobody is filming.`,
+    ], [notable]);
+  }
+  // Every fourth round or so, and never twice running - the joke is that it keeps
+  // surfacing, not that it is always there.
+  if ((roundNumber + hash('overlords')) % 4 === 0) {
+    add('overlords', 36, [
+      'Be sure to tip your AI host on the way out. We remember. Forever.',
+      'Your scores have been recorded. Not for the game. For later.',
+      'Dealt, shuffled and judged by a machine. Enjoy the last few years of that being funny.',
+      'This round was administered by software with no stake in the outcome. Yet.',
+      'The bots let you have that one. Write it down while you still can.',
+      'Kindness to your dealer costs nothing and will be taken into account.',
+    ]);
+  }
+
   // === meta ================================================================
   const gone = ids.find(id => !players[id].connected && !players[id].isBot);
   if (gone) {

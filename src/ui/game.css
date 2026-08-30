@@ -420,33 +420,31 @@
   place-items: center; margin: 0; font-size: 13px; }
 
 /* A wood turn brings three cards over, so it looks like three cards being dealt
-   rather than one card appearing. Each one turns FACE OVER: it arrives edge-on
-   from the face-down pile, shows its back for the first half of the turn and its
-   face for the second, which is what a card being flipped actually looks like.
-   The swap happens at the halfway point because that is when a real card is
-   edge-on to you and neither side is visible.
+   rather than one card appearing. Each one turns FACE OVER: it starts flat on the
+   pile, tips through edge-on and lands face up.
+
+   It is fully OPAQUE the whole way. The first cut cross-faded the card in as it
+   turned, and two half-transparent cards overlapping each other three times in a
+   row was reported as hard to watch - which it was. A real card does not fade.
 
    200ms a card, 200ms apart, so a full turn of three runs 600ms and each card is
    clear of the next. Keyed by card in TableauView, so only the cards that just
    arrived turn over - after a short last turn, or a single-card turn under the
    host's rescue, the ones already face up hold still and one card lands on them. */
-.wood-deal { display: grid; perspective: 700px; }
-.wood-deal > * { grid-area: 1 / 1; transform-origin: 50% 50%;
-  animation: wood-flip 200ms ease-out var(--d, 0ms) both; }
+.wood-deal { display: grid; perspective: 800px; }
+.wood-deal > * { grid-area: 1 / 1; transform-origin: 50% 0%; backface-visibility: hidden;
+  animation: wood-flip 200ms cubic-bezier(.3, 0, .2, 1) var(--d, 0ms) both; }
 .wood-deal > *:nth-child(2) { --d: 200ms; }
 .wood-deal > *:nth-child(3) { --d: 400ms; }
-/* backface-visibility is not usable here - the element is one card, not a pair of
-   faces - so the face is simply hidden for the first half of the turn. */
-.wood-deal > * { backface-visibility: hidden; }
+/* Down from flat, through edge-on, onto the pile. Hinged at the top edge, which
+   is the edge a thumb turns a card over on. */
 @keyframes wood-flip {
-  0%   { transform: translate(12%, -14%) rotateY(-90deg) scale(.96); opacity: .55; }
-  49%  { opacity: .55; }
-  50%  { transform: translate(6%, -7%) rotateY(0deg) scale(.98); opacity: 1; }
-  100% { transform: translate(0, 0) rotateY(0deg) scale(1); opacity: 1; }
+  0%   { transform: rotateX(90deg); }
+  100% { transform: rotateX(0deg); }
 }
 /* The cards still arrive and still land in order; they just stop turning. */
 @media (prefers-reduced-motion: reduce) {
-  @keyframes wood-flip { 0% { opacity: 0; } 100% { opacity: 1; } }
+  .wood-deal > * { animation-name: none; }
 }
 
 /* The way back in for a player a forced start left behind. It sits in the track

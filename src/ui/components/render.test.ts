@@ -11,7 +11,7 @@ import { rankRows } from '../scoreRanks';
 import { raceFlashes } from '../raceFlash';
 import { orderlySpaces } from '../../game/center';
 import { orderlyColumns, spaceCountForPlayers } from '../../game/rules';
-import { splashVariant } from '../splashVariant';
+import { splashVariant, type Splash } from '../splashVariant';
 import type { Card, CenterSpace, PlayerInfo, RoundScore, Suit, Tableau } from '../../game/types';
 
 const c = (v: number, suit: Suit, owner = 'me'): Card => ({ v, suit, owner });
@@ -291,42 +291,82 @@ describe('BlitzSplash', () => {
   const table = (...scores: number[]) =>
     Object.fromEntries(scores.map((s, i) => [`p${i}`, player(s)]));
 
-  it('gives the blitzer glitter', () => {
-    expect(splashVariant(table(10, 20, 30), 'p1', 'p1')).toBe('glitter');
+  // No `round` passed means no projected deltas, so before and after are the same
+  // standings - which is the right reading of "the board tells us nothing yet".
+  const base = (t: Record<string, PlayerInfo>, blitzer: string, uid: string | null) =>
+    splashVariant(t, blitzer, uid).base;
+
+  it('gives the blitzer glitter and never a trophy - they have the glitter', () => {
+    expect(splashVariant(table(10, 20, 30), 'p1', 'p1')).toEqual({ base: 'glitter', trophy: false });
   });
   it('never poos on a two-player game', () => {
     // Heads-up, the loser is always last. Rubbing it in is a group activity.
-    expect(splashVariant(table(30, 2), 'p0', 'p1')).toBe('crying');
+    expect(base(table(30, 2), 'p0', 'p1')).toBe('crying');
   });
   it('poos on the worst score at three or more, and everyone else cries', () => {
     const t = table(30, 2, 20);
-    expect(splashVariant(t, 'p0', 'p1')).toBe('poo');
-    expect(splashVariant(t, 'p0', 'p2')).toBe('crying');
+    expect(base(t, 'p0', 'p1')).toBe('poo');
+    expect(base(t, 'p0', 'p2')).toBe('crying');
   });
   it('poos on everyone tied for worst', () => {
     const t = table(30, 2, 2);
-    expect(splashVariant(t, 'p0', 'p1')).toBe('poo');
-    expect(splashVariant(t, 'p0', 'p2')).toBe('poo');
+    expect(base(t, 'p0', 'p1')).toBe('poo');
+    expect(base(t, 'p0', 'p2')).toBe('poo');
   });
   it('spares the table when the blitzer is the one propping it up', () => {
     // The winner gets glitter, so nobody gets the poo that round.
     const t = table(2, 30, 20);
-    expect(splashVariant(t, 'p0', 'p0')).toBe('glitter');
-    expect(splashVariant(t, 'p0', 'p1')).toBe('crying');
-    expect(splashVariant(t, 'p0', 'p2')).toBe('crying');
+    expect(base(t, 'p0', 'p0')).toBe('glitter');
+    expect(base(t, 'p0', 'p1')).toBe('crying');
+    expect(base(t, 'p0', 'p2')).toBe('crying');
   });
   it('is unreadable to a spectator with no uid, and does not crash', () => {
-    expect(splashVariant(table(30, 2, 20), 'p0', null)).toBe('crying');
+    expect(base(table(30, 2, 20), 'p0', null)).toBe('crying');
   });
 
-  const render = (variant: 'glitter' | 'poo' | 'crying') =>
-    renderToStaticMarkup(createElement(BlitzSplash, { name: 'Dave', variant }));
+  // The four losing faces turn on what the round DID, so these pass a board and
+  // let scoreRound project it - the same arithmetic the host is about to run.
+  // scoreRound walks the TABLEAUS and counts each owner's cards out of the
+  // spaces, so every player needs a hand for the projection to see them at all.
+  const empty = (): Tableau => ({ blitz: [], post: [], wood: [], woodIndex: 0 });
+  const board = (owner: string, cards: number, who = ['p0', 'p1', 'p2']) => ({
+    spaces: [{ stack: Array.from({ length: cards }, (_, i) => c(i + 1, 'red', owner)), history: [] }],
+    tableaus: Object.fromEntries(who.map(id => [id, empty()])) as Record<string, Tableau>,
+  });
+
+  it('flushes somebody who has just dropped into last', () => {
+    // p1 is on 20 and p2 on 18; p2 plays nine cards and goes past them.
+    const t = table(40, 20, 18);
+    const r = board('p2', 9);
+    expect(splashVariant(t, 'p0', 'p1', r)).toEqual({ base: 'toilet', trophy: false });
+  });
+  it('gives relief to somebody who has just climbed out of it', () => {
+    const t = table(40, 20, 18);
+    expect(splashVariant(t, 'p0', 'p2', board('p2', 9)).base).toBe('relief');
+  });
+  it('sends the trophy down with whatever else is falling', () => {
+    // p1 leads after the round and did not blitz: tears and a trophy.
+    const t = table(10, 30, 12);
+    expect(splashVariant(t, 'p0', 'p1', board('p0', 3))).toEqual({ base: 'crying', trophy: true });
+  });
+  it('hands nobody a trophy on a level table', () => {
+    expect(splashVariant(table(10, 10, 10), 'p0', 'p1').trophy).toBe(false);
+  });
+
+  const render = (splash: Splash) =>
+    renderToStaticMarkup(createElement(BlitzSplash, { name: 'Dave', splash }));
   it('throws exactly one kind of thing at a viewer', () => {
-    expect(render('glitter')).toContain('✨');
-    expect(render('glitter')).not.toContain('😢');
-    expect(render('poo')).toContain('💩');
-    expect(render('poo')).not.toContain('✨');
-    expect(render('crying')).toContain('😢');
+    const glitter = render({ base: 'glitter', trophy: false });
+    expect(glitter).toContain('🥳');
+    expect(glitter).not.toContain('😢');
+    expect(glitter).toContain('fireworks');
+    const poo = render({ base: 'poo', trophy: false });
+    expect(poo).toContain('💩');
+    expect(poo).not.toContain('🥳');
+    expect(poo).not.toContain('🏆');
+    expect(render({ base: 'crying', trophy: true })).toContain('🏆');
+    expect(render({ base: 'toilet', trophy: false })).toContain('🚽');
+    expect(render({ base: 'relief', trophy: false })).toContain('🥹');
   });
 });
 

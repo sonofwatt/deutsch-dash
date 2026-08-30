@@ -247,6 +247,29 @@
 
 .blitz-splash { position: fixed; inset: 0; display: grid; place-items: center; z-index: 110;
   pointer-events: none; }
+/* Above the weather. The name is the one piece of information the splash carries
+   and it was being rained on: .splash-fx is absolute and was painting over it. */
+.blitz-say { position: relative; z-index: 3; }
+.splash-fx { z-index: 2; }
+.fireworks { position: absolute; inset: 0; z-index: 1; }
+/* One shell: a point the sparks are flung from. The sparks are its children, so
+   the shell only has to be placed and the sparks only have to know a bearing. */
+.shell { position: absolute; width: 0; height: 0; }
+/* A white-hot core inside the colour, which is what stops a small bright dot
+   washing out against the light theme's cream ground. */
+.shell i { position: absolute; left: 0; top: 0; width: 7px; height: 7px; border-radius: 999px;
+  background: hsl(var(--hue) 95% 55%);
+  box-shadow: 0 0 0 1px hsl(var(--hue) 100% 88% / .9), 0 0 10px 2px hsl(var(--hue) 95% 55% / .8);
+  animation: firework 1500ms cubic-bezier(.15, .7, .3, 1) var(--delay, 0ms) both; }
+/* Out along the bearing, then a little gravity at the end - which is the whole
+   difference between a firework and a starburst. */
+@keyframes firework {
+  0%   { transform: rotate(var(--a)) translateX(0) translateY(0); opacity: 0; }
+  8%   { opacity: 1; }
+  70%  { opacity: 1; }
+  100% { transform: rotate(var(--a)) translateX(var(--r)) translateY(4vmin) scale(.5);
+         opacity: 0; }
+}
 /* Both of these are read against whatever the splash is raining past them, in
    either theme, so they carry their own contrast rather than borrowing the
    page's: a hard black outline, drawn with -webkit-text-stroke where it is
