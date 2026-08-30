@@ -2,7 +2,14 @@ import { motion } from 'framer-motion';
 import { EMOJI } from '../../game/badges';
 import type { SplashVariant } from '../splashVariant';
 
-const SPARKS = 22;
+/** A proper shower of it. The blitzer wins the round; the screen should agree. */
+const SPARKS = 44;
+/**
+ * The glitter is not one glyph any more. A single repeated emoji reads as a
+ * pattern; a handful of them reads as a celebration, and the eye picks the whole
+ * burst up as colour rather than as forty copies of one thing.
+ */
+const SPARKLES = ['✨', '🎉', '⭐', '🎊', '💫', '🥳', '🏆', '🌟'];
 /**
  * A downpour rather than a drizzle. At ten, on a phone, most of the screen was
  * empty most of the time and the joke landed as a couple of glyphs drifting past.
@@ -15,10 +22,14 @@ function Glitter() {
     <div className="splash-fx" aria-hidden="true">
       {Array.from({ length: SPARKS }, (_, i) => (
         <span key={i} className="spark" style={{
-          ['--a' as string]: `${(i * 360) / SPARKS}deg`,
-          ['--d' as string]: `${[42, 30, 36][i % 3]}vmin`,
-          ['--delay' as string]: `${(i % 7) * 90}ms`,
-        }}>{'✨' + EMOJI}</span>
+          // Two turns of the circle rather than one, so the arms interleave
+          // instead of arriving as a single rank of spokes.
+          ['--a' as string]: `${(i * 720) / SPARKS}deg`,
+          ['--d' as string]: `${[46, 30, 38, 24, 42][i % 5]}vmin`,
+          ['--delay' as string]: `${(i % 9) * 80}ms`,
+          ['--spin' as string]: `${i % 2 ? 200 : -200}deg`,
+          ['--size' as string]: `${[1, 1.35, 0.8, 1.15][i % 4]}`,
+        }}>{SPARKLES[i % SPARKLES.length] + EMOJI}</span>
       ))}
     </div>
   );
@@ -51,7 +62,7 @@ export function BlitzSplash({ name, variant }: { name: string; variant: SplashVa
         animate={{ scale: 1, opacity: 1, rotate: 0 }}
         transition={{ type: 'spring', stiffness: 300, damping: 18 }}>
         <div className="blitz-word">BLITZ!</div>
-        <p style={{ textAlign: 'center', fontWeight: 600 }}>{name}</p>
+        <p className="blitz-name">{name}</p>
       </motion.div>
     </div>
   );

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { commentary, type CommentaryInput } from './commentary';
 import type { GameStats } from '../game/stats';
 import type { CenterSpace, PlayerInfo, RoundScore, Suit } from '../game/types';
@@ -20,6 +21,13 @@ const base = (over: Partial<CommentaryInput> = {}): CommentaryInput => ({
 const ids = (input: CommentaryInput) => commentary(input).map(r => r.id);
 const textOf = (input: CommentaryInput, id: string) =>
   commentary(input).find(r => r.id === id)?.text ?? '';
+// Read straight off the source, because the alternative is eight fixtures that
+// each have to make one condition true - and the thing worth pinning is simply
+// that no badge was left without a joke.
+const commentaryQuipIds = (): string[] => {
+  const src = readFileSync(new URL('./commentary.ts', import.meta.url), 'utf8');
+  return [...src.matchAll(/add\('(quip-[a-z]+)'/g)].map(m => m[1]);
+};
 
 describe('commentary', () => {
   it('says nothing about an empty table', () => {
@@ -220,5 +228,59 @@ describe('commentary', () => {
     const final = commentary({ ...input, final: true });
     expect(final[0].id).toBe('champion');
     expect(final[0].text).toContain('Ann');
+  });
+});
+
+describe('badge quips', () => {
+  // One joke per badge, fired only when the board has made it true. The point is
+  // that they are CONDITIONAL: a tulip is not a late bloomer for owning a tulip.
+  it('calls the tulip a late bloomer only after a bad spell and a good round', () => {
+    const players = {
+      ann: player('Ann', 40, { badgeId: 'star' }), bo: player('Bo', 38, { badgeId: 'bell' }),
+      cy: player('Cy', 30, { badgeId: 'tulip' }),
+    };
+    // Cy was bottom before this round (30 - 12 = 18, well behind) and has just
+    // taken 12 off it.
+    const good = base({ players, scores: { ann: sc(2, 1), bo: sc(1, 1), cy: sc(12, 0) }, blitzedBy: null });
+    expect(ids(good)).toContain('quip-tulip');
+    // The same player having a quiet round is not a late bloomer, just a tulip.
+    const quiet = base({ players, scores: { ann: sc(6, 0), bo: sc(5, 0), cy: sc(2, 1) }, blitzedBy: null });
+    expect(ids(quiet)).not.toContain('quip-tulip');
+  });
+
+  it('drops the anchor only when they fall two places or more', () => {
+    const players = {
+      ann: player('Ann', 10, { badgeId: 'anchor' }), bo: player('Bo', 20, { badgeId: 'star' }),
+      cy: player('Cy', 20, { badgeId: 'bell' }),
+    };
+    // Ann was ahead of both and is now behind both: two overtakes against her.
+    const fell = base({ players, scores: { ann: sc(0, 5), bo: sc(9, 0), cy: sc(9, 0) }, blitzedBy: null });
+    expect(ids(fell)).toContain('quip-anchor');
+    expect(textOf(fell, 'quip-anchor')).toMatch(/Ann/);
+    const steady = base({ players: { ...players, ann: player('Ann', 40, { badgeId: 'anchor' }) },
+                          scores: { ann: sc(6, 0), bo: sc(5, 0), cy: sc(5, 0) }, blitzedBy: null });
+    expect(ids(steady)).not.toContain('quip-anchor');
+  });
+
+  it('rings the bell for the badge that actually blitzed', () => {
+    // Three players, spread totals and unremarkable deltas: the point is to leave
+    // the bell holder room under MAX_PER_PLAYER, which two remarks about the same
+    // person would otherwise use up before the quip is reached.
+    const players = {
+      ann: player('Ann', 20, { badgeId: 'bell' }), bo: player('Bo', 34, { badgeId: 'boat' }),
+      cy: player('Cy', 27, { badgeId: 'kite' }),
+    };
+    const scores = { ann: sc(3, 0), bo: sc(5, 0), cy: sc(4, 0) };
+    expect(ids(base({ players, scores, blitzedBy: 'ann' }))).toContain('quip-bell');
+    expect(ids(base({ players, scores, blitzedBy: 'bo' }))).not.toContain('quip-bell');
+  });
+
+  it('has a quip for every badge that can be dealt', () => {
+    // Not that each one fires here - that is what the cases above are for - only
+    // that none of the eight was forgotten when they were written.
+    const src = commentaryQuipIds();
+    for (const badge of ['tulip', 'bicycle', 'star', 'bell', 'kite', 'anchor', 'acorn', 'boat']) {
+      expect(src).toContain(`quip-${badge}`);
+    }
   });
 });

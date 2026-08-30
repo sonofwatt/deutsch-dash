@@ -94,10 +94,17 @@ export function Lobby({ code }: { code: string }) {
     setPicking(false);
   }
 
+  const noteVisible = useGameStore(s => s.noteVisible);
+
   function toggleReady() {
     // Close both editors on the way in, so a half-typed name cannot sit behind a
     // Ready badge looking like it was saved.
     if (!iAmReady) { commitName(); setPicking(false); }
+    // Tapping this is proof of presence, so it clears Away as well. Without it a
+    // player whose flag survived a backgrounded tab could ready up and still
+    // block the countdown, with nothing on the screen to tell them why - which is
+    // exactly what happened to a host whose phone had been in their pocket.
+    if (iAmAway) noteVisible(true);
     setReady(!iAmReady);
   }
 
@@ -239,7 +246,7 @@ export function Lobby({ code }: { code: string }) {
                   "I'm Ready" then "Ready" read as the same word twice, and people
                   could not tell which state they were looking at - the colour was
                   carrying the whole message on its own. */}
-              {iAmAway ? 'Away' : iAmReady ? 'Ready!' : 'Ready?'}
+              {iAmAway ? 'Away — tap when you are back' : iAmReady ? 'Ready!' : 'Ready?'}
             </button>}
       </div>
       {/* Quiet, and below the ready button: stepping away is the rarer thing to

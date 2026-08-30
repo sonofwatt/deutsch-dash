@@ -268,7 +268,13 @@
 .pile-space.recycle-slot { border-style: solid; color: var(--ink-soft); cursor: pointer;
   font-size: calc(var(--card-w) * .4); }
 
-.opp-strip { display: flex; gap: 6px; overflow-x: auto; }
+/* It scrolls, and until now it only LOOKED like it did on a phone. Every touch in
+   this strip lands on a mini-card, and .card carries `touch-action: none` so the
+   tableau's drags work - which also tells the browser not to pan, so the strip
+   refused to move under a finger while scrolling fine with a mouse. These cards
+   are display only and are never dragged, so they hand panning back. */
+.opp-strip { display: flex; gap: 6px; overflow-x: auto; overscroll-behavior-x: contain; }
+.opp-strip .card, .opp-strip .card * { touch-action: pan-x; }
 .opp { display: flex; flex-direction: column; gap: 4px; padding: 4px 8px 5px;
   border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line);
   font-size: 12px; white-space: nowrap; }
@@ -414,42 +420,46 @@
   place-items: center; margin: 0; font-size: 13px; }
 
 /* A wood turn brings three cards over, so it looks like three cards being dealt
-   rather than one card flipping. They sit in the same cell and arrive one after
-   another, which is what dealing onto a spot looks like at speed.
+   rather than one card appearing. Each one turns FACE OVER: it arrives edge-on
+   from the face-down pile, shows its back for the first half of the turn and its
+   face for the second, which is what a card being flipped actually looks like.
+   The swap happens at the halfway point because that is when a real card is
+   edge-on to you and neither side is visible.
 
-   Doubled from the first cut, both halves of it: each card takes 380ms rather
-   than 190, and they land 140ms apart rather than 70, so the whole turn runs
-   660ms against the 330 it did - twice the time, at the same rhythm. Halving
-   only the per-card duration would have made them overlap instead of deal.
-
-   Keyed by card in TableauView, so only the cards that actually just arrived
-   animate - the ones already face up hold still. */
-.wood-deal { display: grid; }
-.wood-deal > * { grid-area: 1 / 1; animation: wood-deal 380ms ease-out var(--d, 0ms) both; }
-.wood-deal > *:nth-child(2) { --d: 140ms; }
-.wood-deal > *:nth-child(3) { --d: 280ms; }
-@keyframes wood-deal {
-  0%   { opacity: 0; transform: translate(14%, -22%) rotate(7deg) scale(.94); }
-  100% { opacity: 1; transform: translate(0, 0) rotate(0) scale(1); }
+   200ms a card, 200ms apart, so a full turn of three runs 600ms and each card is
+   clear of the next. Keyed by card in TableauView, so only the cards that just
+   arrived turn over - after a short last turn, or a single-card turn under the
+   host's rescue, the ones already face up hold still and one card lands on them. */
+.wood-deal { display: grid; perspective: 700px; }
+.wood-deal > * { grid-area: 1 / 1; transform-origin: 50% 50%;
+  animation: wood-flip 200ms ease-out var(--d, 0ms) both; }
+.wood-deal > *:nth-child(2) { --d: 200ms; }
+.wood-deal > *:nth-child(3) { --d: 400ms; }
+/* backface-visibility is not usable here - the element is one card, not a pair of
+   faces - so the face is simply hidden for the first half of the turn. */
+.wood-deal > * { backface-visibility: hidden; }
+@keyframes wood-flip {
+  0%   { transform: translate(12%, -14%) rotateY(-90deg) scale(.96); opacity: .55; }
+  49%  { opacity: .55; }
+  50%  { transform: translate(6%, -7%) rotateY(0deg) scale(.98); opacity: 1; }
+  100% { transform: translate(0, 0) rotateY(0deg) scale(1); opacity: 1; }
 }
-/* The cards still arrive and still land in order; they just stop travelling. */
+/* The cards still arrive and still land in order; they just stop turning. */
 @media (prefers-reduced-motion: reduce) {
-  @keyframes wood-deal { 0% { opacity: 0; } 100% { opacity: 1; } }
+  @keyframes wood-flip { 0% { opacity: 0; } 100% { opacity: 1; } }
 }
 
 /* The way back in for a player a forced start left behind. It sits in the track
    their tableau will occupy, so taking a hand does not move the board a pixel -
    the cards simply appear where the bar was. Shaped like the lobby's ready
    button on purpose: it is the same question, asked in the same words. */
-/* As tall as the tableau it stands in for, so the cards appear where the bar was
-   and the board does not resize under a table already playing. The wood column is
-   two cards plus its gap, and every pile carries a label under it - that is the
-   24px. Matching it to the card alone left the board 200px taller than it would
-   be a moment later. */
-/* .btn also sets min-height, at the same specificity and later in the bundle, so
-   this has to carry both classes to win. A card is 2.5 by 3.5, so its HEIGHT is
-   1.4 x --hand-card and the wood column is two of them plus a gap; the rest is
-   the pile label and the row's own padding. */
-.btn.deal-me-in { width: 100%; min-height: calc(var(--hand-card) * 2.8 + 56px);
-  font-weight: 800; }
+/* The SLOT is as tall as the tableau it stands in for, so the cards appear where
+   it was and the board does not resize under a table already playing. The button
+   inside it is an ordinary one: a full-height slab was far more button than a
+   single question needs, and read as an error state rather than an invitation.
+   A card is 2.5 by 3.5, so its HEIGHT is 1.4 x --hand-card; the wood column is
+   two of them plus a gap, and the rest is the pile label and the row's padding. */
+.deal-me-in-slot { min-height: calc(var(--hand-card) * 2.8 + 56px);
+  display: grid; place-items: center; }
+.btn.deal-me-in { width: 100%; font-weight: 800;}
 .deal-me-in span { font-weight: 400; font-size: 13px; opacity: .75; }

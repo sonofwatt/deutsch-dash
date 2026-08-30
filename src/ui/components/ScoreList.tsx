@@ -15,9 +15,9 @@ import type { PlayerInfo, RoundScore } from '../../game/types';
  * correct still frame of this animation rather than a broken one.
  */
 export function ScoreList(
-  { players, scores, blitzedBy }:
+  { players, scores, blitzedBy, showReady }:
   { players: Record<string, PlayerInfo>; scores?: Record<string, RoundScore> | null;
-    blitzedBy?: string | null },
+    blitzedBy?: string | null; showReady?: boolean },
 ) {
   const { previous, current, move } = rankRows(players, scores);
   // Reduced motion starts settled: the final order at once, still tinted, no slide.
@@ -37,7 +37,7 @@ export function ScoreList(
     <>
       {order.map(id => (
         <ScoreRow key={id} player={players[id]} score={scores?.[id] ?? undefined}
-          move={settled ? move[id] : null} blitzed={id === blitzedBy} />
+          move={settled ? move[id] : null} blitzed={id === blitzedBy} showReady={showReady} />
       ))}
     </>
   );

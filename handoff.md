@@ -5,7 +5,7 @@ suite. A commit sitting unpushed has already invalidated one playtest — what
 people are playing is whatever last reached Pages — so check `git status -sb`
 before trusting what a table reports._
 
-_**339 tests green** (315 unit + 24 emulator). This is the only place in the repo
+_**343 tests green** (319 unit + 24 emulator). This is the only place in the repo
 that quotes a count — it drifted three separate ways when it lived in four
 places, so keep it here and nowhere else._
 
@@ -737,6 +737,66 @@ space it can follow rigged into place:
 | 70px flick aimed 90° away | nothing |
 | the same 70px at 400ms - a reposition, not a throw | nothing |
 | slow drag let go over the opponent strip | lands (signal 3) |
+
+### Away outlived the tab that set it _(#52)_
+
+Reported by a host whose phone had been in their pocket long enough for the host
+watchdog to hand the room on. Coming back they had **no ready button** - just
+"Away" - and tapping it turned the row into "Start anyway" beside "Away", which
+was the only way to get a game going.
+
+Every part of that follows from one stale flag. In a lobby `awayAt` is set when
+the tab hides and cleared when it comes back, which depends on catching a single
+`visibilitychange` at the right moment - and a tab that was frozen for a minute,
+whose socket dropped and whose host was handed on while it slept, is exactly where
+that goes wrong. With the flag stuck:
+
+- the ready button reads `iAmAway ? 'Away' : …`, so it **hid the ready state**;
+- `tableReady` requires `awayAt == null`, so the countdown could never start;
+- readying anyway made `showOverride` true, which is the "Start anyway" that
+  appeared - the override was the only door left.
+
+Three changes, and the third is the one that matters:
+
+1. The label says **"Away — tap when you are back"**, because it is a thing to do
+   rather than a state to read.
+2. Tapping the ready button **clears Away** as well. Tapping it is proof of
+   presence - the same reasoning that made the round-end sheet's ready button call
+   `noteActivity`.
+3. **`onSnapshot` clears a stale lobby Away on every snapshot** where the tab is
+   visible. A visible tab sitting in a lobby is not away whatever the flag says,
+   and this is the only place that can know it on every snapshot rather than on
+   one event. Costs a comparison in the steady state.
+
+### The opponent strip only looked scrollable _(#53)_
+
+`overflow-x: auto` was there and it scrolled perfectly with a mouse. Every touch
+in that strip lands on a mini-card, and `.card` carries `touch-action: none` so
+the tableau's drags work - which also tells the browser not to pan. Those cards
+are display only and are never dragged, so `.opp-strip .card` hands panning back
+with `touch-action: pan-x`. **Anything that puts a `.card` somewhere scrollable
+has to do the same.**
+
+### The celebration, and reading it _(#54, #55)_
+
+Forty-four sparks over eight different glyphs rather than twenty-two of one -
+a single repeated emoji reads as a pattern, a handful reads as a celebration -
+each with its own size, delay and tumble, thrown out over two turns of the circle
+so the arms interleave instead of arriving as one rank of spokes.
+
+**"BLITZ!" and the name carry their own contrast.** They are read against whatever
+the splash is raining past them, in either theme, so white on the page's accent
+was hopeless: both now have a hard black outline, `-webkit-text-stroke` with
+`paint-order: stroke fill` plus four offset shadows for anything that lacks it.
+The name is roughly twice the size and no longer set at body weight under a 140px
+word.
+
+### A wood turn is a card turn _(#56)_
+
+Each card arrives **edge-on** and rotates to face up over 200ms - `rotateY(-90deg)`
+to `0`, with the face hidden until the halfway point, which is when a real card is
+edge-on and neither side is visible. 200ms apart, so three of them run 600ms and
+each is clear of the next. `perspective` lives on `.wood-deal`, not on the cards.
 
 ### The host can sit a round out _(#51)_
 
@@ -1547,6 +1607,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `406bbad` | Start anyway shares the ready button's row; the stale scowl cleared |
 | `e2e61e1` | Start anyway counts down; the players it deals around can deal themselves in |
 | `b6e058a` | The host can sit a round out, and the table starts without them |
+| _(this one)_ | A stale Away that locked a host out; glitz, card flips and badge jokes |
 | `c7a1da9` | The flick aimed by direction; the whole space above the hand |
 
 Earlier history, the approved design spec and the original 15-task execution

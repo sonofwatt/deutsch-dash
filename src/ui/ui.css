@@ -136,7 +136,7 @@
   /* badge | name | penalty | played | = | round | TOTAL | blitz bolt. The last
      column is reserved whether or not a bolt is in it, so the totals stay in a
      line down the sheet instead of the blitzer's row shunting left. */
-  grid-template-columns: 28px minmax(0, 1fr) repeat(2, minmax(3ch, auto)) auto
+  grid-template-columns: 28px minmax(0, 1fr) 10px repeat(2, minmax(3ch, auto)) auto
                          repeat(2, minmax(3ch, auto)) 16px;
   padding: 8px 10px; border-radius: var(--radius);
   background: var(--surface); border: 1px solid var(--line); font-size: 14px; }
@@ -157,6 +157,14 @@
   border-left: 2px solid color-mix(in srgb, var(--ink) 28%, transparent);
   align-self: stretch; display: flex; align-items: center; justify-content: flex-end; }
 .score-blitz { font-size: 13px; line-height: 1; text-align: right; }
+/* Who the table is waiting on, in the lobby's three colours at dot size. The
+   column is reserved whether or not a dot is in it, so the arithmetic stays in a
+   line down the sheet on the game-over sheet too. */
+.score-ready { display: flex; align-items: center; }
+.score-ready .dot { width: 8px; height: 8px; border-radius: 999px; display: block;
+  background: #ffffff; border: 1.5px solid #111111; }
+.score-ready .dot.on { background: #22c55e; border-color: #15803d; }
+.score-ready .dot.out { background: #d8d5cc; border-color: #a8a49a; }
 .error { color: var(--danger-ink); }
 /* A row that changed place holds its colour through the slide, then lets go. The
    animation carries the fade so no second timer has to clear the class. */
@@ -239,21 +247,40 @@
 
 .blitz-splash { position: fixed; inset: 0; display: grid; place-items: center; z-index: 110;
   pointer-events: none; }
-.blitz-word { font-size: clamp(48px, 18vw, 120px); font-weight: 800; letter-spacing: .02em;
-  color: var(--accent); text-shadow: 0 4px 24px rgb(0 0 0 / .25); }
+/* Both of these are read against whatever the splash is raining past them, in
+   either theme, so they carry their own contrast rather than borrowing the
+   page's: a hard black outline, drawn with -webkit-text-stroke where it is
+   supported and with four offset shadows everywhere else. Without it the white
+   sat on pale confetti and vanished. */
+.blitz-word { font-size: clamp(56px, 21vw, 140px); font-weight: 800; letter-spacing: .02em;
+  color: #ffffff; text-align: center;
+  -webkit-text-stroke: 3px #000000; paint-order: stroke fill;
+  text-shadow: 0 0 2px #000, 2px 2px 0 #000, -2px 2px 0 #000, 2px -2px 0 #000,
+               -2px -2px 0 #000, 0 6px 28px rgb(0 0 0 / .45); }
+/* Twice the size it was: it is the name of whoever just won the round, and it
+   was set at body weight under a 120px word. */
+.blitz-name { margin: 6px 0 0; text-align: center; font-weight: 800;
+  font-size: clamp(28px, 9vw, 56px); color: #ffffff;
+  -webkit-text-stroke: 2px #000000; paint-order: stroke fill;
+  text-shadow: 0 0 2px #000, 1.5px 1.5px 0 #000, -1.5px 1.5px 0 #000,
+               1.5px -1.5px 0 #000, -1.5px -1.5px 0 #000, 0 4px 18px rgb(0 0 0 / .45); }
 
 /* Blitz splash particles. The whole splash is on screen for SPLASH_MS (3.6s, in
    RoomScreen), so every animation here has to finish inside that. */
 .splash-fx { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
-.spark { position: absolute; left: 50%; top: 50%; font-size: clamp(36px, 10vw, 60px);
+.spark { position: absolute; left: 50%; top: 50%;
+  font-size: calc(clamp(34px, 9.5vw, 58px) * var(--size, 1));
   animation: spark-out 2400ms ease-out var(--delay, 0ms) both; }
 /* Rotate out along --a, then counter-rotate the glyph so it flies upright. */
+/* Out along --a, with the glyph counter-rotated so it flies upright, plus a slow
+   tumble of its own so a burst of forty does not look stamped from one die. */
 @keyframes spark-out {
   0%   { transform: translate(-50%, -50%) rotate(var(--a)) translateX(0)
-                    rotate(calc(-1 * var(--a))) scale(.4); opacity: 0; }
-  20%  { opacity: 1; }
+                    rotate(calc(-1 * var(--a))) scale(.3); opacity: 0; }
+  15%  { opacity: 1; }
+  70%  { opacity: 1; }
   100% { transform: translate(-50%, -50%) rotate(var(--a)) translateX(var(--d))
-                    rotate(calc(-1 * var(--a))) scale(1.1); opacity: 0; }
+                    rotate(calc(-1 * var(--a) + var(--spin, 0deg))) scale(1.25); opacity: 0; }
 }
 /* Twice the size the table saw, which is what "200% larger" asks for: the glyph
    is the joke, and at 24px on a 393px screen it was a speck. Falling slower and

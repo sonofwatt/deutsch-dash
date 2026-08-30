@@ -545,6 +545,20 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         syncAllStuck(); // the centre moved: someone may have just been freed, or trapped
         if (phase === 'playing') armAway(); else disarmAway();
 
+        // Self-heal a stale lobby Away. It is set when the tab hides and cleared
+        // when it comes back, which depends on catching one visibilitychange at
+        // the right moment - and a tab that was frozen for a minute, whose socket
+        // dropped and whose host was handed on while it slept, is exactly where
+        // that goes wrong. A visible tab sitting in a lobby is not away, whatever
+        // the flag says, and this is the only place that can know it on EVERY
+        // snapshot rather than on one event. Costs a comparison in the steady
+        // state, because clearAway is only called on a flag that is actually set.
+        if (phase === 'lobby' && room.players[me]?.awayAt != null
+            && typeof document !== 'undefined' && document.visibilityState === 'visible') {
+          const c = get().code;
+          if (c) void deps.clearAway(c, me);
+        }
+
         // (3) all-stuck rotation.
         //
         // The `me` half of this guard used to be free: if every connected player

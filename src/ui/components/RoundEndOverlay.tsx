@@ -33,7 +33,7 @@ export function RoundEndOverlay() {
     <div className="overlay">
       <div className="sheet">
         <h2 style={{ margin: 0 }}>{blitzer ? `${blitzer} blitzed!` : 'Round over (all stuck)'}</h2>
-        <ScoreList players={room.players} scores={scores} blitzedBy={room.round?.blitzedBy} />
+        <ScoreList players={room.players} scores={scores} blitzedBy={room.round?.blitzedBy} showReady />
         <Commentary remarks={remarksForRoom(room)} />
         {actionError && <p className="error" style={{ margin: 0 }}>{actionError}</p>}
         {me && !me.sittingOut && (

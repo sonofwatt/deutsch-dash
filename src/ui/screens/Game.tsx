@@ -279,9 +279,11 @@ export function Game() {
              already know from the lobby - because it is the same question. The
              answer is immediate: a seat was kept and the board already has their
              spaces, so there is nothing to wait for. */
-          <button className="btn ready-btn deal-me-in" onClick={dealMeIn}>
-            Ready? <span>— deal me into this round</span>
-          </button>
+          <div className="deal-me-in-slot">
+            <button className="btn ready-btn deal-me-in" onClick={dealMeIn}>
+              Ready? <span>— deal me in</span>
+            </button>
+          </div>
         ) : (
           /* A watcher has no cards, but the row is still a track in .game's grid
              and leaving it empty would let the board grow into it and then shrink
