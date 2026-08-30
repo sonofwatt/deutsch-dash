@@ -5,7 +5,7 @@ suite. A commit sitting unpushed has already invalidated one playtest — what
 people are playing is whatever last reached Pages — so check `git status -sb`
 before trusting what a table reports._
 
-_**348 tests green** (324 unit + 24 emulator). This is the only place in the repo
+_**351 tests green** (327 unit + 24 emulator). This is the only place in the repo
 that quotes a count — it drifted three separate ways when it lived in four
 places, so keep it here and nowhere else._
 
@@ -738,6 +738,29 @@ space it can follow rigged into place:
 | the same 70px at 400ms - a reposition, not a throw | nothing |
 | slow drag let go over the opponent strip | lands (signal 3) |
 
+### Three things a playtest asked to be louder or clearer _(#60)_
+
+- **The hint pulses harder.** A 2px outline breathing on and off was easy to miss
+  on a board being scanned at speed, which is exactly the player it exists for -
+  one who has already stalled. It is a 4px ring with a coloured halo, a wash
+  inside the slot, and a **scale to 1.06 at the peak**. The scale is what makes it
+  register out of the corner of an eye: a ring can be missed on a busy board, a
+  square that jumps cannot. It is a transform, so nothing on the grid moves.
+- **Dragging off the wood shows what is UNDER the card.** The pile still holds it
+  - the play commits on the drop, not on the lift - so it was rendering a second
+  copy of the card already following the finger. `TableauView` takes `dragging`
+  and, for the wood only, drops the top of the run. It is the wood only because it
+  is the one pile that shows a run of face-up cards, so there is something behind
+  to look at; the others would reveal a card nobody has turned over yet.
+- **Sitting out is a drawn door, not 🚪.** The emoji is a CLOSED door and every
+  platform draws it differently; this one is always the same shape - black on
+  white, panel swung toward the viewer. The near edge of the panel is taller than
+  the hinged edge, and that alone is what makes it read as open.
+
+The head reads `Dayvigo  0 pts to 75` now. The separators are gone and the gap
+after the name is two **non-breaking** spaces: HTML collapses a run of plain
+spaces to one, so a literal double space in the source renders as a single.
+
 ### The splash says what the round DID to you _(#57)_
 
 `splashVariant` returns `{ base, trophy }` now, and the losing faces are tested
@@ -763,6 +786,16 @@ anywhere, and handing every tied player a toilet would be a lie about a change
 that did not happen. Same reasoning as `basement` in the commentary.
 
 ### The blitzer gets fireworks _(#58)_
+
+**Fifteen shells at forty-six sparks each**, about 690 elements - ten times the
+first cut. It is affordable because it exists for 3.6 seconds and every spark
+animates on transform and opacity alone, so the whole thing composites and nothing
+reflows. **Worth re-measuring on a low-end phone before it grows again.** Each
+shell also fires a one-element ignition bloom, which is most of why it reads as
+going OFF rather than as dots appearing, and every sixth spark is small and white
+against the coloured ones - which is what turns a burst into a glittery one. The
+flicker is a `brightness` twinkle running alongside the flight on its own offset
+per spark, not a fade.
 
 Three glyphs (😎🥳🔥) rather than eight - a burst reads as a celebration when the
 eye takes it in at once, and eight faces at forty copies read as a pile of
@@ -1654,6 +1687,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `b6e058a` | The host can sit a round out, and the table starts without them |
 | `9f1a634` | A stale Away that locked a host out; glitz, card flips and badge jokes |
 | `9bb1ba8` | Fireworks, four losing faces, an opaque card turn, and the AI overlords |
+| _(this one)_ | Ten times the fireworks; a louder hint; the wood shows what is under |
 | `c7a1da9` | The flick aimed by direction; the whole space above the hand |
 
 Earlier history, the approved design spec and the original 15-task execution

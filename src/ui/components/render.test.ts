@@ -12,7 +12,7 @@ import { raceFlashes } from '../raceFlash';
 import { orderlySpaces } from '../../game/center';
 import { orderlyColumns, spaceCountForPlayers } from '../../game/rules';
 import { splashVariant, type Splash } from '../splashVariant';
-import type { Card, CenterSpace, PlayerInfo, RoundScore, Suit, Tableau } from '../../game/types';
+import type { Card, CenterSpace, PlayerInfo, PlaySource, RoundScore, Suit, Tableau } from '../../game/types';
 
 const c = (v: number, suit: Suit, owner = 'me'): Card => ({ v, suit, owner });
 const run = (suit: Suit) => Array.from({ length: 10 }, (_, i) => c(i + 1, suit));
@@ -226,6 +226,37 @@ describe('CenterGrid', () => {
     // A first paint and every static render land here.
     expect(gridColumns(16, false, undefined)).toBe(4);
     expect(gridColumns(16, false, { w: 0, h: 0 })).toBe(4);
+  });
+});
+
+describe('dragging off the wood', () => {
+  // The play has not happened yet - it commits on the drop - so the pile still
+  // holds the card. What it must not do is show a second copy of the one already
+  // following the finger.
+  const hand = (woodIndex: number): Tableau =>
+    ({ blitz: [c(5, 'red')], post: [[], [], []],
+       wood: [c(1, 'red'), c(2, 'blue'), c(3, 'green'), c(4, 'yellow')], woodIndex });
+  const view = (t: Tableau, dragging: PlaySource | null) => renderToStaticMarkup(createElement(
+    TableauView, { t, badgeId: 'tulip' as const, selection: null, postHighlight: [],
+      onSelect: noop, onFlip: noop, onTapPost: noop, startDrag: noop,
+      woodSide: 'right' as const, dragging }));
+
+  it('shows the card underneath while the top one is in the air', () => {
+    const t = hand(3);                       // 1, 2, 3 turned over; 3 is on top
+    expect(view(t, null)).toContain('>3<');  // at rest, the top card
+    const lifted = view(t, { kind: 'wood' });
+    expect(lifted).not.toContain('>3<');     // not a second copy of what is held
+    expect(lifted).toContain('>2<');         // the one under it
+  });
+
+  it('leaves an empty slot when there is nothing underneath', () => {
+    // A single-card turn, or the first card of the pile: taking it leaves nothing.
+    expect(view(hand(1), { kind: 'wood' })).not.toContain('>1<');
+  });
+
+  it('is unmoved by a drag from anywhere else', () => {
+    expect(view(hand(3), { kind: 'blitz' })).toContain('>3<');
+    expect(view(hand(3), { kind: 'post', index: 0 })).toContain('>3<');
   });
 });
 

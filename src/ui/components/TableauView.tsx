@@ -10,6 +10,13 @@ export function TableauView(props: {
   t: Tableau; badgeId: BadgeId; selection: PlaySource | null; postHighlight: number[];
   onSelect: (s: PlaySource) => void; onFlip: () => void; onTapPost: (i: number) => void;
   startDrag: (e: React.PointerEvent, card: Card, source: PlaySource) => void;
+  /**
+   * What is currently in the air, if anything. Only the wood acts on it: it is the
+   * one pile that shows a run of face-up cards, so a card lifted off it leaves
+   * something behind to look at. Optional, like every prop here - render.test.ts
+   * builds these as complete literals and tsc -b typechecks it.
+   */
+  dragging?: PlaySource | null;
   /** Optional: which end the wood pile sits at. Defaults to the right thumb. */
   woodSide?: WoodSide;
 }) {
@@ -25,6 +32,10 @@ export function TableauView(props: {
   // Capped at WOOD_STEP because that is the most a turn can ever deal - a shorter
   // last turn, or the host's single-card rescue, simply deals fewer.
   const dealt = t.wood.slice(Math.max(0, t.woodIndex - WOOD_STEP), t.woodIndex);
+  // The same run without its top card: what the pile looks like with the card the
+  // player is holding taken off it.
+  const beneath = dealt.slice(0, -1);
+  const draggingWood = props.dragging?.kind === 'wood';
   // Every wood card has been turned over at least once: the next flip recycles the
   // pile from the start and deals 3 again (or whatever is left, see flipWood).
   // Tapping the empty draw slot is the recycle. It carries no glyph: a ↻ on the
@@ -89,7 +100,7 @@ export function TableauView(props: {
             {/* No recycle button on the face-up card. It sat on top of the card the
                 thumb reaches for, covering .card-badge entirely at every card size,
                 and the empty draw slot beside it already carries the ↻. */}
-            {woodTop ? (
+            {woodTop && !draggingWood ? (
               <div className="wood-deal"
                 onClick={() => props.onSelect({ kind: 'wood' })}
                 onPointerDown={e => props.startDrag(e, woodTop, { kind: 'wood' })}>
@@ -106,6 +117,20 @@ export function TableauView(props: {
                     selected={i === dealt.length - 1 && isSel({ kind: 'wood' })} />
                 ))}
               </div>
+            /* While the wood top is in the air, show what is UNDER it rather than a
+               second copy of the card already following the finger. The play has
+               not happened yet - it commits on the drop - so the pile still holds
+               the card; this is only what the player would see if it were gone,
+               which is what they are trying to look at. `beneath` is empty when the
+               turn brought a single card, and then the slot is simply empty. */
+            ) : draggingWood ? (
+              beneath.length > 0 ? (
+                <div className="wood-deal">
+                  {beneath.map(card => (
+                    <CardView key={cardId(card)} card={card} badgeId={badgeId} />
+                  ))}
+                </div>
+              ) : <div className="pile-space" />
             ) : <div className="pile-space" />}
           </PileStack>
         </div>

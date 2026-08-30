@@ -255,19 +255,38 @@
 /* One shell: a point the sparks are flung from. The sparks are its children, so
    the shell only has to be placed and the sparks only have to know a bearing. */
 .shell { position: absolute; width: 0; height: 0; }
+/* The ignition bloom: a white core that flares and is gone in a fifth of a second.
+   It is most of why a shell reads as going OFF rather than as dots appearing. */
+.shell b { position: absolute; left: -1px; top: -1px; width: 3px; height: 3px;
+  border-radius: 999px; background: #fff;
+  box-shadow: 0 0 14px 7px hsl(var(--hue) 100% 80% / .95);
+  animation: shell-flash 260ms ease-out var(--delay, 0ms) both; }
+@keyframes shell-flash {
+  0%   { transform: scale(.2); opacity: 0; }
+  20%  { transform: scale(1.6); opacity: 1; }
+  100% { transform: scale(3.4); opacity: 0; }
+}
 /* A white-hot core inside the colour, which is what stops a small bright dot
-   washing out against the light theme's cream ground. */
-.shell i { position: absolute; left: 0; top: 0; width: 7px; height: 7px; border-radius: 999px;
-  background: hsl(var(--hue) 95% 55%);
-  box-shadow: 0 0 0 1px hsl(var(--hue) 100% 88% / .9), 0 0 10px 2px hsl(var(--hue) 95% 55% / .8);
-  animation: firework 1500ms cubic-bezier(.15, .7, .3, 1) var(--delay, 0ms) both; }
+   washing out against the light theme's cream ground. Two sizes and two
+   lightnesses, mixed per spark, so a burst glitters rather than reading as one
+   colour of confetti. */
+.shell i { position: absolute; left: 0; top: 0;
+  width: var(--sz, 6px); height: var(--sz, 6px); border-radius: 999px;
+  background: hsl(var(--hue) 98% var(--lit, 58%));
+  box-shadow: 0 0 0 1px hsl(var(--hue) 100% 92% / .95),
+              0 0 12px 3px hsl(var(--hue) 98% var(--lit, 58%) / .9);
+  animation: firework 1500ms cubic-bezier(.15, .7, .3, 1) var(--delay, 0ms) both,
+             twinkle 260ms ease-in-out var(--tw, 0ms) infinite alternate; }
+/* Not a fade - a flicker. Runs alongside the flight, on its own offset per spark,
+   which is the difference between falling dots and glitter. */
+@keyframes twinkle { from { filter: brightness(1); } to { filter: brightness(1.9); } }
 /* Out along the bearing, then a little gravity at the end - which is the whole
    difference between a firework and a starburst. */
 @keyframes firework {
-  0%   { transform: rotate(var(--a)) translateX(0) translateY(0); opacity: 0; }
-  8%   { opacity: 1; }
+  0%   { transform: rotate(var(--a)) translateX(0) translateY(0) scale(.4); opacity: 0; }
+  6%   { opacity: 1; transform: rotate(var(--a)) translateX(1vmin) translateY(0) scale(1.3); }
   70%  { opacity: 1; }
-  100% { transform: rotate(var(--a)) translateX(var(--r)) translateY(4vmin) scale(.5);
+  100% { transform: rotate(var(--a)) translateX(var(--r)) translateY(4.5vmin) scale(.45);
          opacity: 0; }
 }
 /* Both of these are read against whatever the splash is raining past them, in
@@ -341,3 +360,11 @@
    on one line at the button's usual padding. Let it take two lines instead of
    shrinking the type below what is comfortable to read at a glance. */
 .ready-row .start-anyway { padding: 0 8px; font-size: 14px; line-height: 1.15; }
+
+/* The sit-out door. Fixed black-on-white in both themes, like the ready button's
+   fixed colours and for the same reason: it is a small shape that has to stay
+   the same shape, and a themed outline on a themed pill loses it in dark mode. */
+.door-ajar { width: 19px; height: 19px; display: block;
+  fill: #ffffff; stroke: #111111; stroke-width: 1.6;
+  stroke-linejoin: round; stroke-linecap: round; }
+.door-ajar .knob { fill: #111111; stroke: none; }

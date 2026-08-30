@@ -4,7 +4,7 @@ import { useGameStore, legalTargets, gameStore, isHost } from '../../state/store
 import { allConnectedStuck } from '../../net/plays';
 import { hasLegalMove } from '../../game/rules';
 import { HINT_DELAY_MS, HINT_REPEAT_MS, HINT_SHOW_MS, hintSpace } from '../../game/hint';
-import { EMOJI, type BadgeId } from '../../game/badges';
+import type { BadgeId } from '../../game/badges';
 import { DragGhost } from '../components/DragGhost';
 import { CenterGrid } from '../components/CenterGrid';
 import { TableauView } from '../components/TableauView';
@@ -28,6 +28,27 @@ const NO_SPACES: CenterSpace[] = [];
 // rotations round end all still work; only the button that lets a player claim it
 // is hidden. Flip this back to true to bring the feature back.
 export const ENABLE_STUCK_BUTTON: boolean = false;
+
+/**
+ * A door standing open, drawn rather than borrowed from the emoji font: 🚪 is a
+ * closed door, and every platform draws it differently. This one is always the
+ * same shape - black on white, the panel swung toward the viewer, somebody on
+ * their way out - which is the whole message of the button it sits in.
+ *
+ * The near edge of the panel is TALLER than the hinged edge. That is what makes
+ * it read as open rather than as a rectangle with a line through it.
+ */
+function DoorAjar() {
+  return (
+    <svg className="door-ajar" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      {/* The frame it hangs in, three sides - the fourth is where the door went. */}
+      <path d="M13.5 3.5H20V20.5H13.5" />
+      {/* The panel: hinged at 13.5, free edge forward at 4.5 and taller for it. */}
+      <path d="M13.5 3.5 4.5 1.5V22.5L13.5 20.5Z" />
+      <circle cx="7" cy="12" r="1.15" className="knob" />
+    </svg>
+  );
+}
 
 export function Game() {
   const room = useGameStore(s => s.room)!;
@@ -209,7 +230,12 @@ export function Game() {
       onPointerDown={() => { noteActivity(); setActivity(n => n + 1); }}>
       <div className="game-head">
         <strong>Round {room.meta.roundNumber}</strong>
-        <span className="muted">{me.name} · {me.score} pts · to {room.meta.targetScore}</span>
+        {/* Spaces rather than separators, and non-breaking ones because HTML
+            collapses a run of plain spaces to a single one - a literal double
+            space in the source would render as one and the gap would be lost. */}
+        <span className="muted">
+          {me.name}{'\u00a0\u00a0'}{me.score} pts to {room.meta.targetScore}
+        </span>
         {/* Which thumb the wood pile sits under, changeable mid-game on purpose:
             a player who was auto-rejoined never sees a form again. */}
         <ConnectionPill />
@@ -229,7 +255,7 @@ export function Game() {
             ? <button className="side-swap arming" onClick={() => { setArming(false); setSittingOut(true); }}
                 aria-label="Confirm sitting out of this round">out?</button>
             : <button className="side-swap" onClick={() => setArming(true)}
-                aria-label="Sit out" title="Sit out of the round">{'\u{1f6aa}' + EMOJI}</button>}
+                aria-label="Sit out" title="Sit out of the round"><DoorAjar /></button>}
           <ThemeToggle />
         </span>
       </div>
@@ -256,6 +282,7 @@ export function Game() {
           animate={lastRejected ? { x: [0, -8, 8, -5, 5, 0] } : { x: 0 }}
           transition={{ duration: 0.35 }}>
           <TableauView t={hand} badgeId={me.badgeId} selection={selection} woodSide={woodSide}
+            dragging={drag?.source ?? null}
             postHighlight={targets.posts} onSelect={select} onFlip={flip}
             onTapPost={i => void playTo({ post: i })} startDrag={startDrag} />
         </motion.div>

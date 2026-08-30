@@ -117,17 +117,31 @@
 /* Twice in a second and then away - the element itself is removed after
    HINT_SHOW_MS (see Game.tsx), so this only has to cover the second it is here.
    Two iterations of half a second each, starting and ending invisible. */
-.pile-space.hint { border-radius: var(--radius); outline: 2px solid transparent; outline-offset: 1px;
+/* Louder than it was. A 2px outline breathing on and off was easy to miss on a
+   board being scanned at speed - which is precisely the player it exists for, one
+   who has already stalled. It is a 3px ring now with a coloured halo behind it and
+   a wash of the same violet inside the slot, so the whole square reads rather than
+   its edge, and the pulse goes to full rather than to a tint. */
+.pile-space.hint { border-radius: var(--radius); outline: 4px solid transparent; outline-offset: 2px;
   animation: hint-pulse .5s ease-in-out 2; }
 @keyframes hint-pulse {
-  0%, 100% { outline-color: transparent; }
-  50%      { outline-color: var(--hint); }
+  /* The scale is what makes it register out of the corner of an eye: a ring can
+     be missed on a busy board, a square that jumps cannot. It is a transform, so
+     it moves nothing else on the grid. */
+  0%, 100% { outline-color: transparent; box-shadow: none;
+             background: transparent; transform: scale(1); }
+  50%      { outline-color: var(--hint); transform: scale(1.06);
+             box-shadow: 0 0 0 8px color-mix(in srgb, var(--hint) 48%, transparent),
+                         0 0 24px 9px color-mix(in srgb, var(--hint) 72%, transparent);
+             background: color-mix(in srgb, var(--hint) 22%, transparent); }
 }
 /* MotionConfig reducedMotion="user" does not reach CSS keyframes, so this is the
    only thing standing between a flashing board and somebody who asked for
    stillness. They get the same one-second mark, held steady instead of pulsed. */
 @media (prefers-reduced-motion: reduce) {
-  .pile-space.hint { animation: none; outline-color: var(--hint); }
+  .pile-space.hint { animation: none; outline-color: var(--hint);
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--hint) 34%, transparent);
+    background: color-mix(in srgb, var(--hint) 22%, transparent); }
 }
 
 /* Stuck: the band is the one element on the board that is always present and
