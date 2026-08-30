@@ -70,7 +70,13 @@ export function Lobby({ code }: { code: string }) {
   // The override appears only for a host who has readied and is waiting on
   // somebody else, and it needs a table worth starting. Once everyone is ready
   // the countdown has it from there and this is gone.
-  const showOverride = host && iAmReady && !tableReady(room) && inPlay.length >= 2;
+  // ...and never offer a start that would deal to nobody but machines. The
+  // countdown already refuses that (tableReady); the override must refuse it too,
+  // or the way past a dead phone becomes a way to start a game with no people in
+  // it.
+  const humansInPlay = inPlay.some(([, p]) => !p.isBot);
+  const showOverride = host && (iAmReady || iAmOut)
+    && !tableReady(room) && inPlay.length >= 2 && humansInPlay;
 
   function add() {
     if (!freeBadge) return;
@@ -213,28 +219,29 @@ export function Lobby({ code }: { code: string }) {
       {/* Mine, and the only place my own state is shown. Three states, three
           fixed colours - white, green and yellow with black ink in both themes,
           which is why they are literals and not theme tokens. */}
-      {iAmOut
-        ? <button className="btn ready-btn" onClick={() => setSittingOut(false)}>
-            I'm back — deal me in
-          </button>
-        /* The host's override shares the ready button's row rather than sitting
-           under it as a second full-width slab. It only appears once the host is
-           READY, which is the whole point: before that the count it used to show
-           could never be complete, because the host was one of the players it was
-           counting. Ready first, then "everyone else can catch up". */
-        : <div className={`ready-row${showOverride ? ' with-override' : ''}`}>
-            {showOverride && (
-              <button className="btn start-anyway" onClick={startAnyway}>Start anyway</button>
-            )}
-            <button className={`btn ready-btn${iAmAway ? ' away' : iAmReady ? ' on' : ''}`}
+      {/* The host's override shares the ready button's row rather than sitting under
+          it as a second full-width slab, and it appears once the host has ANSWERED
+          for themselves - ready, or sitting this one out. That is the whole point:
+          the count it used to show could never be complete while the host was one
+          of the players it was counting. A host who is sitting out is not in the
+          count at all, and still needs the way past a dead phone. */}
+      <div className={`ready-row${showOverride ? ' with-override' : ''}`}>
+        {showOverride && (
+          <button className="btn start-anyway" onClick={startAnyway}>Start anyway</button>
+        )}
+        {iAmOut
+          ? <button className="btn ready-btn" onClick={() => setSittingOut(false)}>
+              I'm back — deal me in
+            </button>
+          : <button className={`btn ready-btn${iAmAway ? ' away' : iAmReady ? ' on' : ''}`}
               onClick={toggleReady}>
               {/* A question when it is asking and a statement when it is answered.
                   "I'm Ready" then "Ready" read as the same word twice, and people
                   could not tell which state they were looking at - the colour was
                   carrying the whole message on its own. */}
               {iAmAway ? 'Away' : iAmReady ? 'Ready!' : 'Ready?'}
-            </button>
-          </div>}
+            </button>}
+      </div>
       {/* Quiet, and below the ready button: stepping away is the rarer thing to
           want, and it must not be the button a thumb finds by accident. */}
       {!iAmOut && (
@@ -253,6 +260,12 @@ export function Lobby({ code }: { code: string }) {
           relative weight because one player's phone is in dark mode. */}
       {host && !tableReady(room) && inPlay.length < 2 && (
         <p className="muted">Waiting for players…</p>
+      )}
+      {/* A table of nothing but bots will never be ready however long it waits -
+          they are ready by definition and there is nobody for them to play
+          against - so say that rather than leaving it looking like a hang. */}
+      {!tableReady(room) && inPlay.length >= 2 && !humansInPlay && (
+        <p className="muted">Somebody has to play them. Deal yourself back in, or add a player.</p>
       )}
       {!host && !tableReady(room) && (
         <p className="muted">

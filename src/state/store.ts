@@ -182,6 +182,11 @@ export function tableReady(room: Room): boolean {
   // Two players who are actually going to be dealt in. A table of one plus three
   // spectators is not a game.
   if (playing.length < 2) return false;
+  // And at least one of them a person. Bots are ready by definition, so without
+  // this a host sitting out of a room full of bots leaves a table that is
+  // permanently "ready": it counts itself down and deals a round the machines
+  // play to each other while the only human present watches.
+  if (!playing.some(p => !p.isBot)) return false;
   return playing.every(p => p.isBot || (p.ready === true && p.awayAt == null && p.connected));
 }
 

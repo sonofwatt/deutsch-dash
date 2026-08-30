@@ -441,6 +441,27 @@ describe('the lobby ready gate', () => {
     store.getState().leave();
   });
 
+  it('will not count a table of bots down, however ready they are', async () => {
+    // A host who sits out of a room full of bots leaves a table that is
+    // permanently "ready" - bots are ready by definition - and it would count
+    // itself down and deal a round the machines play to each other.
+    const bots = { me: human({ sittingOut: true }), b1: bot(), b2: bot() };
+    expect(tableReady({ ...lobby(bots) })).toBe(false);
+    // One person back in it and it is a game again.
+    expect(tableReady({ ...lobby({ me: human({ ready: true }), b1: bot(), b2: bot() }) })).toBe(true);
+  });
+
+  it('starts once the players who are actually in it are ready', async () => {
+    // The host sitting out is not waited on: the countdown belongs to whoever is
+    // being dealt in, and two of them with one human is a game.
+    const room = lobby({
+      host: human({ sittingOut: true }), you: human({ ready: true }), b: bot(),
+    });
+    expect(tableReady(room)).toBe(true);
+    // ...and it still needs two.
+    expect(tableReady(lobby({ host: human({ sittingOut: true }), you: human({ ready: true }) }))).toBe(false);
+  });
+
   it('refuses to change identity once the player has readied', async () => {
     const deps = fakeDeps();
     const store = createGameStore(deps);

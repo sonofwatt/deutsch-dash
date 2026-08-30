@@ -5,7 +5,7 @@ suite. A commit sitting unpushed has already invalidated one playtest — what
 people are playing is whatever last reached Pages — so check `git status -sb`
 before trusting what a table reports._
 
-_**337 tests green** (313 unit + 24 emulator). This is the only place in the repo
+_**339 tests green** (315 unit + 24 emulator). This is the only place in the repo
 that quotes a count — it drifted three separate ways when it lived in four
 places, so keep it here and nowhere else._
 
@@ -737,6 +737,32 @@ space it can follow rigged into place:
 | 70px flick aimed 90° away | nothing |
 | the same 70px at 400ms - a reposition, not a throw | nothing |
 | slow drag let go over the opponent strip | lands (signal 3) |
+
+### The host can sit a round out _(#51)_
+
+The countdown belongs to the players who are actually being dealt in, and the host
+is not automatically one of them. `tableReady` already skipped players who were
+sitting out, so a sitting-out host was already not waited on - what was missing
+was everything around it.
+
+- **`tableReady` now needs at least one HUMAN in play.** Bots are ready by
+  definition, so a host sitting out of a room full of them left a table that was
+  permanently "ready": it counted itself down and dealt a round the machines
+  played to each other while the only person present watched. Two players, one of
+  them a person, all of them ready.
+- **The override follows the same rule**, and appears once the host has ANSWERED
+  for themselves - ready, *or* sitting this one out. Gating it on "ready" alone
+  strands a sitting-out host with a dead phone on the table, which is the exact
+  thing the override exists for. It is also hidden when the deal would contain no
+  humans, or the way past a dead phone becomes a way to start a game with nobody
+  in it.
+- **The round-end sheet's override needed the same gate**, and for a sharper
+  reason: between rounds `ready` starts cleared, and `startRound` deals on it, so
+  a host tapping "Next round anyway" before readying dealt a round to **nobody at
+  all**. Recoverable - everyone has a seat and therefore the deal-me-in bar - but
+  a sheet closing onto an empty board is not what anybody pressed the button for.
+
+A bots-only lobby says so now rather than sitting there looking hung.
 
 ### Seats, hands, and the players a forced start deals around _(#50)_
 
@@ -1520,6 +1546,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `85705c4` | The host can cancel a countdown and keep the lobby |
 | `406bbad` | Start anyway shares the ready button's row; the stale scowl cleared |
 | `e2e61e1` | Start anyway counts down; the players it deals around can deal themselves in |
+| _(this one)_ | The host can sit a round out, and the table starts without them |
 | `c7a1da9` | The flick aimed by direction; the whole space above the hand |
 
 Earlier history, the approved design spec and the original 15-task execution

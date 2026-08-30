@@ -18,6 +18,9 @@ export function RoundEndOverlay() {
   const me = uid ? room.players[uid] : null;
   const iAmReady = me?.ready === true;
   const all = tableReady(room);
+  // Ready, or sitting this one out: either is an answer, and the override needs
+  // one before it can be sure the deal it forces has somebody in it.
+  const answered = iAmReady || me?.sittingOut === true;
   const tally = readyTally(room);
   // The sheet is a gate now, the same as the lobby is: everyone says when they
   // have finished reading their score and the host takes the table on. Pressing
@@ -42,11 +45,21 @@ export function RoundEndOverlay() {
           // Primary once the table is with them, and an override before that -
           // the same shape as the lobby, and for the same reason: a dead phone
           // must not be able to strand a table between rounds either.
+          //
+          // The override waits for the host to have answered for THEMSELVES,
+          // ready or sitting out, exactly as the lobby's does. Without that a
+          // host who taps it before readying deals a round to nobody at all:
+          // startRound gives a hand only to players who are ready, and between
+          // rounds that flag starts cleared.
           ? all
             ? <button className="btn btn-primary" onClick={next}>Next round</button>
-            : <button className="btn start-anyway" onClick={next}>
-                Next round anyway ({tally.ready}/{tally.total} ready)
-              </button>
+            : answered
+              ? <button className="btn start-anyway" onClick={next}>
+                  Next round anyway ({tally.ready}/{tally.total} ready)
+                </button>
+              : <p className="muted" style={{ textAlign: 'center' }}>
+                  Say you are ready, then you can start without the others.
+                </p>
           : <p className="muted" style={{ textAlign: 'center' }}>
               {all ? 'Waiting for the host…' : `Waiting for the table… (${tally.ready}/${tally.total} ready)`}
             </p>}
