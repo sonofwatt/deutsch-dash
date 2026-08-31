@@ -5,7 +5,7 @@ suite. A commit sitting unpushed has already invalidated one playtest — what
 people are playing is whatever last reached Pages — so check `git status -sb`
 before trusting what a table reports._
 
-_**351 tests green** (327 unit + 24 emulator). This is the only place in the repo
+_**359 tests green** (335 unit + 24 emulator). This is the only place in the repo
 that quotes a count — it drifted three separate ways when it lived in four
 places, so keep it here and nowhere else._
 
@@ -763,16 +763,60 @@ HTML collapses a run of plain ones to a single; that read as an extra space and
 came back out. The word on the splash is **DASH!**, not BLITZ! - the round-end
 sheet still says "blitzed", which is the verb rather than the name.
 
-**The washroom sign is coloured by GENDER, not by suit** (`--sign-boy` /
-`--sign-girl`, bright blue and bright pink, with the figure knocked out in white
-in every theme). It used to take the suit colour, which said nothing the big
-number underneath was not already saying far more loudly - so the one glyph whose
-job is "boy or girl", which is exactly what `canBuildOnPost` turns on, was
-answering it in silhouette alone at about 15px. The number still carries the suit.
+**The washroom sign carries both facts, one each.** The plate is an OUTLINE in
+the card's suit and the FIGURE inside it is `--sign-boy` / `--sign-girl` - bright
+blue or bright pink. It used to be a solid plate in the suit colour, which said
+nothing the big number was not already saying far more loudly, so the one glyph
+whose job is "boy or girl" - exactly what `canBuildOnPost` turns on - was
+answering it in silhouette alone at about 15px. A middle cut filled the whole
+plate with the gender colour: it read well and threw the suit away. The rect is
+inset by half its stroke, or a centred stroke on the viewBox edge comes out thin
+along that side. The badge emblem went from `.24` to `.30` of the card - it is how
+a player finds their own cards in the middle, and it was the smallest thing on the
+face.
 
 `select.field` carries `padding-right: 26px`. A browser draws a select's chevron
 at the inside edge of the padding box, so the same 14px on both sides put it
 almost on the border.
+
+### A way out of being stuck, and a countdown between rounds _(#61, #62)_
+
+**`sinkWoodTop` sends the face-up wood card to the very bottom of the pile**, and
+the index steps back with it so the next turn deals on from what was underneath.
+That is not `rotateWood`, which is the table-wide standstill rotation and moves
+the pile's BOTTOM card while resetting everybody's index at once.
+
+Why it works at all is the arithmetic in `woodCycleTops`: nine cards at three a
+turn reach 3, 6 and 9 and **nothing else, ever**. Sink one and the pile is the
+same length with the index one step off, so the laps stop landing on the same
+cards - the reachable set in that example goes from three of nine to six. Pinned
+in `wood.test.ts` with the worked numbers.
+
+- **It is a deliberate action.** It costs a card out of the running order, and the
+  player should be the one spending it. `sinkWood` is gated on actually being
+  stuck, so it cannot be used to reshuffle a pile that merely has nothing good in
+  it this second.
+- **The offer waits three seconds** (`STUCK_OFFER_MS`). A button appearing with
+  the bad news reads as the game telling you what to do; three seconds later it
+  reads as an offer, and it leaves room for somebody else's play to free you
+  without either happening. It holds the `stuckAt` it is offering FOR - the same
+  epoch trick the hint uses - so being freed and stuck again withdraws it without
+  the effect clearing anything, and without the synchronous setState the linter
+  rightly objects to.
+- **It replaces the note rather than sitting under it**, because the caption row
+  is a fixed track (`--note-h`) and the board must not move to make room.
+
+**The countdown now runs between rounds too.** `nextRound` is `startRound`, so the
+tick needed no branch at zero - only the two guards that pinned it to the lobby.
+Ready up on the score sheet and the table counts 3-2-1 over the scores, with the
+host's cancel. Pinned both ways: it counts in `lobby` and `roundEnd`, and in no
+other phase.
+
+**Neither is verifiable by rigging.** A stuck flag written straight into the
+database is cleared again by `syncStuck` on the next snapshot - correctly, because
+the hand is not actually stuck - so the three-second offer has only been proved by
+a render test and the arithmetic underneath it. The countdown WAS driven for real:
+sheet up, ready pressed, 3 on screen with a cancel, next round dealt.
 
 ### The splash says what the round DID to you _(#57)_
 
@@ -1702,6 +1746,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `9bb1ba8` | Fireworks, four losing faces, an opaque card turn, and the AI overlords |
 | `c2640b7` | Ten times the fireworks; a louder hint; the wood shows what is under |
 | `c7a1da9` | The flick aimed by direction; the whole space above the hand |
+| `258e544` | A way out of being stuck; a countdown between rounds |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
