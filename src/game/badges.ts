@@ -33,7 +33,11 @@ export const BADGES: Record<BadgeId, Badge> = {
   // The kite's indigo sat a shade away from --suit-blue, and CardView puts the
   // badge plate and the suit on the SAME card. Deep reef water instead: nowhere
   // near a suit, nowhere near the anchor's cyan, and an orange fish reads on it.
-  clownfish: { id: 'clownfish', label: 'Clownfish', color: '#155e75', glyph: '\u{1F420}' + EMOJI },
+  // Labelled for what the phones actually DRAW. There is no clownfish emoji, and
+  // both Noto and Apple render U+1F420 as a yellow-and-blue tropical fish, so a
+  // Clownfish label was describing a picture nobody was looking at. The id keeps
+  // the original name because it is a live key under `badges/$badgeId`.
+  clownfish: { id: 'clownfish', label: 'Tropical Fish', color: '#155e75', glyph: '\u{1F420}' + EMOJI },
   anchor:  { id: 'anchor',  label: 'Anchor',  color: '#0891b2', glyph: '⚓' + EMOJI },
   acorn:   { id: 'acorn',   label: 'Acorn',   color: '#92400e', glyph: '\u{1F330}' + EMOJI },
   boat:    { id: 'boat',    label: 'Boat',    color: '#475569', glyph: '⛵' + EMOJI },

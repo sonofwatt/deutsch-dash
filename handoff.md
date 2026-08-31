@@ -342,7 +342,7 @@ render, and it sets state.
   `BADGES` by whatever id a player is carrying, so a badge dropped from the picker
   has to stay drawable or a room dealt before it went takes the screen down over a
   missing glyph. The bicycle went this way on 2026-08-31 for the clover, and the
-  kite the same day for the clownfish. Retiring one means moving its quip over
+  kite the same day for the tropical fish. Retiring one means moving its quip over
   too, which `commentary.test.ts` pins by counting `quip-*` against `BADGE_IDS`.
 
 ### Game rules as implemented
@@ -1820,6 +1820,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `aafd534` | The flick bench published beside the app |
 | `bbf3cac` | The bicycle retired for a clover |
 | `2e2bb62` | The kite retired for a clownfish |
+| `PENDING` | The fish badge labelled for the glyph the phones draw |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
