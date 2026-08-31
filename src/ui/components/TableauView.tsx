@@ -17,6 +17,10 @@ export function TableauView(props: {
    * builds these as complete literals and tsc -b typechecks it.
    */
   dragging?: PlaySource | null;
+  /** This player has no move. Optional, like every prop here. */
+  stuck?: boolean;
+  /** Offered a few seconds after that: send the face-up wood card to the bottom. */
+  onSinkWood?: () => void;
   /** Optional: which end the wood pile sits at. Defaults to the right thumb. */
   woodSide?: WoodSide;
 }) {
@@ -147,5 +151,22 @@ export function TableauView(props: {
   // decide what counts as letting go "into the middle": everything above this
   // row is board as far as the player is concerned, whether or not the drop
   // zone element reaches that far.
-  return <div className="tableau-zone" data-hand>{ends}</div>;
+  return (
+    <div className={`tableau-zone wood-${props.woodSide}`} data-hand>
+      {ends}
+      {/* The stuck note lives HERE, in the band above the post piles that the
+          wood column's two-card height leaves empty. It is absolutely positioned,
+          so it costs no layout at all - it was in the drop zone's caption row
+          under the grid, which is a long way from the pile it is talking about.
+          Inset from whichever end the wood is on, because that is the one column
+          the band does not span. */}
+      {props.stuck && (
+        props.onSinkWood
+          ? <button className="wood-note" onClick={props.onSinkWood}>
+              Send top wood card to bottom
+            </button>
+          : <span className="wood-note quiet">No moves left</span>
+      )}
+    </div>
+  );
 }

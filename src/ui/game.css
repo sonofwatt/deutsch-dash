@@ -152,12 +152,6 @@
    work" (the rejected-play shake, the negative score column), and having nothing
    to play is not an error the player has made. Amber is the right register - it
    is a wait, not a fault. */
-/* 14px, up from 12. This is the line that tells somebody why nothing they do is
-   working, read at arm's length on a board being played at speed - it was the
-   smallest type on the screen and carrying the most weight. */
-.drop-zone.stuck { color: var(--warn-ink); font-weight: 700; font-size: 14px;
-  background: color-mix(in srgb, var(--warn) 8%, transparent); }
-
 /* The table has stopped. Across the board, because it is not about one hand.
    Transparent to the pointer so it can never be the thing that blocks a play;
    only the button inside it takes taps. */
@@ -489,10 +483,22 @@
 .btn.deal-me-in { width: 100%; font-weight: 800;}
 .deal-me-in span { font-weight: 400; font-size: 13px; opacity: .75; }
 
-/* The way out, offered a few seconds after the stuck note. It REPLACES the note
-   in the caption row rather than sitting under it, so the board does not move to
-   make room - that row is a fixed track (--note-h) for exactly this reason. */
-.drop-note.sink-wood { width: auto; border: 1px solid var(--warn-ink);
-  background: color-mix(in srgb, var(--warn) 16%, transparent);
-  color: var(--warn-ink); font-weight: 700; font-size: 13px;
-  border-radius: var(--radius); padding: 0 12px; cursor: pointer; }
+
+
+/* The stuck note, and the way out of it, in the band the wood column's two-card
+   height leaves empty above the post piles. Absolutely positioned, so it costs
+   no layout at all - it used to sit in the drop zone's caption row under the
+   grid, a long way from the pile it is talking about.
+
+   Inset from whichever end the wood is on, because that is the one column the
+   band does not span; the tableau carries wood-left / wood-right for it. */
+.tableau-zone { position: relative; }
+.wood-note { position: absolute; top: 0; height: calc(var(--hand-card) * 1.4);
+  display: grid; place-items: center; text-align: center; z-index: 2;
+  padding: 0 10px; border-radius: var(--radius);
+  border: 1px solid var(--warn-ink); background: color-mix(in srgb, var(--warn) 14%, var(--bg));
+  color: var(--warn-ink); font-weight: 700; font-size: 14px; line-height: 1.15;
+  cursor: pointer; }
+.wood-note.quiet { border-style: dashed; cursor: default; font-weight: 600; }
+.tableau-zone.wood-left .wood-note { left: calc(var(--hand-card) + var(--tgap)); right: 0; }
+.tableau-zone.wood-right .wood-note { right: calc(var(--hand-card) + var(--tgap)); left: 0; }

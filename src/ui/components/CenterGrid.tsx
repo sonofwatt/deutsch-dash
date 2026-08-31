@@ -143,10 +143,9 @@ export function CenterGrid(props: {
   onTap: (i: number) => void; snapping?: boolean; onSnapTap: () => void;
   // Optional: a board with nobody racing passes nothing at all.
   races?: Record<number, RaceFlash>;
-  // All three optional on purpose - render.test.ts builds these props as complete
+  // All optional on purpose - render.test.ts builds these props as complete
   // literals, and tsc -b typechecks it, so a REQUIRED prop here breaks the build
   // rather than just the tests. See the handoff's two traps.
-  stuck?: boolean;
   // Which space the helper hint is pointing at, if the host turned hints on and
   // the player has gone quiet. See game/hint.ts for why it is the destination.
   hint?: number | null;
@@ -160,13 +159,6 @@ export function CenterGrid(props: {
    * else here - render.test.ts builds these props as complete literals and tsc -b
    * typechecks it, so a REQUIRED prop breaks the build rather than just the tests.
    */
-  /**
-   * Offered to a stuck player, a few seconds after the note appears: send the
-   * face-up wood card to the bottom and carry on. It replaces the note rather
-   * than sitting under it, so the board does not move to make room for it - the
-   * caption row is a fixed track (see --note-h).
-   */
-  onSinkWood?: () => void;
   stall?: {
     mode: 'stalled' | 'rescue';
     /** Only the host is offered the way out; everybody else is told to wait. */
@@ -198,7 +190,7 @@ export function CenterGrid(props: {
             rest and only speaks when it has something to say - a soft wash while
             you hold a card that fits somewhere, and the stuck note when you hold
             nothing that does. The grid keeps the position it always had. */}
-        <div className={`drop-zone${props.snapping ? ' on' : ''}${props.stuck ? ' stuck' : ''}`}
+        <div className={`drop-zone${props.snapping ? ' on' : ''}`}
           data-drop="nearest" onClick={props.onSnapTap}>
         <div className="game-grid"
           // Rows as well as columns: the slot is sized against the height the
@@ -277,15 +269,8 @@ export function CenterGrid(props: {
         {/* Down at the tableau end of the zone, where the old band used to be, so
             a stuck player reads it without looking away from their own cards -
             and so it never lands on top of the grid. */}
-        {props.stuck && props.onSinkWood ? (
-          <button className="drop-note sink-wood"
-            onClick={e => { e.stopPropagation(); props.onSinkWood!(); }}>
-            No moves left — send the wood card to the bottom
-          </button>
-        ) : (props.stuck || props.snapping) && (
-          <span className="drop-note">
-            {props.stuck ? 'No moves left — waiting for the others' : 'drop anywhere here → nearest space'}
-          </span>
+        {props.snapping && (
+          <span className="drop-note">drop anywhere here → nearest space</span>
         )}
         </div>
       </div>

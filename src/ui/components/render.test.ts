@@ -114,19 +114,10 @@ describe('CenterGrid', () => {
     expect(gridAt).toBeLessThan(slotAt);
   });
 
-  it('says "no moves left" in the drop zone, not under the tableau', () => {
-    // It used to be a <p> below the tableau, which shoved the whole board up the
-    // screen the moment it appeared. The zone is always there, so this costs
-    // nothing; and a stuck player has no legal targets, so it is never washed
-    // green and saying "no moves left" at the same time.
-    const stuck = renderToStaticMarkup(createElement(CenterGrid, {
-      spaces, highlight: [], badgeOf: () => 'star' as const, onTap: noop, onSnapTap: noop, stuck: true,
-    }));
-    expect(stuck).toContain('drop-zone stuck');
-    expect(stuck).toContain('No moves left');
-    expect(stuck).not.toContain('stuck-note');
-    // At rest it says nothing at all - it is a target, not a caption. The old
-    // permanent "drop here" box is what this replaced.
+  it('says nothing at rest, and speaks only when a card has somewhere to go', () => {
+    // The zone is a target, not a caption. The old permanent "drop here" box is
+    // what this replaced - and the stuck note has moved out of here entirely,
+    // down into the tableau's own empty band beside the wood.
     expect(html).not.toContain('drop here');
     expect(html).not.toContain('No moves left');
     expect(html).toContain('data-drop="nearest"');
@@ -230,29 +221,38 @@ describe('CenterGrid', () => {
 });
 
 describe('the way out of being stuck', () => {
-  // The offer replaces the note in the caption row rather than sitting under it,
-  // so the board does not move to make room - that row is a fixed track.
-  const board = (over: Record<string, unknown>) => renderToStaticMarkup(createElement(CenterGrid, {
-    spaces: [{ stack: [], history: [] }], highlight: [], badgeOf: () => 'star' as const,
-    onTap: noop, onSnapTap: noop, ...over,
-  }));
+  // It sits in the band the wood column's two-card height leaves empty above the
+  // posts, absolutely positioned so it costs no layout - not under the grid,
+  // which is a long way from the pile it is talking about.
+  const hand: Tableau = { blitz: [c(5, 'red')], post: [[], [], []],
+                          wood: [c(1, 'red'), c(2, 'blue')], woodIndex: 1 };
+  const view = (over: Record<string, unknown>) => renderToStaticMarkup(createElement(
+    TableauView, { t: hand, badgeId: 'tulip' as const, selection: null, postHighlight: [],
+      onSelect: noop, onFlip: noop, onTapPost: noop, startDrag: noop,
+      woodSide: 'right' as const, ...over }));
 
   it('says only that there are no moves until the offer is passed in', () => {
-    const html = board({ stuck: true });
+    const html = view({ stuck: true });
     expect(html).toContain('No moves left');
-    expect(html).not.toContain('sink-wood');
+    expect(html).not.toContain('Send top wood card');
   });
 
-  it('becomes the offer once it is, and does not double up', () => {
-    const html = board({ stuck: true, onSinkWood: noop });
-    expect(html).toContain('sink-wood');
-    expect(html).toContain('send the wood card to the bottom');
-    // One line in that row, never two - it is a fixed-height track.
-    expect(html.match(/drop-note/g)).toHaveLength(1);
+  it('becomes the offer once it is, and never both at once', () => {
+    const html = view({ stuck: true, onSinkWood: noop });
+    expect(html).toContain('Send top wood card to bottom');
+    expect(html).not.toContain('No moves left');
+    expect(html.match(/wood-note/g)).toHaveLength(1);
   });
 
   it('offers nothing to a player who is not stuck', () => {
-    expect(board({ onSinkWood: noop })).not.toContain('sink-wood');
+    expect(view({ onSinkWood: noop })).not.toContain('wood-note');
+  });
+
+  it('is inset from whichever end the wood is on', () => {
+    // The band spans everything except the wood column, so the side it starts
+    // from has to follow the player's own preference.
+    expect(view({ stuck: true, woodSide: 'left' })).toContain('wood-left');
+    expect(view({ stuck: true, woodSide: 'right' })).toContain('wood-right');
   });
 });
 

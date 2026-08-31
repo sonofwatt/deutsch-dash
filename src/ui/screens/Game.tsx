@@ -293,8 +293,7 @@ export function Game() {
         : <OpponentStrip me={uid} players={room.players} tableaus={round.tableaus} woodSide={woodSide} />}
       <CenterGrid spaces={round.spaces} highlight={targets.spaces} badgeOf={badgeOf}
         onTap={i => void playTo({ space: i })} races={races}
-        snapping={targets.spaces.length > 0} stuck={hand != null && me.stuckAt != null} hint={hint}
-        onSinkWood={hand != null && stuckAwhile ? sinkWood : undefined}
+        snapping={targets.spaces.length > 0} hint={hint}
         openings={openings} stall={stall}
         onSnapTap={() => { if (targets.spaces.length) void playTo({ space: targets.spaces[0] }); }} />
       <div>
@@ -304,6 +303,8 @@ export function Game() {
           transition={{ duration: 0.35 }}>
           <TableauView t={hand} badgeId={me.badgeId} selection={selection} woodSide={woodSide}
             dragging={drag?.source ?? null}
+            stuck={me.stuckAt != null}
+            onSinkWood={stuckAwhile ? sinkWood : undefined}
             postHighlight={targets.posts} onSelect={select} onFlip={flip}
             onTapPost={i => void playTo({ post: i })} startDrag={startDrag} />
         </motion.div>

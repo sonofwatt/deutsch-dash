@@ -5,7 +5,7 @@ suite. A commit sitting unpushed has already invalidated one playtest — what
 people are playing is whatever last reached Pages — so check `git status -sb`
 before trusting what a table reports._
 
-_**359 tests green** (335 unit + 24 emulator). This is the only place in the repo
+_**360 tests green** (336 unit + 24 emulator). This is the only place in the repo
 that quotes a count — it drifted three separate ways when it lived in four
 places, so keep it here and nowhere else._
 
@@ -813,8 +813,16 @@ in `wood.test.ts` with the worked numbers.
   epoch trick the hint uses - so being freed and stuck again withdraws it without
   the effect clearing anything, and without the synchronous setState the linter
   rightly objects to.
-- **It replaces the note rather than sitting under it**, because the caption row
-  is a fixed track (`--note-h`) and the board must not move to make room.
+- **It lives in the tableau, not under the grid.** The wood column is two cards
+  tall and the posts are one, so the row already carries an empty band above them
+  - and that is a foot away from the pile the message is about, where the drop
+  zone's caption row was not. The note is absolutely positioned inside
+  `.tableau-zone`, so it still costs no layout, and it is inset from whichever end
+  the wood is on because that is the one column the band does not span
+  (`wood-left` / `wood-right` on the zone). Measured on both sides: it overlaps no
+  card either way.
+- The drop zone's caption row now only ever says "drop anywhere here", which is
+  what it was for.
 
 **The countdown now runs between rounds too.** `nextRound` is `startRound`, so the
 tick needed no branch at zero - only the two guards that pinned it to the lobby.
