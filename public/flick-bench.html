@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="robots" content="noindex">
+<meta name="description" content="A bench for tuning the flick gesture in Deutsch Dash: it traces your thumb, draws the cone it measured, and puts every threshold on a slider.">
+<title>Deutsch Dash flick bench</title>
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&display=swap">
+<style>
+:root{
+  --bg:#f4f2ec; --surface:#ffffff; --ink:#23211c; --soft:#7a766c; --line:#e3e0d7;
+  --chip:#efece4; --slot:#6f6a5b; --slotfill:#ebe8e0;
+  --aim:#7c3aed; --ok:#16a34a; --no:#d92d20; --warn:#b45309;
+  --trace:#2563eb;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#171613; --surface:#1e1d19; --ink:#f2f0ea; --soft:#a29d92; --line:#37342d;
+  --chip:#26241f; --slot:#8b8577; --slotfill:#1f1e19;
+  --aim:#b79cff; --ok:#5bd08a; --no:#ff7a6d; --warn:#e9c25a; --trace:#7ea6ff;
+}}
+:root[data-theme="dark"]{
+  --bg:#171613; --surface:#1e1d19; --ink:#f2f0ea; --soft:#a29d92; --line:#37342d;
+  --chip:#26241f; --slot:#8b8577; --slotfill:#1f1e19;
+  --aim:#b79cff; --ok:#5bd08a; --no:#ff7a6d; --warn:#e9c25a; --trace:#7ea6ff;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:Outfit,system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.45;
+  -webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+.wrap{max-width:min(100%,52rem);margin:0 auto;padding:14px 14px 40px;display:grid;gap:14px}
+header h1{margin:0;font-size:22px;font-weight:800;letter-spacing:-.02em}
+header p{margin:2px 0 0;color:var(--soft);font-size:13px}
+.rig{position:relative;background:var(--surface);border:1px solid var(--line);
+  border-radius:12px;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}
+canvas{position:absolute;inset:0;pointer-events:none;z-index:3}
+.board{display:grid;gap:7px;padding:12px;justify-content:center}
+.slot{border:2px dashed var(--slot);background:var(--slotfill);border-radius:9px;
+  aspect-ratio:2.5/3.5;display:grid;place-items:center;font-size:11px;font-weight:700;
+  color:var(--soft);cursor:pointer}
+.slot.legal{border-style:solid;border-color:var(--ok);
+  background:color-mix(in srgb,var(--ok) 14%,var(--slotfill));color:var(--ok)}
+.slot.won{box-shadow:0 0 0 4px color-mix(in srgb,var(--ok) 45%,transparent)}
+.hand{display:flex;gap:8px;justify-content:center;padding:10px 12px 14px;
+  border-top:1px dashed var(--line)}
+.card{width:54px;aspect-ratio:2.5/3.5;border-radius:9px;background:var(--surface);
+  border:1px solid var(--line);box-shadow:0 1px 2px rgb(0 0 0/.08),0 4px 12px rgb(0 0 0/.06);
+  display:grid;place-items:center;font-weight:800;font-size:20px;color:var(--trace);
+  touch-action:none;cursor:grab}
+.card.live{cursor:grabbing;opacity:.35}
+.ghost{position:fixed;left:0;top:0;z-index:9;pointer-events:none;width:54px;
+  aspect-ratio:2.5/3.5;border-radius:9px;background:var(--surface);border:1px solid var(--line);
+  box-shadow:0 6px 18px rgb(0 0 0/.28);display:grid;place-items:center;font-weight:800;
+  font-size:20px;color:var(--trace)}
+.verdict{display:flex;align-items:center;gap:10px;padding:11px 13px;border-radius:10px;
+  border:1px solid var(--line);background:var(--surface);font-weight:700;font-size:15px}
+.verdict .tag{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+  padding:3px 9px;border-radius:999px;background:var(--chip);color:var(--soft)}
+.verdict.hit .tag{background:color-mix(in srgb,var(--ok) 20%,transparent);color:var(--ok)}
+.verdict.miss .tag{background:color-mix(in srgb,var(--no) 18%,transparent);color:var(--no)}
+.verdict span.why{font-weight:400;color:var(--soft);font-size:13.5px}
+.grid2{display:grid;gap:12px;grid-template-columns:1fr}
+@media(min-width:720px){.grid2{grid-template-columns:1fr 1fr}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 13px}
+.panel h2{margin:0 0 9px;font-size:12px;font-weight:800;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--soft)}
+.rows{display:grid;gap:7px;font-variant-numeric:tabular-nums;font-size:13.5px}
+.rows div{display:flex;justify-content:space-between;gap:10px}
+.rows b{font-weight:700;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px}
+.rows .bad b{color:var(--no)} .rows .good b{color:var(--ok)}
+.ctl{display:grid;gap:3px;margin-bottom:11px}
+.ctl label{display:flex;justify-content:space-between;font-size:13px;gap:10px}
+.ctl label b{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:700;
+  font-variant-numeric:tabular-nums}
+.ctl small{color:var(--soft);font-size:11.5px;line-height:1.3}
+input[type=range]{width:100%;accent-color:var(--aim);height:26px}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+button.act{font:inherit;font-size:13px;font-weight:600;padding:8px 13px;border-radius:8px;
+  border:1px solid var(--line);background:var(--chip);color:var(--ink);cursor:pointer}
+button.act:hover{border-color:var(--soft)}
+.log{display:grid;gap:5px;font-size:12.5px;font-variant-numeric:tabular-nums;
+  max-height:190px;overflow:auto}
+.log div{display:flex;gap:8px;padding:5px 8px;border-radius:6px;background:var(--chip)}
+.log .k{font-weight:800;min-width:38px}
+.log .hit .k{color:var(--ok)} .log .miss .k{color:var(--no)}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--soft);padding:0 2px}
+.legend i{display:inline-block;width:12px;height:3px;border-radius:2px;vertical-align:middle;
+  margin-right:5px}
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+<header>
+  <h1>Flick bench</h1>
+  <p>Drag a card off the hand and let go. The rig runs Deutsch Dash's own throw code
+     on your gesture and draws what it decided and why. Nothing here is saved and
+     nothing is sent anywhere; the sliders only affect your own browser.</p>
+</header>
+
+<div class="rig" id="rig">
+  <div class="board" id="board"></div>
+  <div class="hand"><div class="card" id="card">7</div></div>
+  <canvas id="cv"></canvas>
+</div>
+
+<div class="legend">
+  <span><i style="background:var(--trace)"></i>your thumb</span>
+  <span><i style="background:var(--aim)"></i>the throw it measured</span>
+  <span><i style="background:color-mix(in srgb,var(--aim) 35%,transparent)"></i>the cone</span>
+  <span><i style="background:var(--ok)"></i>bearing to a legal slot</span>
+  <span><i style="background:var(--warn)"></i>the near radius</span>
+  <span>tap a slot to make it legal or not</span>
+</div>
+
+<div class="verdict" id="verdict"><span class="tag">waiting</span><span class="why">Throw a card.</span></div>
+
+<div class="grid2">
+  <div class="panel">
+    <h2>What it measured</h2>
+    <div class="rows" id="readout"></div>
+  </div>
+  <div class="panel">
+    <h2>Recent throws</h2>
+    <div class="log" id="log"></div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Thresholds</h2>
+  <div id="controls"></div>
+  <div class="btnrow">
+    <button class="act" id="reset">Back to the game's values</button>
+    <button class="act" id="clear">Clear the log</button>
+    <button class="act" id="allslots">Make every slot legal</button>
+  </div>
+</div>
+</div>
+
+<script>
+(() => {
+'use strict';
+// The game's own numbers, from src/ui/useDrag.ts. Every one of these is a knob
+// here, and the readout says which of them a throw actually failed on.
+const DEFAULTS = {
+  windowMs:   { v:160, min:60,  max:400, step:10,  label:'Window',
+    hint:'How far back from the release the throw is measured. Longer reaches into the wind-up.' },
+  segMs:      { v:20,  min:5,   max:80,  step:5,   label:'Shortest stretch',
+    hint:'A stretch shorter than this in time is noise, not a speed.' },
+  segPx:      { v:10,  min:2,   max:40,  step:1,   label:'Shortest stretch (px)',
+    hint:'And too short in distance to carry a direction.' },
+  minSpeed:   { v:0.30,min:0.05,max:1.5, step:0.05,label:'Speed floor (px/ms)',
+    hint:'Below this it is a drag, not a throw. A thumb flick runs about 1 to 3.' },
+  minTravel:  { v:18,  min:4,   max:80,  step:2,   label:'Travel floor (px)',
+    hint:'Total distance inside the window. Guards a fast tap with a shaky finger.' },
+  coneDeg:    { v:45,  min:10,  max:90,  step:5,   label:'Cone (deg)',
+    hint:'A half-angle: 45 is a 90 degree cone in front of the throw. Only slots inside it are judged on bearing.' },
+  tieDeg:     { v:8,   min:0,   max:30,  step:1,   label:'Tie band (deg)',
+    hint:'Slots within this of the best angle count as equally aimed at; the nearest wins.' },
+  nearPx:     { v:45,  min:0,   max:160, step:5,   label:'Near radius (px)',
+    hint:'How close the throw can END to a slot and have it count, in ANY direction. Measured to the slot edge, so 0px means it landed on it. This is what covers the rest of the circle.' },
+};
+const S = {};
+for (const k in DEFAULTS) S[k] = DEFAULTS[k].v;
+
+// ---- the algorithm, ported verbatim ---------------------------------------
+function throwOf(samples) {
+  const last = samples[samples.length - 1];
+  if (!last || samples.length < 2) return { ok:false, why:'Not enough of a gesture to measure.' };
+  const win = samples.filter(s => last.t - s.t <= S.windowMs);
+  const travel = Math.hypot(last.x - win[0].x, last.y - win[0].y);
+  if (travel < S.minTravel)
+    return { ok:false, why:`Travelled ${travel.toFixed(0)}px inside the window, under the ${S.minTravel}px floor.`, travel };
+  let best = null;
+  for (const s of win) {
+    const dt = last.t - s.t;
+    if (dt < S.segMs) continue;
+    const dx = last.x - s.x, dy = last.y - s.y;
+    const d = Math.hypot(dx, dy);
+    if (d < S.segPx) continue;
+    const speed = d / dt;
+    if (!best || speed > best.speed) best = { from:last, dx, dy, speed, dt, d };
+  }
+  if (!best) return { ok:false, why:'No stretch in the window was long enough to measure.', travel };
+  if (best.speed < S.minSpeed)
+    return { ok:false, why:`Fastest stretch was ${best.speed.toFixed(2)}px/ms, under the ${S.minSpeed.toFixed(2)} floor.`, travel, best };
+  if (best.dy >= 0)
+    return { ok:false, why:'The throw was not upward. Only up counts, because the board is above the hand.', travel, best };
+  return { ok:true, travel, best };
+}
+function edgeDistance(p, c) {
+  const dx = Math.max(Math.abs(p.x - c.cx) - c.w / 2, 0);
+  const dy = Math.max(Math.abs(p.y - c.cy) - c.h / 2, 0);
+  return Math.hypot(dx, dy);
+}
+function aimedAt(cands, t) {
+  const aim = Math.atan2(t.dy, t.dx);
+  const scored = cands.map(c => {
+    const dx = c.cx - t.from.x, dy = c.cy - t.from.y;
+    const d = Math.hypot(dx, dy);
+    let off = d < 1 ? 0 : Math.abs(Math.atan2(dy, dx) - aim) * 180 / Math.PI;
+    if (off > 180) off = 360 - off;
+    return { i:c.i, off, d, edge: edgeDistance(t.from, c) };
+  });
+  // 1 and 2: it ended on a slot, or near enough to one. Any direction.
+  const near = scored.filter(c => c.edge <= S.nearPx).sort((a,b) => a.edge - b.edge)[0];
+  if (near) return { pick:near.i, scored, rule: near.edge === 0 ? 'landed on it' : `${near.edge.toFixed(0)}px from its edge`, bestAngle: near.off };
+  // 3: the line of the throw.
+  const inCone = scored.filter(c => c.off <= S.coneDeg);
+  if (!inCone.length) return { pick:null, scored };
+  const bestAngle = Math.min(...inCone.map(c => c.off));
+  const pick = inCone.filter(c => c.off <= bestAngle + S.tieDeg).sort((a,b) => a.d - b.d)[0];
+  return { pick:pick.i, scored, bestAngle, rule:`${pick.off.toFixed(0)}° off the line` };
+}
+
+// ---- the mock board --------------------------------------------------------
+const COLS = 4, ROWS = 4;
+const board = document.getElementById('board');
+board.style.gridTemplateColumns = `repeat(${COLS}, 52px)`;
+const legal = new Set([1, 4, 11]);
+const slots = [];
+for (let i = 0; i < COLS * ROWS; i++) {
+  const el = document.createElement('div');
+  el.className = 'slot' + (legal.has(i) ? ' legal' : '');
+  el.textContent = legal.has(i) ? 'legal' : '';
+  el.addEventListener('click', () => {
+    if (legal.has(i)) legal.delete(i); else legal.add(i);
+    el.classList.toggle('legal', legal.has(i));
+    el.textContent = legal.has(i) ? 'legal' : '';
+    draw();
+  });
+  board.appendChild(el); slots.push(el);
+}
+document.getElementById('allslots').addEventListener('click', () => {
+  slots.forEach((el, i) => { legal.add(i); el.classList.add('legal'); el.textContent = 'legal'; });
+  draw();
+});
+
+// ---- controls --------------------------------------------------------------
+const controls = document.getElementById('controls');
+const outs = {};
+for (const k in DEFAULTS) {
+  const d = DEFAULTS[k];
+  const wrap = document.createElement('div'); wrap.className = 'ctl';
+  wrap.innerHTML = `<label>${d.label}<b id="v-${k}">${d.v}</b></label>
+    <input type="range" id="r-${k}" min="${d.min}" max="${d.max}" step="${d.step}" value="${d.v}">
+    <small>${d.hint}</small>`;
+  controls.appendChild(wrap);
+  outs[k] = wrap.querySelector(`#v-${k}`);
+  wrap.querySelector(`#r-${k}`).addEventListener('input', e => {
+    S[k] = Number(e.target.value);
+    outs[k].textContent = d.step < 1 ? S[k].toFixed(2) : S[k];
+    if (last) evaluate(last, false);
+  });
+}
+document.getElementById('reset').addEventListener('click', () => {
+  for (const k in DEFAULTS) {
+    S[k] = DEFAULTS[k].v;
+    document.getElementById('r-' + k).value = S[k];
+    outs[k].textContent = DEFAULTS[k].step < 1 ? S[k].toFixed(2) : S[k];
+  }
+  if (last) evaluate(last, false);
+});
+
+// ---- the gesture -----------------------------------------------------------
+const rig = document.getElementById('rig');
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const cardEl = document.getElementById('card');
+let samples = [], last = null, ghost = null, dragging = false;
+
+function sizeCanvas() {
+  const r = rig.getBoundingClientRect();
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+  cv.style.width = r.width + 'px'; cv.style.height = r.height + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  draw();
+}
+addEventListener('resize', sizeCanvas);
+
+function local(e) {
+  const r = rig.getBoundingClientRect();
+  return { x: e.clientX - r.left, y: e.clientY - r.top, t: performance.now() };
+}
+cardEl.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  cardEl.setPointerCapture?.(e.pointerId);
+  dragging = true; samples = [local(e)]; last = null;
+  cardEl.classList.add('live');
+  ghost = document.createElement('div');
+  ghost.className = 'ghost'; ghost.textContent = '7';
+  document.body.appendChild(ghost);
+  moveGhost(e);
+  draw();
+});
+function moveGhost(e) {
+  if (ghost) ghost.style.transform = `translate(${e.clientX - 27}px, ${e.clientY - 42}px)`;
+}
+addEventListener('pointermove', e => {
+  if (!dragging) return;
+  samples.push(local(e)); moveGhost(e); draw();
+}, { passive:true });
+addEventListener('pointerup', e => {
+  if (!dragging) return;
+  dragging = false;
+  samples.push(local(e));
+  cardEl.classList.remove('live');
+  ghost?.remove(); ghost = null;
+  last = samples.slice();
+  evaluate(last, true);
+});
+
+function candidates() {
+  const r = rig.getBoundingClientRect();
+  return [...legal].map(i => {
+    const b = slots[i].getBoundingClientRect();
+    return { i, cx: b.left + b.width/2 - r.left, cy: b.top + b.height/2 - r.top,
+             w: b.width, h: b.height };
+  });
+}
+
+let shown = null;
+function evaluate(pts, log) {
+  const t = throwOf(pts);
+  let aim = null, verdict, why;
+  if (!t.ok) { verdict = 'miss'; why = t.why; }
+  else {
+    aim = aimedAt(candidates(), t.best);
+    if (aim.pick == null) { verdict = 'miss'; why = `A throw, but no legal slot is inside the ${S.coneDeg}° cone or within ${S.nearPx}px of where it stopped.`; }
+    else { verdict = 'hit'; why = `Slot ${aim.pick}, chosen because it ${aim.rule}.`; }
+  }
+  shown = { t, aim };
+  const v = document.getElementById('verdict');
+  v.className = 'verdict ' + verdict;
+  v.innerHTML = `<span class="tag">${verdict === 'hit' ? 'played' : 'no play'}</span><span class="why">${why}</span>`;
+  readout(pts, t, aim);
+  slots.forEach(el => el.classList.remove('won'));
+  if (aim && aim.pick != null) slots[aim.pick].classList.add('won');
+  if (log) addLog(verdict, t, aim);
+  draw();
+}
+
+function row(label, value, cls) {
+  return `<div class="${cls || ''}"><span>${label}</span><b>${value}</b></div>`;
+}
+function readout(pts, t, aim) {
+  const dur = pts.length > 1 ? pts[pts.length-1].t - pts[0].t : 0;
+  const total = pts.length > 1
+    ? Math.hypot(pts[pts.length-1].x - pts[0].x, pts[pts.length-1].y - pts[0].y) : 0;
+  let html = '';
+  html += row('samples', pts.length);
+  html += row('gesture', `${dur.toFixed(0)} ms, ${total.toFixed(0)} px`);
+  html += row('travel in window', `${(t.travel ?? 0).toFixed(0)} px`,
+              (t.travel ?? 0) < S.minTravel ? 'bad' : 'good');
+  if (t.best) {
+    const ang = (Math.atan2(t.best.dy, t.best.dx) * 180 / Math.PI + 90).toFixed(0);
+    html += row('fastest stretch', `${t.best.d.toFixed(0)} px in ${t.best.dt.toFixed(0)} ms`);
+    html += row('peak speed', `${t.best.speed.toFixed(2)} px/ms`,
+                t.best.speed < S.minSpeed ? 'bad' : 'good');
+    html += row('direction', `${ang}° from straight up`, t.best.dy >= 0 ? 'bad' : 'good');
+  } else {
+    html += row('fastest stretch', 'none');
+  }
+  if (aim) {
+    const inCone = aim.scored.filter(c => c.off <= S.coneDeg).length;
+    html += row('legal slots', `${aim.scored.length}, ${inCone} in the cone`,
+                inCone ? 'good' : 'bad');
+    for (const c of [...aim.scored].sort((a,b) => a.edge - b.edge).slice(0, 4)) {
+      const reach = c.edge <= S.nearPx || c.off <= S.coneDeg;
+      html += row(`slot ${c.i}`, `${c.off.toFixed(0)}° off, ${c.edge.toFixed(0)} px from edge`,
+                  reach ? 'good' : 'bad');
+    }
+  }
+  document.getElementById('readout').innerHTML = html;
+}
+
+const logEl = document.getElementById('log');
+document.getElementById('clear').addEventListener('click', () => logEl.innerHTML = '');
+function addLog(verdict, t, aim) {
+  const d = document.createElement('div');
+  d.className = verdict;
+  const sp = t.best ? t.best.speed.toFixed(2) : '-';
+  const off = aim && aim.pick != null ? `${aim.bestAngle.toFixed(0)}°` : '-';
+  d.innerHTML = `<span class="k">${verdict === 'hit' ? 'PLAY' : 'NONE'}</span>
+    <span>${sp} px/ms</span><span>${(t.travel ?? 0).toFixed(0)} px</span><span>${off}</span>`;
+  logEl.prepend(d);
+  while (logEl.children.length > 20) logEl.lastChild.remove();
+}
+
+// ---- drawing ---------------------------------------------------------------
+function css(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function draw() {
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  const pts = dragging ? samples : (last || []);
+  if (pts.length > 1) {
+    ctx.strokeStyle = css('--trace'); ctx.lineWidth = 2.5;
+    ctx.lineJoin = ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+    for (const p of pts.slice(1)) ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+    ctx.fillStyle = css('--trace');
+    for (const p of pts) { ctx.beginPath(); ctx.arc(p.x, p.y, 1.8, 0, 7); ctx.fill(); }
+  }
+  if (dragging || !shown || !shown.t.best) return;
+  const b = shown.t.best, o = b.from;
+  const ang = Math.atan2(b.dy, b.dx), half = S.coneDeg * Math.PI / 180;
+  const R = Math.hypot(cv.width, cv.height);
+  // the cone
+  ctx.fillStyle = css('--aim') + '2e';
+  ctx.beginPath(); ctx.moveTo(o.x, o.y);
+  ctx.arc(o.x, o.y, R, ang - half, ang + half); ctx.closePath(); ctx.fill();
+  // the near radius: the rest of the circle, where direction stops mattering
+  if (S.nearPx > 0) {
+    ctx.strokeStyle = css('--warn'); ctx.lineWidth = 1.5; ctx.setLineDash([5, 5]);
+    ctx.beginPath(); ctx.arc(o.x, o.y, S.nearPx, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+  }
+  // bearings to every legal slot
+  if (shown.aim) {
+    for (const c of shown.aim.scored) {
+      const s = slots[c.i].getBoundingClientRect(), r = rig.getBoundingClientRect();
+      const cx = s.left + s.width/2 - r.left, cy = s.top + s.height/2 - r.top;
+      const on = c.edge <= S.nearPx || c.off <= S.coneDeg;
+      ctx.strokeStyle = on ? css('--ok') : css('--soft');
+      ctx.lineWidth = shown.aim.pick === c.i ? 3 : 1.2;
+      ctx.setLineDash(on ? [] : [4, 4]);
+      ctx.beginPath(); ctx.moveTo(o.x, o.y); ctx.lineTo(cx, cy); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+  // the throw itself
+  ctx.strokeStyle = css('--aim'); ctx.lineWidth = 4; ctx.lineCap = 'round';
+  const L = 90, ex = o.x + Math.cos(ang) * L, ey = o.y + Math.sin(ang) * L;
+  ctx.beginPath(); ctx.moveTo(o.x, o.y); ctx.lineTo(ex, ey); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(ex, ey);
+  ctx.lineTo(ex - Math.cos(ang - .4) * 14, ey - Math.sin(ang - .4) * 14);
+  ctx.lineTo(ex - Math.cos(ang + .4) * 14, ey - Math.sin(ang + .4) * 14);
+  ctx.closePath(); ctx.fillStyle = css('--aim'); ctx.fill();
+  ctx.fillStyle = css('--aim'); ctx.beginPath(); ctx.arc(o.x, o.y, 5, 0, 7); ctx.fill();
+}
+sizeCanvas();
+document.getElementById('readout').innerHTML = row('samples', 0);
+})();
+</script>
+
+</body>
+</html>

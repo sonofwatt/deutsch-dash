@@ -745,12 +745,17 @@ Three things about `throwOf` that are not obvious:
   direction test is what rejects a wild throw; this only has to tell a throw from
   a reposition.
 
-**There is a bench for tuning all of this**, built 2026-08-31: a standalone page
-that ports `throwOf` and `aimedAt` verbatim, traces the thumb, draws the cone and
+**There is a bench for tuning all of this**, built 2026-08-31, and it is deployed
+with the app: `public/flick-bench.html`, served at `/deutsch-dash/flick-bench.html`.
+Vite copies `public/` verbatim, so it needs no route and no link from the game.
+
+It ports `throwOf` and `aimedAt` **verbatim**, traces the thumb, draws the cone and
 the near radius, and puts every threshold on a slider with a readout saying which
 one a throw failed on. It is the only way any of these numbers has been judged
-against a real thumb. Rebuild it from `src/ui/useDrag.ts` if the algorithm moves,
-or it will quietly stop being a mirror and start being a lie.
+against a real thumb, and the numbers a tester reports are the numbers the game
+uses. **Rebuild it from `src/ui/useDrag.ts` whenever the algorithm moves**, or it
+quietly stops being a mirror and starts being a lie. `noindex`, no analytics, no
+storage: the sliders live in the tester's own browser and nothing is sent anywhere.
 
 **A cancelled pointer commits the throw.** `pointercancel` fires when the OS takes
 the gesture away mid-air - an iOS home swipe, an Android back swipe, a second
