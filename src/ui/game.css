@@ -255,14 +255,19 @@
    The plate is GENDER-coloured (see --sign-boy / --sign-girl): it used to take the
    suit colour, which repeated what the big number already said. */
 .card-group { position: absolute; top: 3px; left: 3px; display: block;
-  width: calc(var(--card-w) * .27); height: calc(var(--card-w) * .378);
-  color: var(--suit); }
-/* Outline in the card's own colour, figure in the gender's. The two facts a card
-   carries in this corner are its suit and its gender, and they now have a place
-   each instead of competing for the same fill. */
-.card-group .plate { fill: none; stroke: currentColor; stroke-width: 2; }
-.card-group.sign-boy .figure { fill: var(--sign-boy); }
-.card-group.sign-girl .figure { fill: var(--sign-girl); }
+  width: calc(var(--card-w) * .27); height: calc(var(--card-w) * .378); }
+/* A solid plate in the gender's colour with the figure knocked out in white - a
+   washroom sign, which is the thing it is imitating and the thing that reads at
+   15px. An outlined plate with a coloured figure was tried and put back: at card
+   size the outline is a hairline and the figure is a few pixels of colour, so
+   both halves of it were doing less than the one solid block does. */
+.card-group.sign-boy { color: var(--sign-boy); }
+.card-group.sign-girl { color: var(--sign-girl); }
+.card-group .plate { fill: currentColor; }
+/* White in every theme, rather than var(--surface): the figure is the knockout,
+   and white on a coloured plate is the one reading that holds whether the card
+   behind it is light or dark. */
+.card-group .figure { fill: #ffffff; }
 /* .30 of the card, up from .24: the emblem is how a player finds their own cards
    in the middle, and it was the smallest thing on the face. */
 .card-badge { position: absolute; bottom: 3px; right: 5px; font-size: calc(var(--card-w) * .30); }

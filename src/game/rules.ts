@@ -21,9 +21,10 @@ export const MAX_SPACES = 32;
 /**
  * Centre spaces for a game. 4 x players, and that ratio is load-bearing rather
  * than cosmetic: only an Ace opens a space, and each player holds exactly one Ace
- * per suit, so 4 x players is one space per Ace in the game. Keeping it exact is
- * what guarantees an Ace always has somewhere to go - if every space is occupied,
- * every Ace is already down and nobody can be holding one.
+ * per suit, so 4 x players is one space per Ace in the game. Never going BELOW it
+ * is what guarantees an Ace always has somewhere to go - if every space is
+ * occupied, every Ace is already down and nobody can be holding one. Going above
+ * it is free, which is what lets two players have a square board.
  *
  * The old cap of 24 broke that at seven and eight players, where 28 and 32 Aces
  * competed for 24 spaces. On an ordinary board that is survivable (a full board is
@@ -36,7 +37,12 @@ export const MAX_SPACES = 32;
  * Two players get 8 (not the old fixed 16), which is why cards are bigger there.
  */
 export function spaceCountForPlayers(playerCount: number, orderly = false): number {
-  const natural = Math.min(MAX_SPACES, 4 * Math.max(1, playerCount));
+  // Two players are the one size 4 x players lays out badly: eight spaces is
+  // 3 + 3 + 2 at three columns and a wide strip at four, and neither reads as a
+  // board. A ninth makes it a 3 x 3 square. It costs nothing, because the ratio
+  // below is a FLOOR and not an equality - the guarantee is that no Ace can be
+  // left homeless, and nine spaces for eight Aces keeps it with one to spare.
+  const natural = playerCount === 2 ? 9 : Math.min(MAX_SPACES, 4 * Math.max(1, playerCount));
   if (!orderly) return natural;
   // One colour per column means the columns come in fours, so an orderly board
   // has to be a whole number of rows deep: 20 is 8 x 2.5 and 28 is 8 x 3.5, both

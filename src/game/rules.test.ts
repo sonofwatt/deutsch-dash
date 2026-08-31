@@ -31,7 +31,9 @@ describe('postCountForPlayers', () => {
 
 describe('spaceCountForPlayers', () => {
   it('is one space per Ace in the game, up to the cap', () => {
-    expect(spaceCountForPlayers(2)).toBe(8);
+    // Two is the exception: nine, not eight, so the board is a 3 x 3 square
+    // rather than 3 + 3 + 2. The ratio is a floor, so a spare space is free.
+    expect(spaceCountForPlayers(2)).toBe(9);
     expect(spaceCountForPlayers(3)).toBe(12);
     expect(spaceCountForPlayers(4)).toBe(16);
     expect(spaceCountForPlayers(5)).toBe(20);
@@ -53,9 +55,15 @@ describe('spaceCountForPlayers', () => {
     // 20 is 8 x 2.5 and 28 is 8 x 3.5: both leave holes in the bottom row.
     expect(spaceCountForPlayers(5, true)).toBe(24);
     expect(spaceCountForPlayers(7, true)).toBe(32);
-    for (const n of [2, 3, 4, 6, 8]) {
+    for (const n of [3, 4, 6, 8]) {
       expect(spaceCountForPlayers(n, true)).toBe(spaceCountForPlayers(n)); // already divide
     }
+    // Two is the one size where orderly and ordinary part company: nine is a
+    // 3 x 3 square, which is what an ordinary board wants, and an orderly one
+    // cannot use three columns at all - it needs a whole number of four-column
+    // rows, so it rounds to 12. Both are symmetrical, which is the point.
+    expect(spaceCountForPlayers(2)).toBe(9);
+    expect(spaceCountForPlayers(2, true)).toBe(12);
     // and rounding is stable: the size it lands on maps to itself, so nothing
     // downstream can disagree about how big the board is.
     for (const n of [2, 3, 4, 5, 6, 7, 8]) {

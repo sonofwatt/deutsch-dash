@@ -12,19 +12,19 @@ import type { Card, FaceGroup } from '../../game/types';
  * deliberately exaggerated: the skirt flares to nearly the full plate width
  * against a torso barely half that, so the shapes differ in outline, not detail.
  *
- * **The FIGURE is coloured by gender, the plate outlined in the card's suit.**
- * Two facts, two places to put them: the silhouette answers "boy or girl" in
- * bright pink or blue, which is what the post-building rule turns on, while the
- * outline keeps the card's own colour on the badge. The first cut filled the whole
- * plate with the gender colour - it read well and threw the suit away.
+ * **The plate is coloured by GENDER, not by suit.** It used to take the suit
+ * colour, which said nothing the big number underneath was not already saying far
+ * more loudly - so the one glyph whose job is to answer "boy or girl" was
+ * answering it in shape alone, at about 15px. An in-between version outlined the
+ * plate in the suit and coloured the figure instead, to carry both facts; at card
+ * size the outline is a hairline and the figure a few pixels, so both halves did
+ * less than the one solid block. The number still carries the suit.
  */
 export function FaceGlyph({ group }: { group: FaceGroup }) {
   return (
     <svg className={`card-group sign-${group}`} viewBox="0 0 20 28" aria-hidden="true"
       preserveAspectRatio="xMidYMid meet">
-      {/* Inset by half the stroke, or a centred stroke on the box edge is drawn
-          half outside the viewBox and comes out thin along that side. */}
-      <rect className="plate" x="1" y="1" width="18" height="26" rx="4" />
+      <rect className="plate" x="0" y="0" width="20" height="28" rx="4.5" />
       <g className="figure">
         <circle cx="10" cy="5.7" r="3.6" />
         {group === 'boy' ? (

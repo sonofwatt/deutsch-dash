@@ -346,7 +346,13 @@ render, and it sets state.
   size. The `+N` overflow marker is suppressed there — a 10px glyph sliced to a
   third is a smear rather than a number — but the rail's `aria-label` still
   carries the true count.
-- Board size is `4 × players` — `spaceCountForPlayers`, capped only by
+- **Two players get NINE spaces, not eight.** Eight is 3 + 3 + 2 at three columns
+  and a wide strip at four, and neither reads as a board; nine is a 3 × 3 square.
+  It is free because the ratio below is a **floor, not an equality** - the
+  guarantee is that no Ace can be left homeless, and nine spaces for eight Aces
+  keeps it with one to spare. An orderly two-player board rounds to 12 instead
+  (three rows of four), because an orderly one cannot use three columns at all.
+- Board size is otherwise `4 × players` — `spaceCountForPlayers`, capped only by
   `MAX_SPACES = 32`, which is `4 × MAX_PLAYERS` and so no longer binds. Four per
   player is **one space per Ace in the game**, and keeping that exact is what
   guarantees an Ace always has somewhere to go: if every space is occupied then
@@ -763,17 +769,21 @@ HTML collapses a run of plain ones to a single; that read as an extra space and
 came back out. The word on the splash is **DASH!**, not BLITZ! - the round-end
 sheet still says "blitzed", which is the verb rather than the name.
 
-**The washroom sign carries both facts, one each.** The plate is an OUTLINE in
-the card's suit and the FIGURE inside it is `--sign-boy` / `--sign-girl` - bright
-blue or bright pink. It used to be a solid plate in the suit colour, which said
-nothing the big number was not already saying far more loudly, so the one glyph
-whose job is "boy or girl" - exactly what `canBuildOnPost` turns on - was
-answering it in silhouette alone at about 15px. A middle cut filled the whole
-plate with the gender colour: it read well and threw the suit away. The rect is
-inset by half its stroke, or a centred stroke on the viewBox edge comes out thin
-along that side. The badge emblem went from `.24` to `.30` of the card - it is how
-a player finds their own cards in the middle, and it was the smallest thing on the
-face.
+**The washroom sign is a solid plate in the GENDER's colour** (`--sign-boy`
+`#0f6ad4`, `--sign-girl` `#e0489b`) with the figure knocked out in white. It used
+to take the suit colour, which said nothing the big number was not already saying
+far more loudly, so the one glyph whose job is "boy or girl" - exactly what
+`canBuildOnPost` turns on - was answering it in silhouette alone at about 15px.
+
+Two versions were tried and put back, and both are worth knowing about before
+trying them again. **Outlining the plate in the suit and colouring the figure
+instead** carries both facts, but at card size the outline is a hairline and the
+figure a few pixels of colour, so each half did less than the one solid block
+does. And the first colours (`#0a84ff` / `#ff2d8f`) read as neon beside the suits;
+these are a stop back from that and still carry a white figure at 15px.
+
+The badge emblem went from `.24` to `.30` of the card - it is how a player finds
+their own cards in the middle, and it was the smallest thing on the face.
 
 `select.field` carries `padding-right: 26px`. A browser draws a select's chevron
 at the inside edge of the padding box, so the same 14px on both sides put it
