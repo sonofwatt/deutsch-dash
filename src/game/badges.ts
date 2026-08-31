@@ -1,7 +1,7 @@
 export type BadgeId =
-  | 'tulip' | 'clover' | 'star' | 'bell' | 'kite' | 'anchor' | 'acorn' | 'boat'
-  // Retired, and still a BadgeId on purpose - see BADGES.
-  | 'bicycle';
+  | 'tulip' | 'clover' | 'star' | 'bell' | 'clownfish' | 'anchor' | 'acorn' | 'boat'
+  // Retired, and still BadgeIds on purpose - see BADGES.
+  | 'bicycle' | 'kite';
 
 export interface Badge { id: BadgeId; label: string; color: string; glyph: string }
 
@@ -30,12 +30,17 @@ export const BADGES: Record<BadgeId, Badge> = {
   clover:  { id: 'clover',  label: 'Clover',  color: '#4d7c0f', glyph: '\u{1F340}' + EMOJI },
   star:    { id: 'star',    label: 'Star',    color: '#7c3aed', glyph: '⭐' + EMOJI },
   bell:    { id: 'bell',    label: 'Bell',    color: '#ea580c', glyph: '\u{1F514}' + EMOJI },
-  kite:    { id: 'kite',    label: 'Kite',    color: '#4f46e5', glyph: '\u{1FA81}' + EMOJI },
+  // The kite's indigo sat a shade away from --suit-blue, and CardView puts the
+  // badge plate and the suit on the SAME card. Deep reef water instead: nowhere
+  // near a suit, nowhere near the anchor's cyan, and an orange fish reads on it.
+  clownfish: { id: 'clownfish', label: 'Clownfish', color: '#155e75', glyph: '\u{1F420}' + EMOJI },
   anchor:  { id: 'anchor',  label: 'Anchor',  color: '#0891b2', glyph: '⚓' + EMOJI },
   acorn:   { id: 'acorn',   label: 'Acorn',   color: '#92400e', glyph: '\u{1F330}' + EMOJI },
   boat:    { id: 'boat',    label: 'Boat',    color: '#475569', glyph: '⛵' + EMOJI },
   // Retired 2026-08-31, replaced by the clover. Not offered, still drawable.
   bicycle: { id: 'bicycle', label: 'Bicycle', color: '#0d9488', glyph: '\u{1F6B2}' + EMOJI },
+  // Retired 2026-08-31, replaced by the clownfish. Not offered, still drawable.
+  kite:    { id: 'kite',    label: 'Kite',    color: '#4f46e5', glyph: '\u{1FA81}' + EMOJI },
 };
 
 /**
@@ -44,4 +49,4 @@ export const BADGES: Record<BadgeId, Badge> = {
  * BADGES, because BADGES carries retired ids that must never be offered.
  */
 export const BADGE_IDS: BadgeId[] =
-  ['tulip', 'clover', 'star', 'bell', 'kite', 'anchor', 'acorn', 'boat'];
+  ['tulip', 'clover', 'star', 'bell', 'clownfish', 'anchor', 'acorn', 'boat'];

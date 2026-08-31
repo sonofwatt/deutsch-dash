@@ -225,21 +225,21 @@ emu('server-side player cap and badge uniqueness (database.rules.json)', () => {
       createdAt: Date.now(), hostId: HOST, targetScore: 75, phase: 'lobby', roundNumber: 0, playerCount: 1,
     }));
     await assertSucceeds(db.ref(`rooms/${code}`).update({
-      [`players/${HOST}`]: { name: 'Host', badgeId: 'kite', joinedAt: 1, connected: true, stuckAt: null, awayAt: null, score: 0, ready: true },
-      'badges/kite': HOST,
+      [`players/${HOST}`]: { name: 'Host', badgeId: 'clownfish', joinedAt: 1, connected: true, stuckAt: null, awayAt: null, score: 0, ready: true },
+      'badges/clownfish': HOST,
     }));
 
     // Functional regression: the real createRoom() (regular SDK) still
     // produces this same shape end-to-end.
     const { ensureSignedIn, db: realDb } = await import('./firebase');
     await ensureSignedIn();
-    const realCode = await createRoom('Solo', 'kite');
+    const realCode = await createRoom('Solo', 'clownfish');
     const snap = await get(ref(realDb, `rooms/${realCode}`));
     const room = normalizeRoom(snap.val())!;
     expect(room.meta.phase).toBe('lobby');
     expect(room.meta.playerCount).toBe(1);
     expect(Object.keys(room.players)).toHaveLength(1);
-    const badgeSnap = await get(ref(realDb, `rooms/${realCode}/badges/kite`));
+    const badgeSnap = await get(ref(realDb, `rooms/${realCode}/badges/clownfish`));
     expect(badgeSnap.val()).toBe(room.meta.hostId);
   });
 

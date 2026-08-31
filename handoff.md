@@ -341,9 +341,9 @@ render, and it sets state.
   badges** and `BADGE_IDS` is the list without them: every render site indexes
   `BADGES` by whatever id a player is carrying, so a badge dropped from the picker
   has to stay drawable or a room dealt before it went takes the screen down over a
-  missing glyph. The bicycle was retired this way on 2026-08-31 for the clover.
-  Retiring another one means adding its quip to the commentary too, which
-  `commentary.test.ts` pins by counting `quip-*` against `BADGE_IDS`.
+  missing glyph. The bicycle went this way on 2026-08-31 for the clover, and the
+  kite the same day for the clownfish. Retiring one means moving its quip over
+  too, which `commentary.test.ts` pins by counting `quip-*` against `BADGE_IDS`.
 
 ### Game rules as implemented
 
@@ -1755,8 +1755,9 @@ the ledgered pointer-capture re-select check on mouse drags.
 - `oxlint` reports 7 warnings, all `react(only-export-components)` fast-refresh
   hints plus two pre-existing `RoomScreen` warnings. Zero errors.
 - ShareInvite clipboard try/catch; rejection-shake remounts the tableau;
-  room-code collision check on create; kite/bell badge hues sit near suit
-  blue/red; host transfer disabled in lobby (deliberate).
+  room-code collision check on create; the bell's hue sits near suit red (the
+  kite's near-blue went with the kite); host transfer disabled in lobby
+  (deliberate).
 - A bot's `connected` flag is never cleared. Harmless today because
   `pickNextHost` filters bots, but worth knowing.
 
@@ -1811,6 +1812,14 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `c2640b7` | Ten times the fireworks; a louder hint; the wood shows what is under |
 | `c7a1da9` | The flick aimed by direction; the whole space above the hand |
 | `258e544` | A way out of being stuck; a countdown between rounds |
+| `1d19fc2` | The gender plates back and softer; the two-player board squared off |
+| `26723d5` | The stuck note moved to the empty band beside the wood |
+| `e6c6feb` | No em dashes anywhere; the empty band catches a short throw |
+| `821d8ab` | A throw takes the space it landed on or beside, before aim is judged |
+| `ef295be` | The near radius settled at 45px |
+| `aafd534` | The flick bench published beside the app |
+| `bbf3cac` | The bicycle retired for a clover |
+| `PENDING` | The kite retired for a clownfish |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.

@@ -506,13 +506,13 @@ export function commentary(input: CommentaryInput): Remark[] {
       `${nameOf(bell)} ends the round. You could see that one coming a chime off.`,
     ], [bell]);
   }
-  const kite = holder('kite');
-  if (kite && current[0] === kite && lead >= 12) {
-    add('quip-kite', 64, [
-      `${nameOf(kite)} is ${lead} clear and climbing. Somebody find the string.`,
-      `${nameOf(kite)} has gone up like a kite. Bring a ladder, or a stiff breeze in the other direction.`,
-      `${lead} points up for ${nameOf(kite)}, who is now officially out of reach and insufferable with it.`,
-    ], [kite]);
+  const fish = holder('clownfish');
+  if (fish && places[fish] === 0 && delta(fish) >= 6) {
+    add('quip-clownfish', 64, [
+      `${nameOf(fish)} scored ${plural(delta(fish), 'point')} and moved exactly nowhere. Just keep swimming.`,
+      `${plural(delta(fish), 'point')} for ${nameOf(fish)}, same seat as before. All that swimming, same anemone.`,
+      `${nameOf(fish)} had a good round and nothing to show for it. With table-mates like these, who needs anemones.`,
+    ], [fish]);
   }
   const acorn = holder('acorn');
   if (acorn && delta(acorn) <= -6) {

@@ -284,7 +284,7 @@ describe('badge quips', () => {
     // person would otherwise use up before the quip is reached.
     const players = {
       ann: player('Ann', 20, { badgeId: 'bell' }), bo: player('Bo', 34, { badgeId: 'boat' }),
-      cy: player('Cy', 27, { badgeId: 'kite' }),
+      cy: player('Cy', 27, { badgeId: 'clownfish' }),
     };
     const scores = { ann: sc(3, 0), bo: sc(5, 0), cy: sc(4, 0) };
     expect(ids(base({ players, scores, blitzedBy: 'ann' }))).toContain('quip-bell');
