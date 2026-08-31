@@ -153,12 +153,14 @@ describe('aimedAt', () => {
   });
 
   it('measures that gap to the EDGE, not to the centre', () => {
-    // One space on its own, so nothing else can be nearer. 45px beyond its top
+    // One space on its own, so nothing else can be nearer. 40px beyond its top
     // edge is inside FLICK_NEAR_PX; a centre-to-centre measure would call the same
-    // point 73px away and miss it. Thrown sideways, so only proximity can pick it.
+    // point 68px away and miss it. Deliberately not sitting on the threshold, so
+    // the test says "inside" rather than "exactly at". Thrown sideways, so only
+    // proximity can pick it.
     const lone = [box(0, 60, 300)];
     const near = (gap: number) => ({ from: { x: 60, y: 300 - 28 - gap }, dx: 400, dy: -8, speed: 1 });
-    expect(aimedAt(lone, near(45))).toBe(0);
+    expect(aimedAt(lone, near(40))).toBe(0);
     expect(aimedAt(lone, near(70))).toBeNull();
   });
 

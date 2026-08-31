@@ -93,7 +93,7 @@ const AIM_TIE_DEG = 8;
  * and out of the cone entirely - which read as the space not being playable at
  * all. Proximity does not care which way the throw was pointing.
  */
-export const FLICK_NEAR_PX = 50;
+export const FLICK_NEAR_PX = 45;
 
 /**
  * The throw a gesture was, or null if it was not one.

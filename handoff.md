@@ -712,7 +712,7 @@ Three signals, tried in this order (`useDrag.ts`, then the `nearest` branch of
 **`aimedAt` itself has three rules, and the first two are the forgiving ones.**
 
 1. **It ended ON a space.** That is where they put it; nothing else is weighed.
-2. **It ended within `FLICK_NEAR_PX` (50px) of one**, measured to the space's
+2. **It ended within `FLICK_NEAR_PX` (45px) of one**, measured to the space's
    EDGE, in ANY direction. This is what covers the rest of the circle. The cone
    only looks forward, so a throw that overshoots a space by a hair leaves it
    BEHIND the release point where the cone cannot see it at all - reported from a
