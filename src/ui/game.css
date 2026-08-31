@@ -255,15 +255,17 @@
    The plate is GENDER-coloured (see --sign-boy / --sign-girl): it used to take the
    suit colour, which repeated what the big number already said. */
 .card-group { position: absolute; top: 3px; left: 3px; display: block;
-  width: calc(var(--card-w) * .27); height: calc(var(--card-w) * .378); }
-.card-group.sign-boy { color: var(--sign-boy); }
-.card-group.sign-girl { color: var(--sign-girl); }
-.card-group .plate { fill: currentColor; }
-/* White in every theme and on every card face, rather than var(--surface). It is
-   a washroom sign: the figure is the knockout, and white on a bright plate is the
-   one reading that holds whether the card behind it is light or dark. */
-.card-group .figure { fill: #ffffff; }
-.card-badge { position: absolute; bottom: 3px; right: 5px; font-size: calc(var(--card-w) * .24); }
+  width: calc(var(--card-w) * .27); height: calc(var(--card-w) * .378);
+  color: var(--suit); }
+/* Outline in the card's own colour, figure in the gender's. The two facts a card
+   carries in this corner are its suit and its gender, and they now have a place
+   each instead of competing for the same fill. */
+.card-group .plate { fill: none; stroke: currentColor; stroke-width: 2; }
+.card-group.sign-boy .figure { fill: var(--sign-boy); }
+.card-group.sign-girl .figure { fill: var(--sign-girl); }
+/* .30 of the card, up from .24: the emblem is how a player finds their own cards
+   in the middle, and it was the smallest thing on the face. */
+.card-badge { position: absolute; bottom: 3px; right: 5px; font-size: calc(var(--card-w) * .30); }
 .card-back { background: color-mix(in srgb, var(--badge) 22%, var(--surface));
   border-color: color-mix(in srgb, var(--badge) 45%, var(--line)); }
 .card-badge-big { font-size: calc(var(--card-w) * .5); opacity: .9; }
@@ -481,3 +483,11 @@
   display: grid; place-items: center; }
 .btn.deal-me-in { width: 100%; font-weight: 800;}
 .deal-me-in span { font-weight: 400; font-size: 13px; opacity: .75; }
+
+/* The way out, offered a few seconds after the stuck note. It REPLACES the note
+   in the caption row rather than sitting under it, so the board does not move to
+   make room - that row is a fixed track (--note-h) for exactly this reason. */
+.drop-note.sink-wood { width: auto; border: 1px solid var(--warn-ink);
+  background: color-mix(in srgb, var(--warn) 16%, transparent);
+  color: var(--warn-ink); font-weight: 700; font-size: 13px;
+  border-radius: var(--radius); padding: 0 12px; cursor: pointer; }

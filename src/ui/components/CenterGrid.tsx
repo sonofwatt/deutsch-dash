@@ -160,6 +160,13 @@ export function CenterGrid(props: {
    * else here - render.test.ts builds these props as complete literals and tsc -b
    * typechecks it, so a REQUIRED prop breaks the build rather than just the tests.
    */
+  /**
+   * Offered to a stuck player, a few seconds after the note appears: send the
+   * face-up wood card to the bottom and carry on. It replaces the note rather
+   * than sitting under it, so the board does not move to make room for it - the
+   * caption row is a fixed track (see --note-h).
+   */
+  onSinkWood?: () => void;
   stall?: {
     mode: 'stalled' | 'rescue';
     /** Only the host is offered the way out; everybody else is told to wait. */
@@ -270,7 +277,12 @@ export function CenterGrid(props: {
         {/* Down at the tableau end of the zone, where the old band used to be, so
             a stuck player reads it without looking away from their own cards -
             and so it never lands on top of the grid. */}
-        {(props.stuck || props.snapping) && (
+        {props.stuck && props.onSinkWood ? (
+          <button className="drop-note sink-wood"
+            onClick={e => { e.stopPropagation(); props.onSinkWood!(); }}>
+            No moves left — send the wood card to the bottom
+          </button>
+        ) : (props.stuck || props.snapping) && (
           <span className="drop-note">
             {props.stuck ? 'No moves left — waiting for the others' : 'drop anywhere here → nearest space'}
           </span>

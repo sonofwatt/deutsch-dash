@@ -29,6 +29,9 @@ const NO_SPACES: CenterSpace[] = [];
 // is hidden. Flip this back to true to bring the feature back.
 export const ENABLE_STUCK_BUTTON: boolean = false;
 
+/** How long the stuck note stands on its own before the way out is offered. */
+export const STUCK_OFFER_MS = 3000;
+
 /**
  * A door standing open, drawn rather than borrowed from the emoji font: 🚪 is a
  * closed door, and every platform draws it differently. This one is always the
@@ -66,6 +69,7 @@ export function Game() {
   const setSittingOut = useGameStore(s => s.setSittingOut);
   const setSingleFlip = useGameStore(s => s.setSingleFlip);
   const dealMeIn = useGameStore(s => s.dealMeIn);
+  const sinkWood = useGameStore(s => s.sinkWood);
   const [woodSide, swapSides] = useWoodSide();
 
   // The helper hint waits for the player to go quiet, so it never fires under
@@ -87,6 +91,15 @@ export function Game() {
   // The sit-out button's confirm step. Disarms itself, so a stray tap in the
   // corner of a fast board costs nothing but a glance.
   const [arming, setArming] = useState(false);
+  // The stuck note gets three seconds on its own before the way out is offered.
+  // A button appearing at the same instant as the bad news reads as the game
+  // telling you what to do; three seconds later it reads as an offer - and it
+  // leaves room for somebody else's play to un-stick you without either.
+  //
+  // Holds the stuckAt it is offering FOR, the same epoch trick the hint uses
+  // below: being freed and stuck again is a new episode with a new timestamp, so
+  // the offer withdraws itself without the effect having to clear anything.
+  const [offerFor, setOfferFor] = useState<number | null>(null);
   useEffect(() => {
     if (!arming) return;
     const t = setTimeout(() => setArming(false), 4000);
@@ -107,6 +120,16 @@ export function Game() {
   const round = room.round;
   const me = room.players[uid];
   const badgeOf = (owner: string): BadgeId => room.players[owner]?.badgeId ?? me.badgeId;
+
+  // Unconditional and above every early return, like every other hook on this
+  // screen - sitting out makes those returns reachable mid-round.
+  const stuckAt = me?.stuckAt ?? null;
+  useEffect(() => {
+    if (stuckAt == null) return;
+    const t = setTimeout(() => setOfferFor(stuckAt), STUCK_OFFER_MS);
+    return () => clearTimeout(t);
+  }, [stuckAt]);
+  const stuckAwhile = stuckAt != null && offerFor === stuckAt;
 
   const { drag, startDrag } = useDrag((source: PlaySource, target: DropTarget, at: Point) => {
     gameStore.setState({ selection: source }); // direct set - select() would TOGGLE an already-selected source off
@@ -271,6 +294,7 @@ export function Game() {
       <CenterGrid spaces={round.spaces} highlight={targets.spaces} badgeOf={badgeOf}
         onTap={i => void playTo({ space: i })} races={races}
         snapping={targets.spaces.length > 0} stuck={hand != null && me.stuckAt != null} hint={hint}
+        onSinkWood={hand != null && stuckAwhile ? sinkWood : undefined}
         openings={openings} stall={stall}
         onSnapTap={() => { if (targets.spaces.length) void playTo({ space: targets.spaces[0] }); }} />
       <div>

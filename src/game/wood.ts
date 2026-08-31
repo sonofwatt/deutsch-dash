@@ -15,6 +15,28 @@ export function flipWood(t: Tableau, step: number = WOOD_STEP): Tableau {
   return { ...t, woodIndex };
 }
 
+/**
+ * Take the face-up top card out of the pile and put it at the very bottom.
+ *
+ * The way out of a hand that cannot move. Turning three at a time only ever
+ * exposes every third card, so a player can be genuinely stuck with a pile full
+ * of playable cards (see woodCycleTops) - and sinking ONE card shifts every
+ * subsequent turn by one, which changes the whole set the cycle reaches. It is a
+ * deliberate action rather than something the game does for them: it costs a card
+ * out of the running order, and the player should be the one spending it.
+ *
+ * Not rotateWood, which is the table-wide standstill rotation - that moves the
+ * BOTTOM card of the pile and resets the index for everybody at once.
+ */
+export function sinkWoodTop(t: Tableau): Tableau {
+  if (t.woodIndex < 1 || t.wood.length < 2) return t;
+  const i = t.woodIndex - 1;
+  const card = t.wood[i];
+  // The index steps back with it: the cards behind it have not moved, so what was
+  // under the sunk card is the top now, and the next turn deals on from there.
+  return { ...t, wood: [...t.wood.slice(0, i), ...t.wood.slice(i + 1), card], woodIndex: i };
+}
+
 export function rotateWood(t: Tableau): Tableau {
   if (t.wood.length < 2) return t;
   return { ...t, wood: [...t.wood.slice(1), t.wood[0]], woodIndex: 0 };

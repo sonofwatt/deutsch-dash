@@ -229,6 +229,33 @@ describe('CenterGrid', () => {
   });
 });
 
+describe('the way out of being stuck', () => {
+  // The offer replaces the note in the caption row rather than sitting under it,
+  // so the board does not move to make room - that row is a fixed track.
+  const board = (over: Record<string, unknown>) => renderToStaticMarkup(createElement(CenterGrid, {
+    spaces: [{ stack: [], history: [] }], highlight: [], badgeOf: () => 'star' as const,
+    onTap: noop, onSnapTap: noop, ...over,
+  }));
+
+  it('says only that there are no moves until the offer is passed in', () => {
+    const html = board({ stuck: true });
+    expect(html).toContain('No moves left');
+    expect(html).not.toContain('sink-wood');
+  });
+
+  it('becomes the offer once it is, and does not double up', () => {
+    const html = board({ stuck: true, onSinkWood: noop });
+    expect(html).toContain('sink-wood');
+    expect(html).toContain('send the wood card to the bottom');
+    // One line in that row, never two - it is a fixed-height track.
+    expect(html.match(/drop-note/g)).toHaveLength(1);
+  });
+
+  it('offers nothing to a player who is not stuck', () => {
+    expect(board({ onSinkWood: noop })).not.toContain('sink-wood');
+  });
+});
+
 describe('dragging off the wood', () => {
   // The play has not happened yet - it commits on the drop - so the pile still
   // holds the card. What it must not do is show a second copy of the one already

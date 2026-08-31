@@ -462,6 +462,48 @@ describe('the lobby ready gate', () => {
     expect(tableReady(lobby({ host: human({ sittingOut: true }), you: human({ ready: true }) }))).toBe(false);
   });
 
+  it('counts the table down between rounds as well as into the first one', async () => {
+    // nextRound is startRound, so the tick needs no branch at zero - but the two
+    // guards that keep the countdown to the lobby did.
+    vi.useFakeTimers();
+    try {
+      let cb!: (room: Room | null) => void;
+      const deps = fakeDeps({
+        watchRoom: vi.fn((_c: string, f: (room: Room | null) => void) => { cb = f; return () => {}; }),
+      });
+      const store = createGameStore(deps);
+      await store.getState().enterRoom('ABCDEF', 'D', 'tulip');
+      const ready = { me: human({ ready: true }), you: human({ ready: true }) };
+      const sheet = (countdown?: number) => {
+        const r = lobby(ready, countdown);
+        return { ...r, meta: { ...r.meta, phase: 'roundEnd' as const } };
+      };
+      cb(sheet());
+      expect(deps.setCountdown).toHaveBeenLastCalledWith('ABCDEF', 3);
+      cb(sheet(3));   // the snapshot that write raises, which the tick reads
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(deps.setCountdown).toHaveBeenLastCalledWith('ABCDEF', 2);
+      store.getState().leave();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('counts down in no other phase', async () => {
+    let cb!: (room: Room | null) => void;
+    const deps = fakeDeps({
+      watchRoom: vi.fn((_c: string, f: (room: Room | null) => void) => { cb = f; return () => {}; }),
+    });
+    const store = createGameStore(deps);
+    await store.getState().enterRoom('ABCDEF', 'D', 'tulip');
+    const ready = { me: human({ ready: true }), you: human({ ready: true }) };
+    for (const phase of ['playing', 'gameOver'] as const) {
+      cb({ ...lobby(ready), meta: { ...lobby(ready).meta, phase } });
+    }
+    expect(deps.setCountdown).not.toHaveBeenCalled();
+    store.getState().leave();
+  });
+
   it('refuses to change identity once the player has readied', async () => {
     const deps = fakeDeps();
     const store = createGameStore(deps);

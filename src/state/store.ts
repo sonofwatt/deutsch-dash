@@ -3,7 +3,7 @@ import { useStore } from 'zustand';
 import type { BadgeId } from '../game/badges';
 import { cardId, type Card, type CenterSpace, type PlayerInfo, type PlaySource, type Room, type Tableau } from '../game/types';
 import { canBuildOnPost, canPlayToSpace, isStuck, placeOnPost, sourceTop, takeCard } from '../game/rules';
-import { flipWood, rotateWood, WOOD_STEP } from '../game/wood';
+import { flipWood, rotateWood, sinkWoodTop, WOOD_STEP } from '../game/wood';
 import { reconcileTableau } from '../game/center';
 import { buildDeck, deal, shuffle } from '../game/deck';
 import { botDelay, chooseBotAction, type BotLevel } from '../game/bot';
@@ -115,6 +115,8 @@ export interface GameStore {
   setFling(on: boolean): void;
   /** Host-only, and only meaningful while the table is deadlocked. */
   setSingleFlip(on: boolean): void;
+  /** Send the face-up wood card to the bottom of the pile. Only when stuck. */
+  sinkWood(): void;
   /** Host-only: stop a countdown in progress and leave the table in its lobby. */
   cancelCountdown(): void;
   /** Host-only: count the table down without waiting for everybody to be ready. */
@@ -334,6 +336,15 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
       work.catch(() => set({ actionError: `Could not ${whatFailed}. Check your connection and try again.` }));
     }
 
+    /**
+     * The two phases a countdown runs in. The lobby's leads into the first deal
+     * and the score sheet's into the next one, and they are the same three
+     * seconds for the same reason - nobody should be dealt a hand they have not
+     * looked up for. nextRound is startRound, so the tick needs no branch at zero.
+     */
+    const counting = (phase: Room['meta']['phase'] | undefined) =>
+      phase === 'lobby' || phase === 'roundEnd';
+
     function stopCountdown() {
       if (countdownTimer) clearTimeout(countdownTimer);
       countdownTimer = null;
@@ -348,7 +359,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
       countdownTimer = null;
       const s = get();
       const { code, room } = s;
-      if (!code || !room || !isHost(s) || room.meta.phase !== 'lobby') { forcedCountdown = false; return; }
+      if (!code || !room || !isHost(s) || !counting(room.meta.phase)) { forcedCountdown = false; return; }
       if (!forcedCountdown && !tableReady(room)) { void deps.setCountdown(code, null); return; }
       const n = room.meta.countdown ?? 0;
       if (n > 1) {
@@ -370,7 +381,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
     /** Start or cancel the countdown to match the lobby we are looking at. */
     function syncCountdown(room: Room) {
       const s = get();
-      if (!s.code || !isHost({ uid: s.uid, room }) || room.meta.phase !== 'lobby') {
+      if (!s.code || !isHost({ uid: s.uid, room }) || !counting(room.meta.phase)) {
         stopCountdown();
         return;
       }
@@ -787,6 +798,29 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         if (taken.next.blitz.length === 0) void deps.announceBlitz(code, uid);
       },
 
+      /**
+       * The way out of a hand that cannot move, and deliberately a thing the
+       * player does rather than something that happens to them: it costs a card
+       * out of the running order. Gated on actually BEING stuck, so it cannot be
+       * used to shuffle a pile that simply has nothing good in it right now.
+       */
+      sinkWood() {
+        if (!get().online) return;
+        const { tableau: t, uid, code, room } = get();
+        if (!t || !uid || !code || !room?.round) return;
+        if (room.meta.phase !== 'playing' || room.players[uid]?.sittingOut) return;
+        if (!isStuck(t, room.round.spaces, flips.get(uid) ?? 0, woodStep(room))) return;
+        const next = sinkWoodTop(t);
+        if (next === t) return;
+        noteActivity();
+        set({ tableau: next, selection: null });
+        void persist(next);
+        // The cycle counts from here: they have changed which cards it reaches, so
+        // the flips that proved them stuck no longer describe this pile.
+        flips.set(uid, 0);
+        syncStuck(uid, next);
+      },
+
       flip() {
         if (!get().online) return;
         const { tableau: t, uid } = get();
@@ -873,7 +907,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
       startAnyway() {
         const s = get();
         const { code, room } = s;
-        if (!code || !room || !isHost(s) || room.meta.phase !== 'lobby') return;
+        if (!code || !room || !isHost(s) || !counting(room.meta.phase)) return;
         if (room.meta.countdown != null || countdownTimer) return;
         // The same three seconds everybody else gets. It was an instant deal, and
         // the players it deals around deserve the same warning as the rest - and

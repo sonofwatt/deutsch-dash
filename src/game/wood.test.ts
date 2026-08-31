@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { flipWood, rotateWood, woodCycleTops } from './wood';
+import { flipWood, rotateWood, sinkWoodTop, woodCycleTops } from './wood';
 import type { Card, Suit, Tableau } from './types';
 
 const c = (v: number, suit: Suit): Card => ({ v, suit, owner: 'me' });
@@ -74,5 +74,32 @@ describe('woodCycleTops', () => {
   it('terminates on an empty or single-card pile', () => {
     expect(woodCycleTops(woodTab([]))).toEqual([]);
     expect(woodCycleTops(woodTab(cards(1))).map(x => x.v)).toEqual([1]);
+  });
+});
+
+describe('sinkWoodTop', () => {
+  it('moves the face-up top card to the very bottom and steps the index back', () => {
+    const t = woodTab(cards(6), 3);            // 1,2,3 turned over; 3 on top
+    const n = sinkWoodTop(t);
+    expect(n.wood.map(x => x.v)).toEqual([1, 2, 4, 5, 6, 3]);
+    expect(n.woodIndex).toBe(2);               // 2 is the top now
+  });
+
+  it('changes which cards the cycle can ever reach - the whole point of it', () => {
+    // Nine cards at three a turn reach 3, 6, 9 and nothing else. Sink one and the
+    // reachable set moves, which is what un-sticks a hand that had no move in it.
+    const t = woodTab(cards(9));
+    expect(woodCycleTops(t).map(x => x.v)).toEqual([3, 6, 9]);
+    const after = sinkWoodTop(flipWood(t));    // turn over 1,2,3 then sink the 3
+    // Six of the nine now, not three. Nine cards at three a turn divides evenly
+    // and the cycle closes after one lap; sinking a card leaves the pile the same
+    // length but the INDEX one step off, so the laps no longer land on the same
+    // cards and the cycle runs twice as far before it repeats.
+    expect(woodCycleTops(after).map(x => x.v)).toEqual([2, 6, 9, 3, 4, 7]);
+  });
+
+  it('does nothing with nothing turned over, or a pile of one', () => {
+    expect(sinkWoodTop(woodTab(cards(6), 0))).toEqual(woodTab(cards(6), 0));
+    expect(sinkWoodTop(woodTab(cards(1), 1))).toEqual(woodTab(cards(1), 1));
   });
 });

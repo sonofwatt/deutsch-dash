@@ -7,6 +7,9 @@ export function RoundEndOverlay() {
   const room = useGameStore(s => s.room)!;
   const uid = useGameStore(s => s.uid);
   const next = useGameStore(s => s.next);
+  const startAnyway = useGameStore(s => s.startAnyway);
+  const cancelCountdown = useGameStore(s => s.cancelCountdown);
+  const countdown = room.meta.countdown ?? null;
   const setReady = useGameStore(s => s.setReady);
   const noteActivity = useGameStore(s => s.noteActivity);
   const host = isHost({ uid, room });
@@ -41,7 +44,11 @@ export function RoundEndOverlay() {
             {iAmReady ? 'Ready!' : 'Ready?'}
           </button>
         )}
-        {host
+        {/* Once the table is ready the countdown has it, exactly as in the lobby -
+            so there is no button to press, only one to call it off. */}
+        {host && all && countdown == null
+          ? <p className="muted" style={{ textAlign: 'center' }}>Dealing in a moment…</p>
+          : host
           // Primary once the table is with them, and an override before that -
           // the same shape as the lobby, and for the same reason: a dead phone
           // must not be able to strand a table between rounds either.
@@ -54,7 +61,7 @@ export function RoundEndOverlay() {
           ? all
             ? <button className="btn btn-primary" onClick={next}>Next round</button>
             : answered
-              ? <button className="btn start-anyway" onClick={next}>
+              ? <button className="btn start-anyway" onClick={startAnyway}>
                   Next round anyway ({tally.ready}/{tally.total} ready)
                 </button>
               : <p className="muted" style={{ textAlign: 'center' }}>
@@ -68,6 +75,18 @@ export function RoundEndOverlay() {
             not the thing to reach for first - but it has to be reachable. */}
         <a className="muted keep-back" href="#/">Leave game</a>
       </div>
+      {/* The same three seconds the lobby counts, over the sheet the scores are
+          on, so nobody is dealt a hand they have not looked up for. */}
+      {countdown != null && (
+        <div className="overlay countdown-overlay">
+          <div className="countdown-num" key={countdown}>{countdown === 0 ? 'GO!' : countdown}</div>
+          {host && countdown > 0 && (
+            <button className="btn countdown-cancel" onClick={cancelCountdown}>
+              Cancel — back to the scores
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
