@@ -1820,7 +1820,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `aafd534` | The flick bench published beside the app |
 | `bbf3cac` | The bicycle retired for a clover |
 | `2e2bb62` | The kite retired for a clownfish |
-| `PENDING` | The fish badge labelled for the glyph the phones draw |
+| `8113014` | The fish badge labelled for the glyph the phones draw |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
