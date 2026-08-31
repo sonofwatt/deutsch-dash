@@ -120,7 +120,7 @@ export function BlitzSplash({ name, splash }: { name: string; splash: Splash }) 
         initial={{ scale: 0.3, opacity: 0, rotate: -6 }}
         animate={{ scale: 1, opacity: 1, rotate: 0 }}
         transition={{ type: 'spring', stiffness: 300, damping: 18 }}>
-        <div className="blitz-word">BLITZ!</div>
+        <div className="blitz-word">DASH!</div>
         <p className="blitz-name">{name}</p>
       </motion.div>
     </div>

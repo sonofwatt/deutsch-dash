@@ -370,7 +370,7 @@ export function commentary(input: CommentaryInput): Remark[] {
   }
   if (blitzedBy && players[blitzedBy]?.isBot) {
     add('bot-blitz', 60, [
-      `${nameOf(blitzedBy)} blitzed. It is a bot. It does not even want the points.`,
+      `${nameOf(blitzedBy)} blitzed. It is a bot. It does not even want the points. That's embarrassing... For you.`,
       `Beaten to it by ${nameOf(blitzedBy)}, who is made of arithmetic.`,
       `${nameOf(blitzedBy)} blitzed, felt nothing, and moved on. Be more like ${nameOf(blitzedBy)}.`,
       `Beaten by ${nameOf(blitzedBy)}, who is a program. No hard feelings, because it has none.`,

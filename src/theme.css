@@ -78,6 +78,10 @@ button { font: inherit; }
 .btn:disabled { opacity: .4; cursor: default; }
 input.field, select.field { min-height: 48px; padding: 0 14px; border-radius: var(--radius);
   border: 1px solid var(--line); background: var(--surface); color: var(--ink); width: 100%; }
+/* The browser draws a select's chevron at the inside edge of the padding box, so
+   with the same 14px both sides it sat almost on the border. Room on the trailing
+   side only, which leaves the text where it was. */
+select.field { padding-right: 26px; }
 button, [data-drop] { touch-action: manipulation; }
 .card, .card * { user-select: none; -webkit-user-select: none; }
 html { -webkit-text-size-adjust: 100%; }

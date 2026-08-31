@@ -757,9 +757,15 @@ space it can follow rigged into place:
   white, panel swung toward the viewer. The near edge of the panel is taller than
   the hinged edge, and that alone is what makes it read as open.
 
-The head reads `Dayvigo  0 pts to 75` now. The separators are gone and the gap
-after the name is two **non-breaking** spaces: HTML collapses a run of plain
-spaces to one, so a literal double space in the source renders as a single.
+The head reads `Dayvigo 0 pts to 75` - one space throughout, no separators. It
+went via a doubled gap after the name, written with non-breaking spaces because
+HTML collapses a run of plain ones to a single; that read as an extra space and
+came back out. The word on the splash is **DASH!**, not BLITZ! - the round-end
+sheet still says "blitzed", which is the verb rather than the name.
+
+`select.field` carries `padding-right: 26px`. A browser draws a select's chevron
+at the inside edge of the padding box, so the same 14px on both sides put it
+almost on the border.
 
 ### The splash says what the round DID to you _(#57)_
 

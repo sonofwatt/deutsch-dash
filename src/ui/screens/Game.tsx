@@ -230,12 +230,9 @@ export function Game() {
       onPointerDown={() => { noteActivity(); setActivity(n => n + 1); }}>
       <div className="game-head">
         <strong>Round {room.meta.roundNumber}</strong>
-        {/* Spaces rather than separators, and non-breaking ones because HTML
-            collapses a run of plain spaces to a single one - a literal double
-            space in the source would render as one and the gap would be lost. */}
-        <span className="muted">
-          {me.name}{'\u00a0\u00a0'}{me.score} pts to {room.meta.targetScore}
-        </span>
+        {/* One space throughout, and no separators. It read as "Dayvigo  0 pts"
+            with a doubled gap before, which is the extra space that was reported. */}
+        <span className="muted">{me.name} {me.score} pts to {room.meta.targetScore}</span>
         {/* Which thumb the wood pile sits under, changeable mid-game on purpose:
             a player who was auto-rejoined never sees a form again. */}
         <ConnectionPill />
