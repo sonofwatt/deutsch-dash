@@ -5,7 +5,7 @@ suite. A commit sitting unpushed has already invalidated one playtest - what
 people are playing is whatever last reached Pages - so check `git status -sb`
 before trusting what a table reports._
 
-_**360 tests green** (336 unit + 24 emulator). This is the only place in the repo
+_**366 tests green** (342 unit + 24 emulator). This is the only place in the repo
 that quotes a count - it drifted three separate ways when it lived in four
 places, so keep it here and nowhere else._
 
@@ -709,6 +709,22 @@ Three signals, tried in this order (`useDrag.ts`, then the `nearest` branch of
    catches a throw that OVERSHOT - aim from a release point past the board points
    back down at it, so the aim finds nothing and the release decides instead.
 
+**`aimedAt` itself has three rules, and the first two are the forgiving ones.**
+
+1. **It ended ON a space.** That is where they put it; nothing else is weighed.
+2. **It ended within `FLICK_NEAR_PX` (50px) of one**, measured to the space's
+   EDGE, in ANY direction. This is what covers the rest of the circle. The cone
+   only looks forward, so a throw that overshoots a space by a hair leaves it
+   BEHIND the release point where the cone cannot see it at all - reported from a
+   table as the space simply not being playable. `edgeDistance` is zero anywhere
+   inside a space, so one measure covers both rules; a centre-to-centre one would
+   call a throw that stopped just inside a big slot "half a card away".
+3. **Otherwise the line of the throw**, within `FLICK_MAX_AIM_DEG`, now **45**
+   (a half-angle, so a 90 degree cone in front).
+
+**`spaceCentres` returns boxes, not points**, because rules 1 and 2 need the
+width and height.
+
 **The candidates are always the LEGAL spaces**, which is what makes it forgiving
 in the way the table asked for: aim at a space that is full, or at a pile this
 card cannot follow, and it lands on a playable one rather than coming back.
@@ -727,8 +743,14 @@ Three things about `throwOf` that are not obvious:
 - **`FLICK_MIN_SPEED` (0.3 px/ms) sits nearer a drag than a flick on purpose.** A
   careful drag runs at 100-400px/s and a thumb flick at 1000px/s and up. The
   direction test is what rejects a wild throw; this only has to tell a throw from
-  a reposition. `FLICK_MAX_AIM_DEG` (55°) is the other knob, and the only one in
-  here that is a matter of feel rather than geometry.
+  a reposition.
+
+**There is a bench for tuning all of this**, built 2026-08-31: a standalone page
+that ports `throwOf` and `aimedAt` verbatim, traces the thumb, draws the cone and
+the near radius, and puts every threshold on a slider with a readout saying which
+one a throw failed on. It is the only way any of these numbers has been judged
+against a real thumb. Rebuild it from `src/ui/useDrag.ts` if the algorithm moves,
+or it will quietly stop being a mirror and start being a lie.
 
 **A cancelled pointer commits the throw.** `pointercancel` fires when the OS takes
 the gesture away mid-air - an iOS home swipe, an Android back swipe, a second

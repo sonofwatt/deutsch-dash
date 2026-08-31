@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { parseDrop, nearestOf, ghostFix, GHOST_ANCHOR, throwOf, aimedAt, FLICK_MAX_AIM_DEG } from './useDrag';
+import { parseDrop, nearestOf, ghostFix, GHOST_ANCHOR, throwOf, aimedAt,
+  edgeDistance, FLICK_MAX_AIM_DEG } from './useDrag';
 
 describe('parseDrop', () => {
   it('reads the three drop kinds off the attribute', () => {
@@ -107,10 +108,13 @@ describe('throwOf', () => {
 describe('aimedAt', () => {
   // Released at (200, 700). A board above it: two spaces up-left, one up-right.
   const from = { x: 200, y: 700 };
+  // Small boxes, and all of them far enough from `from` that the proximity rule
+  // below cannot reach them - these cases are about the CONE.
+  const box = (index: number, cx: number, cy: number) => ({ index, cx, cy, w: 40, h: 56 });
   const spaces = [
-    { index: 0, cx: 60, cy: 300 },   // up and well to the left
-    { index: 1, cx: 120, cy: 200 },  // up, a little to the left, further away
-    { index: 2, cx: 340, cy: 300 },  // up and to the right
+    box(0, 60, 300),    // up and well to the left
+    box(1, 120, 200),   // up, a little to the left, further away
+    box(2, 340, 300),   // up and to the right
   ];
   const aim = (dx: number, dy: number) => ({ from, dx, dy, speed: 1 });
 
@@ -126,10 +130,36 @@ describe('aimedAt', () => {
     expect(aimedAt(spaces, aim(-100, -420))).toBe(0);
   });
 
-  it('refuses a wild throw that is aimed at nothing', () => {
-    // Hard left, along the bottom of the screen: no space is in that direction.
+  it('refuses a wild throw that is aimed at nothing and lands near nothing', () => {
+    // Hard left, along the bottom of the screen: no space is in that direction,
+    // and the release is hundreds of pixels from every one of them.
     expect(aimedAt(spaces, aim(-400, -20))).toBeNull();
     expect(aimedAt([], aim(0, -400))).toBeNull();
+  });
+
+  it('takes the space it ENDED on, whatever direction the throw was going', () => {
+    // Thrown hard to the right, but the release is inside space 0. That is where
+    // they put it, and nothing else is weighed.
+    const on = { from: { x: 60, y: 300 }, dx: 400, dy: -20, speed: 1 };
+    expect(aimedAt(spaces, on)).toBe(0);
+  });
+
+  it('takes a space it stopped just PAST, which the cone cannot see', () => {
+    // The throw overshoots space 0 by 12px, which leaves the space behind the
+    // release point and outside a forward cone entirely - the case that read as
+    // the space not being playable at all.
+    const past = { from: { x: 60, y: 300 - 28 - 12 }, dx: 0, dy: -400, speed: 1 };
+    expect(aimedAt(spaces, past)).toBe(0);
+  });
+
+  it('measures that gap to the EDGE, not to the centre', () => {
+    // One space on its own, so nothing else can be nearer. 45px beyond its top
+    // edge is inside FLICK_NEAR_PX; a centre-to-centre measure would call the same
+    // point 73px away and miss it. Thrown sideways, so only proximity can pick it.
+    const lone = [box(0, 60, 300)];
+    const near = (gap: number) => ({ from: { x: 60, y: 300 - 28 - gap }, dx: 400, dy: -8, speed: 1 });
+    expect(aimedAt(lone, near(45))).toBe(0);
+    expect(aimedAt(lone, near(70))).toBeNull();
   });
 
   it('lands on a legal space even when the throw was aimed between them', () => {
@@ -143,14 +173,27 @@ describe('aimedAt', () => {
 
   it('measures the cone off the line of the throw, either side alike', () => {
     // A space exactly on the cone edge is in; one past it is out.
-    const edge = (deg: number) => [{
-      index: 9,
-      cx: from.x + Math.sin((deg * Math.PI) / 180) * 400,
-      cy: from.y - Math.cos((deg * Math.PI) / 180) * 400,
-    }];
+    const edge = (deg: number) => [box(9,
+      from.x + Math.sin((deg * Math.PI) / 180) * 400,
+      from.y - Math.cos((deg * Math.PI) / 180) * 400)];
     const up = aim(0, -400);
     expect(aimedAt(edge(FLICK_MAX_AIM_DEG - 2), up)).toBe(9);
     expect(aimedAt(edge(-(FLICK_MAX_AIM_DEG - 2)), up)).toBe(9);
     expect(aimedAt(edge(FLICK_MAX_AIM_DEG + 4), up)).toBeNull();
+  });
+});
+
+describe('edgeDistance', () => {
+  const b = { index: 0, cx: 100, cy: 100, w: 40, h: 60 };
+  it('is zero anywhere inside the space', () => {
+    expect(edgeDistance({ x: 100, y: 100 }, b)).toBe(0);
+    expect(edgeDistance({ x: 119, y: 129 }, b)).toBe(0);   // just inside a corner
+  });
+  it('is the gap to the nearest border, not to the middle', () => {
+    expect(edgeDistance({ x: 130, y: 100 }, b)).toBe(10);  // 30 right of centre, 20 is the half-width
+    expect(edgeDistance({ x: 100, y: 140 }, b)).toBe(10);
+  });
+  it('measures diagonally off a corner', () => {
+    expect(edgeDistance({ x: 123, y: 134 }, b)).toBeCloseTo(5);
   });
 });

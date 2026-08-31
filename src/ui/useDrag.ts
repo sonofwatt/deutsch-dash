@@ -77,12 +77,23 @@ export const FLICK_MIN_SPEED = 0.3;
 export const FLICK_MIN_TRAVEL = 18;
 /**
  * How far off the line of the throw a space may sit and still count as aimed at.
- * Generous on purpose - "the general direction of the pile they want" - and it
- * is the one number in here that is a matter of feel rather than of geometry.
+ * A half-angle, so 45 is a 90 degree cone in front of the throw.
  */
-export const FLICK_MAX_AIM_DEG = 55;
+export const FLICK_MAX_AIM_DEG = 45;
 /** Two spaces this close in bearing are both "aimed at"; the nearer one wins. */
 const AIM_TIE_DEG = 8;
+/**
+ * How close to a space the throw can END and have it count, whatever direction it
+ * was going. Measured to the space's EDGE rather than its centre, so a throw that
+ * stops just past a border is a few pixels away rather than half a card away, and
+ * zero means the throw landed on the space itself.
+ *
+ * This is what covers the rest of the circle. The cone above only looks FORWARD,
+ * so a throw that overshoots a space by a hair leaves it behind the release point
+ * and out of the cone entirely - which read as the space not being playable at
+ * all. Proximity does not care which way the throw was pointing.
+ */
+export const FLICK_NEAR_PX = 50;
 
 /**
  * The throw a gesture was, or null if it was not one.
@@ -130,21 +141,42 @@ export function throwOf(samples: Sample[]): Throw | null {
 /**
  * Which of these candidates the throw was aimed at, or null if none of them was.
  *
- * Bearing, not distance. A flick says a DIRECTION and nothing reliable about how
- * far - the same thumb movement means "over there" whether the space is 100px
- * away or 600 - so the card goes to the legal space lying nearest the line of the
- * throw. Candidates are already filtered to legal ones by the caller, which is
- * what makes this forgiving in the way it needs to be: aim at a space that is
- * full, or at a pile the card cannot follow, and it lands on the playable one
- * closest to the line rather than coming back.
+ * Three rules, in this order, and the first two are the forgiving ones:
+ *
+ * 1. **It ended on a space.** That is where they put it; nothing else is weighed.
+ * 2. **It ended within `FLICK_NEAR_PX` of one**, measured to the edge, whatever
+ *    direction the throw was going. This covers the rest of the circle: a throw
+ *    that overshoots a space by a hair leaves it BEHIND the release point, where
+ *    the forward cone cannot see it, and it read as that space not being playable.
+ * 3. **Otherwise the line of the throw.** A flick says a direction and nothing
+ *    dependable about distance - the same thumb movement means "over there"
+ *    whether the space is 100px away or 600 - so the card goes to the legal space
+ *    nearest that line.
+ *
+ * Candidates are already filtered to LEGAL spaces by the caller, which is what
+ * makes all three forgiving in the way they need to be: aim at a space that is
+ * full, or at a pile the card cannot follow, and it lands on a playable one rather
+ * than coming back.
  *
  * Returning null is the wild-flick case, and it is deliberate. A throw at nothing
- * in particular should do nothing, or the gesture becomes "shake the phone to
- * play a card".
+ * in particular, ending nowhere near anything, should do nothing - or the gesture
+ * becomes "shake the phone to play a card".
  */
-export function aimedAt(
-  candidates: { index: number; cx: number; cy: number }[], t: Throw,
-): number | null {
+export function aimedAt(candidates: SpaceBox[], t: Throw): number | null {
+  // 1. It ended ON a space. Nothing else to weigh up: that is where they put it.
+  //    2. Or a hair outside one - a throw that overshoots a border by a few pixels
+  //    meant that space, and the cone below cannot see it because it is now
+  //    BEHIND the release point. Nearest edge wins.
+  const near = candidates
+    .map(c => ({ c, d: edgeDistance(t.from, c) }))
+    .filter(x => x.d <= FLICK_NEAR_PX)
+    .sort((a, b) => a.d - b.d)[0];
+  if (near) return near.c.index;
+
+  // 3. Otherwise the line of the throw. A flick says a direction and nothing
+  //    dependable about distance, so the card goes to the legal space nearest that
+  //    line - and to nothing at all if none is near it, which is the wild-flick
+  //    case and is deliberate.
   const aim = Math.atan2(t.dy, t.dx);
   const scored = candidates.flatMap(c => {
     const dx = c.cx - t.from.x, dy = c.cy - t.from.y;
@@ -191,14 +223,29 @@ export function nearestOf(
   return best;
 }
 
+/** A space's box on screen: where its centre is and how big it is. */
+export interface SpaceBox { index: number; cx: number; cy: number; w: number; h: number }
+
 /** Where these centre spaces are on screen right now. */
-export function spaceCentres(indices: number[]) {
+export function spaceCentres(indices: number[]): SpaceBox[] {
   return indices.flatMap(index => {
     const el = document.querySelector(`[data-drop="space:${index}"]`);
     if (!el) return [];
     const r = el.getBoundingClientRect();
-    return [{ index, cx: r.left + r.width / 2, cy: r.top + r.height / 2 }];
+    return [{ index, cx: r.left + r.width / 2, cy: r.top + r.height / 2, w: r.width, h: r.height }];
   });
+}
+
+/**
+ * How far a point is from a space's edge: zero anywhere inside it, and otherwise
+ * the straight-line gap to the nearest point on its border. A centre-to-centre
+ * measure would call a throw that stopped just inside a big slot "half a card
+ * away", which is the opposite of what it is.
+ */
+export function edgeDistance(p: Point, c: SpaceBox): number {
+  const dx = Math.max(Math.abs(p.x - c.cx) - c.w / 2, 0);
+  const dy = Math.max(Math.abs(p.y - c.cy) - c.h / 2, 0);
+  return Math.hypot(dx, dy);
 }
 
 /** Which of these centre spaces is nearest the point, by where they are on screen. */
