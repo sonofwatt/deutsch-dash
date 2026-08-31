@@ -142,7 +142,7 @@ emu('server-side player cap and badge uniqueness (database.rules.json)', () => {
     // the reason for rejection, not an incidental counter mismatch.
     await assertFails(racerCtx.database().ref(`rooms/${code}`).update({
       [`players/${RACER}`]: {
-        name: 'Racer', badgeId: 'bicycle', joinedAt: Date.now(), connected: true, stuckAt: null, score: 0,
+        name: 'Racer', badgeId: 'clover', joinedAt: Date.now(), connected: true, stuckAt: null, score: 0,
       },
       'meta/playerCount': 9,
     }));
@@ -255,7 +255,7 @@ emu('server-side player cap and badge uniqueness (database.rules.json)', () => {
     await assertSucceeds(hostCtx.database().ref(`rooms/${code}/meta/phase`).set('playing'));
     await assertSucceeds(racerCtx.database().ref(`rooms/${code}`).update({
       [`players/${RACER}`]: {
-        name: 'Racer', badgeId: 'bicycle', joinedAt: Date.now(), connected: true, stuckAt: null, score: 0,
+        name: 'Racer', badgeId: 'clover', joinedAt: Date.now(), connected: true, stuckAt: null, score: 0,
       },
       'meta/playerCount': 2,
     }));
@@ -269,7 +269,7 @@ emu('server-side player cap and badge uniqueness (database.rules.json)', () => {
     await assertSucceeds(hostCtx.database().ref(`rooms/${code}/meta/phase`).set('playing'));
     await assertFails(racerCtx.database().ref(`rooms/${code}`).update({
       [`players/${RACER}`]: {
-        name: 'Racer', badgeId: 'bicycle', joinedAt: Date.now(), connected: true, stuckAt: null, score: 0,
+        name: 'Racer', badgeId: 'clover', joinedAt: Date.now(), connected: true, stuckAt: null, score: 0,
       },
       'meta/playerCount': 9,
     }));
@@ -408,7 +408,7 @@ emu('app writes under real security rules (regular client SDK, correct namespace
 
     const p2 = await secondaryIdentity('away-p2');
     createdApps.push(p2.app);
-    expect(await joinAs(p2.db, code, p2.uid, 'P2', 'bicycle')).toBe('ok');
+    expect(await joinAs(p2.db, code, p2.uid, 'P2', 'clover')).toBe('ok');
 
     await set(ref(p2.db, `rooms/${code}/players/${p2.uid}/awayAt`), Date.now());
     expect((await peekRoom(code))!.players[p2.uid].awayAt).not.toBeNull();
@@ -466,7 +466,7 @@ emu('app writes under real security rules (regular client SDK, correct namespace
 
     const p2 = await secondaryIdentity('canary-p2');
     createdApps.push(p2.app);
-    expect(await joinAs(p2.db, code, p2.uid, 'P2', 'bicycle')).toBe('ok');
+    expect(await joinAs(p2.db, code, p2.uid, 'P2', 'clover')).toBe('ok');
 
     // Real host-only round write (the other thing Finding 1 asked to check
     // carefully) - must still succeed under real rules for this test to mean
@@ -585,7 +585,7 @@ emu('app writes under real security rules (regular client SDK, correct namespace
     const p2 = await secondaryIdentity('happy-p2');
     createdApps.push(p2.app);
 
-    expect(await joinAs(p2.db, code, p2.uid, 'P2', 'bicycle')).toBe('ok');
+    expect(await joinAs(p2.db, code, p2.uid, 'P2', 'clover')).toBe('ok');
     let room = (await peekRoom(code))!;
     expect(Object.keys(room.players)).toHaveLength(2);
     expect(room.meta.playerCount).toBe(2);
@@ -594,7 +594,7 @@ emu('app writes under real security rules (regular client SDK, correct namespace
     // must NOT bump playerCount again (this exercises the data.exists()
     // branch of players/$uid's validate, and the auth.uid === $uid branch of
     // its .write, for a real NON-host uid, not the room's creator).
-    expect(await joinAs(p2.db, code, p2.uid, 'P2 renamed', 'bicycle')).toBe('ok');
+    expect(await joinAs(p2.db, code, p2.uid, 'P2 renamed', 'clover')).toBe('ok');
     room = (await peekRoom(code))!;
     expect(Object.keys(room.players)).toHaveLength(2);
     expect(room.meta.playerCount).toBe(2);

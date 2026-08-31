@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { BADGE_IDS } from '../game/badges';
 import { commentary, type CommentaryInput } from './commentary';
 import type { GameStats } from '../game/stats';
 import type { CenterSpace, PlayerInfo, RoundScore, Suit } from '../game/types';
@@ -292,10 +293,11 @@ describe('badge quips', () => {
 
   it('has a quip for every badge that can be dealt', () => {
     // Not that each one fires here - that is what the cases above are for - only
-    // that none of the eight was forgotten when they were written.
+    // that none of the eight was forgotten when they were written. Read off
+    // BADGE_IDS, so retiring a badge and adding one cannot leave a quip behind.
     const src = commentaryQuipIds();
-    for (const badge of ['tulip', 'bicycle', 'star', 'bell', 'kite', 'anchor', 'acorn', 'boat']) {
-      expect(src).toContain(`quip-${badge}`);
-    }
+    for (const badge of BADGE_IDS) expect(src).toContain(`quip-${badge}`);
+    // ...and nothing left over from a badge nobody can pick any more.
+    expect(src).toHaveLength(BADGE_IDS.length);
   });
 });

@@ -336,7 +336,14 @@ render, and it sets state.
   `badges/$badgeId`'s validate requires `newData.val() === auth.uid` and bots have
   no auth identity. This still blocks a human taking that badge, with no rules
   change.
-- The practical player ceiling is the 8 entries in `BADGE_IDS`.
+- The practical player ceiling is the 8 entries in `BADGE_IDS`, which is written
+  out by hand rather than taken from `BADGES`. **`BADGES` also carries RETIRED
+  badges** and `BADGE_IDS` is the list without them: every render site indexes
+  `BADGES` by whatever id a player is carrying, so a badge dropped from the picker
+  has to stay drawable or a room dealt before it went takes the screen down over a
+  missing glyph. The bicycle was retired this way on 2026-08-31 for the clover.
+  Retiring another one means adding its quip to the commentary too, which
+  `commentary.test.ts` pins by counting `quip-*` against `BADGE_IDS`.
 
 ### Game rules as implemented
 

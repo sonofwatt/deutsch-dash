@@ -481,14 +481,14 @@ export function commentary(input: CommentaryInput): Remark[] {
       `That is ${nameOf(anchor)} anchored to the bottom of the table. The badge was a warning, not a suggestion.`,
     ], [anchor]);
   }
-  const bicycle = holder('bicycle');
-  if (bicycle && (played[bicycle] ?? 0) > 0
-      && (played[bicycle] ?? 0) >= Math.max(...ids.map(id => played[id] ?? 0))) {
-    add('quip-bicycle', 64, [
-      `${nameOf(bicycle)} put more cards in the middle than anyone. Kept the wheels turning while the rest of you were freewheeling.`,
-      `Nobody out-pedalled ${nameOf(bicycle)} this round. Tyre-d yet?`,
-      `${nameOf(bicycle)} did the legwork. The others were along for the ride, which is spoke-n about later.`,
-    ], [bicycle]);
+  const clover = holder('clover');
+  if (clover && (played[clover] ?? 0) > 0
+      && (played[clover] ?? 0) >= Math.max(...ids.map(id => played[id] ?? 0))) {
+    add('quip-clover', 64, [
+      `${nameOf(clover)} put more cards in the middle than anyone. Some people are just lucky. Some people counted.`,
+      `Nobody out-played ${nameOf(clover)} this round. Beginner's luck, presumably, for the ninth round running.`,
+      `${nameOf(clover)} owned the middle. Luck of the draw, and the draw, and the draw.`,
+    ], [clover]);
   }
   const star = holder('star');
   if (star && deltas.length > 1 && delta(star) === deltas[0] && deltas[0] > 0) {
