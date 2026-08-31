@@ -763,6 +763,13 @@ HTML collapses a run of plain ones to a single; that read as an extra space and
 came back out. The word on the splash is **DASH!**, not BLITZ! - the round-end
 sheet still says "blitzed", which is the verb rather than the name.
 
+**The washroom sign is coloured by GENDER, not by suit** (`--sign-boy` /
+`--sign-girl`, bright blue and bright pink, with the figure knocked out in white
+in every theme). It used to take the suit colour, which said nothing the big
+number underneath was not already saying far more loudly - so the one glyph whose
+job is "boy or girl", which is exactly what `canBuildOnPost` turns on, was
+answering it in silhouette alone at about 15px. The number still carries the suit.
+
 `select.field` carries `padding-right: 26px`. A browser draws a select's chevron
 at the inside edge of the padding box, so the same 14px on both sides put it
 almost on the border.

@@ -4,17 +4,23 @@ import { faceGroup } from '../../game/rules';
 import type { Card, FaceGroup } from '../../game/types';
 
 /**
- * Boy/girl marker, drawn as an actual washroom-door sign: the figure knocked out
- * of a solid suit-coloured plate. Post building is gated on this pair (red/blue
- * are boys, green/yellow girls), so the two have to be told apart instantly at
- * card size - the first cut used matching outline figures whose only difference
- * was a slightly tapered torso, which was not enough. The silhouettes are now
+ * Boy/girl marker, drawn as an actual washroom-door sign: a white figure knocked
+ * out of a solid plate. Post building is gated on this pair (red/blue are boys,
+ * green/yellow girls), so the two have to be told apart instantly at card size -
+ * the first cut used matching outline figures whose only difference was a
+ * slightly tapered torso, which was not enough, and the silhouettes are now
  * deliberately exaggerated: the skirt flares to nearly the full plate width
  * against a torso barely half that, so the shapes differ in outline, not detail.
+ *
+ * **The plate is coloured by GENDER, not by suit.** It used to take the suit
+ * colour, which said nothing the big number underneath was not already saying
+ * far more loudly - so the one glyph on the card whose job is to answer "boy or
+ * girl" was answering it in shape alone, at about 15px. Bright pink and bright
+ * blue answer it in colour as well, from across a table.
  */
 export function FaceGlyph({ group }: { group: FaceGroup }) {
   return (
-    <svg className="card-group" viewBox="0 0 20 28" aria-hidden="true"
+    <svg className={`card-group sign-${group}`} viewBox="0 0 20 28" aria-hidden="true"
       preserveAspectRatio="xMidYMid meet">
       <rect className="plate" x="0" y="0" width="20" height="28" rx="4.5" />
       <g className="figure">

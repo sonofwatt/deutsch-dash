@@ -20,6 +20,11 @@
      daylight, and the 16 center slots are the thing players aim at. */
   --pile-line: #6f6a5b; --pile-fill: #ebe8e0;
   --suit-red: #d92d20; --suit-blue: #2563eb; --suit-green: #16a34a; --suit-yellow: #eab308;
+  /* The washroom sign on every card face. Deliberately NOT the suit colours: this
+     is the one glyph whose job is boy-or-girl, which is what the post-building
+     rule turns on, and it now says so in colour as well as in silhouette. Brighter
+     than any suit on purpose - it has to read at about 15px across a table. */
+  --sign-boy: #0a84ff; --sign-girl: #ff2d8f;
   --card-w: clamp(44px, 12vw, 72px);
   /* Card height comes from aspect-ratio: 2.5 / 3.5 (poker-standard playing card
      proportions) at each use site, deliberately NOT from a --card-h token here.
