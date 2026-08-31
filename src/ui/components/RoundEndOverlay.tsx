@@ -82,7 +82,7 @@ export function RoundEndOverlay() {
           <div className="countdown-num" key={countdown}>{countdown === 0 ? 'GO!' : countdown}</div>
           {host && countdown > 0 && (
             <button className="btn countdown-cancel" onClick={cancelCountdown}>
-              Cancel — back to the scores
+              Cancel - back to the scores
             </button>
           )}
         </div>

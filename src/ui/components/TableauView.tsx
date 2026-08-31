@@ -160,12 +160,19 @@ export function TableauView(props: {
           under the grid, which is a long way from the pile it is talking about.
           Inset from whichever end the wood is on, because that is the one column
           the band does not span. */}
-      {props.stuck && (
+      {props.stuck ? (
         props.onSinkWood
           ? <button className="wood-note" onClick={props.onSinkWood}>
-              Send top wood card to bottom
+              No moves left - Send top wood card to bottom
             </button>
           : <span className="wood-note quiet">No moves left</span>
+      ) : (
+        /* With nothing to say, the band is a target instead. It is the nearest
+           empty space to a thumb coming off the wood or the Blitz pile, so a
+           throw that barely leaves the hand lands in it - and data-drop is all
+           that takes, because parseDrop walks up from whatever is under the
+           finger. Invisible, and it covers no card (see .wood-note's geometry). */
+        <div className="wood-note drop-band" data-drop="nearest" aria-hidden="true" />
       )}
     </div>
   );

@@ -7,8 +7,8 @@ import type { PlayerInfo, RoundScore } from '../../game/types';
  * One player's line on the round-end and game-over sheets: the round's arithmetic
  * spelled out (`-4 +6 = +2`) followed by the running total.
  *
- * The sum is `RoundScore.delta` verbatim — the exact number `commitScores` added to
- * `player.score` — never recomputed here, so the displayed sum and total cannot
+ * The sum is `RoundScore.delta` verbatim - the exact number `commitScores` added to
+ * `player.score` - never recomputed here, so the displayed sum and total cannot
  * disagree. `score` is absent only defensively (game over with no round snapshot),
  * where the row degrades to a name and a total.
  *

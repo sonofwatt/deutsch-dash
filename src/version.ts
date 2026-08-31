@@ -25,7 +25,7 @@ const MAJOR = 1;
 /** Rounds of feature work since the Deutsch Dash rename (`1529330`). */
 const FEATURE_BATCHES = 31;
 /** Tweaks, lone fixes and documentation passes over the same stretch. */
-const SMALL_CHANGES = 20;
+const SMALL_CHANGES = 23;
 
 /**
  * Pure, and tested by worked example, so bumping the counters above never means

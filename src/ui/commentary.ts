@@ -167,7 +167,7 @@ export function commentary(input: CommentaryInput): Remark[] {
   if (deltas.length > 1 && deltas[0] > 0 && deltas[0] >= 2 * Math.max(deltas[1], 1)) {
     const best = ids.find(id => delta(id) === deltas[0])!;
     add('landslide', 66, [
-      `${nameOf(best)} scored ${deltas[0]} — more than double anyone else. Unsporting.`,
+      `${nameOf(best)} scored ${deltas[0]} - more than double anyone else. Unsporting.`,
       `${nameOf(best)} took ${deltas[0]} points off that round. The rest of you shared the scraps.`,
       `${nameOf(best)} lapped the table. The rest of you were sharing a brain cell.`,
       `${nameOf(best)} scored ${deltas[0]}. The rest of you scored a lift home.`,

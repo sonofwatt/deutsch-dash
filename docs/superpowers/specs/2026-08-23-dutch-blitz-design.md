@@ -1,15 +1,15 @@
-# Dutch Blitz Web App — Design Spec
+# Dutch Blitz Web App - Design Spec
 
 **Date:** 2026-08-23
-**Name:** Deutsch Dash (chosen 2026-08-25; repo `deutsch-dash`, Firebase project id `holland-hustle` — project ids are immutable and never shown to players)
+**Name:** Deutsch Dash (chosen 2026-08-25; repo `deutsch-dash`, Firebase project id `holland-hustle` - project ids are immutable and never shown to players)
 **Status:** Approved by David 2026-08-23
 
 ## 1. Summary
 
-A free, mobile-first multiplayer web version of the card game Dutch Blitz for 2–8 players.
+A free, mobile-first multiplayer web version of the card game Dutch Blitz for 2-8 players.
 A host creates a room and texts an invite link to friends; everyone plays in their phone
 browser in real time. Static frontend hosted on GitHub Pages; Firebase Realtime Database
-(RTDB) is the only backend — there is no server.
+(RTDB) is the only backend - there is no server.
 
 **Priority requirement: flawless play on iOS Safari and Android Chrome.** Desktop is a
 supported adaptation, not the design target.
@@ -18,7 +18,7 @@ supported adaptation, not the design target.
 
 **Goals**
 
-1. Real-time simultaneous play (no turns) for 2–8 players with fair conflict resolution.
+1. Real-time simultaneous play (no turns) for 2-8 players with fair conflict resolution.
 2. Room creation + invite via the phone's native share sheet (SMS-friendly link).
 3. Classic Dutch Blitz rules with multi-round scoring to a target score.
 4. Slick, clean, modern aesthetic; smooth 60fps card flip/move animations on mid-range phones.
@@ -88,9 +88,9 @@ rooms/{roomCode}/
 
 ## 4. Game rules implemented
 
-- Each of up to 8 players uses a 40-card deck: values 1–10 in the four shared suit colors
-  (red, blue, green, yellow). Every card also belongs to one of two **face groups** —
-  red & blue ("boy" in the physical game) and yellow & green ("girl") — which governs
+- Each of up to 8 players uses a 40-card deck: values 1-10 in the four shared suit colors
+  (red, blue, green, yellow). Every card also belongs to one of two **face groups** -
+  red & blue ("boy" in the physical game) and yellow & green ("girl") - which governs
   post-pile building. Our design shows the group as a subtle, colorblind-safe face
   marking (e.g. two distinct corner glyph shapes).
 - **Badges:** each player picks one of 8 badge combos (distinct hue + unique symbol,
@@ -99,7 +99,7 @@ rooms/{roomCode}/
   hues must stay distinguishable from the four suit colors and from each other
   (final palette chosen during visual design against a contrast checklist).
 - **Setup per round:** 10 cards to the Blitz pile (face up, top card playable); post
-  piles — 3, or 5 in a 2-player game — one face-up card each; the rest is the face-down
+  piles - 3, or 5 in a 2-player game - one face-up card each; the rest is the face-down
   wood pile, flipped three at a time (top of the flipped three is playable). When the
   wood pile is exhausted it is turned over unshuffled and reused.
 - **Playable to the center:** the top card of any post pile, the Blitz top, or the
@@ -119,7 +119,7 @@ rooms/{roomCode}/
   wins the game. Ties at/above target: highest total wins; if still tied, play another round.
 - **Stuck handling:** an "I'm stuck" button (stuck = no legal play to the center *and*
   no legal post-pile build). When every connected player is stuck, all wood piles rotate
-  one card (top card moves to bottom, shifting the flip-of-three cycle — the official
+  one card (top card moves to bottom, shifting the flip-of-three cycle - the official
   standstill rule) and stuck flags clear. If three
   consecutive rotations produce zero plays, the round ends and is scored with no Blitz
   bonus to anyone.
@@ -180,14 +180,14 @@ Every feature is verified on real iOS Safari and Android Chrome before it counts
   No deletion job (would require Cloud Functions); abandoned rooms are simply ignored
   and storage stays trivially small.
 - **Firebase limits (Spark tier):** 100 simultaneous connections, 1GB storage, 10GB/mo
-  transfer — orders of magnitude above friends-scale. No quota handling in v1 beyond a
+  transfer - orders of magnitude above friends-scale. No quota handling in v1 beyond a
   generic connection-error banner with retry.
 - **Offline/flaky network:** RTDB SDK reconnects automatically; UI shows a "reconnecting"
   pill and blocks plays while disconnected (prevents stale-state plays).
 
 ## 9. Testing strategy
 
-1. **Unit (Vitest):** everything in `src/game/` — deck construction, legal moves, post
+1. **Unit (Vitest):** everything in `src/game/` - deck construction, legal moves, post
    refill, post-build legality (descending + alternating face group), wood flip/rotate
    cycle, scoring, stuck/round-end detection, badge uniqueness.
 2. **Integration (Firebase Emulator Suite):** security rules (players can't write others'
@@ -199,6 +199,6 @@ Every feature is verified on real iOS Safari and Android Chrome before it counts
 
 1. GitHub repo; GitHub Actions workflow builds Vite and deploys to Pages on push to `main`.
 2. One-time Firebase setup (David, ~10 min, guided): create free project, enable
-   anonymous auth + RTDB, paste config into `src/net/firebaseConfig.ts` (committed —
+   anonymous auth + RTDB, paste config into `src/net/firebaseConfig.ts` (committed -
    safe by design), deploy `database.rules.json` via Firebase CLI.
 3. Local dev: `npm run dev` against the Firebase emulator; `npm test` for Vitest.

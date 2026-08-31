@@ -7,6 +7,6 @@ export const JOIN_REASONS: Record<string, string> = {
   // Kept for a room snapshot written by an older client; nothing produces it
   // now that a game in progress admits spectators.
   started: 'This game already started without you.',
-  race: 'Someone just took that spot — try again.',
+  race: 'Someone just took that spot - try again.',
   offline: 'Could not reach the game. Check your connection and try again.',
 };

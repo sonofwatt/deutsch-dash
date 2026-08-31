@@ -237,15 +237,21 @@ describe('the way out of being stuck', () => {
     expect(html).not.toContain('Send top wood card');
   });
 
-  it('becomes the offer once it is, and never both at once', () => {
+  it('becomes the offer once it is, and says both halves', () => {
+    // The message stays: the button says what has happened AND what pressing it
+    // does, because it is the only thing on screen explaining either.
     const html = view({ stuck: true, onSinkWood: noop });
-    expect(html).toContain('Send top wood card to bottom');
-    expect(html).not.toContain('No moves left');
+    expect(html).toContain('No moves left - Send top wood card to bottom');
     expect(html.match(/wood-note/g)).toHaveLength(1);
+    expect(html).not.toContain('data-drop="nearest"');   // not a target while it talks
   });
 
-  it('offers nothing to a player who is not stuck', () => {
-    expect(view({ onSinkWood: noop })).not.toContain('wood-note');
+  it('turns the band into a drop target when it has nothing to say', () => {
+    // The band is the nearest empty space to a thumb coming off the wood, so a
+    // throw that barely leaves the hand should land in it rather than nowhere.
+    const html = view({ onSinkWood: noop });
+    expect(html).not.toContain('No moves left');
+    expect(html).toContain('data-drop="nearest"');
   });
 
   it('is inset from whichever end the wood is on', () => {

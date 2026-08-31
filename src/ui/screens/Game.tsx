@@ -199,7 +199,7 @@ export function Game() {
         </p>
         {out
           ? <button className="btn ready-btn" onClick={() => setSittingOut(false)}>
-              {canRejoin ? "I'm back — rejoin this round" : "I'm back — deal me in"}
+              {canRejoin ? "I'm back - rejoin this round" : "I'm back - deal me in"}
             </button>
           : <button className="btn btn-slim sit-out" onClick={() => setSittingOut(true)}>
               Actually, keep me out
@@ -316,7 +316,7 @@ export function Game() {
         {/* The automatic "no moves left" note is in the drop band now (CenterGrid),
             where it costs no layout. This slot carries the away note instead. */}
         {me.awayAt != null
-          ? <button className="away-note" onClick={noteActivity}>Away — tap to rejoin the round</button>
+          ? <button className="away-note" onClick={noteActivity}>Away - tap to rejoin the round</button>
           : ENABLE_STUCK_BUTTON && (
               <button className="btn stuck-btn" disabled={!stuckAvailable || me.stuckAt != null}
                 onClick={markStuck} style={{ width: '100%', marginTop: 6 }}>
@@ -330,7 +330,7 @@ export function Game() {
              spaces, so there is nothing to wait for. */
           <div className="deal-me-in-slot">
             <button className="btn ready-btn deal-me-in" onClick={dealMeIn}>
-              Ready? <span>— deal me in</span>
+              Ready? <span>- deal me in</span>
             </button>
           </div>
         ) : (

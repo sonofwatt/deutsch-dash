@@ -500,5 +500,7 @@
   color: var(--warn-ink); font-weight: 700; font-size: 14px; line-height: 1.15;
   cursor: pointer; }
 .wood-note.quiet { border-style: dashed; cursor: default; font-weight: 600; }
+/* The same band with nothing to say: a drop target and nothing to look at. */
+.wood-note.drop-band { border: 0; background: none; }
 .tableau-zone.wood-left .wood-note { left: calc(var(--hand-card) + var(--tgap)); right: 0; }
 .tableau-zone.wood-right .wood-note { right: calc(var(--hand-card) + var(--tgap)); left: 0; }

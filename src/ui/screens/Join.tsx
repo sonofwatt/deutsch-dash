@@ -97,7 +97,7 @@ export function Join({ code }: { code: string }) {
         <p className="muted">
           {online
             ? 'Could not reach the game.'
-            : 'Waiting for your connection to come back — this will retry by itself.'}
+            : 'Waiting for your connection to come back - this will retry by itself.'}
         </p>
         <button className="btn btn-primary" onClick={retry}>Try again</button>
         <a className="muted keep-back" href="#/">Home</a>

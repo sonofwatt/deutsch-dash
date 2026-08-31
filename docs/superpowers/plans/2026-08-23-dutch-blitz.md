@@ -19,7 +19,7 @@
 - Stack order convention everywhere: **last array element = top of pile**.
 - Mobile-first: Pointer Events only (no mouse/touch forks); touch targets >= 44px; `100dvh`; safe-area insets; `touch-action: none` on draggables; `user-select: none` on cards; `overscroll-behavior: none`; respect `prefers-reduced-motion`.
 - Animations use `transform`/`opacity` only.
-- Hash routing only (`#/room/CODE`) — no history API, no 404 tricks.
+- Hash routing only (`#/room/CODE`) - no history API, no 404 tricks.
 - No server code. Firebase anonymous auth only. `src/net/firebaseConfig.ts` is committed (safe by design).
 - Every commit message ends with `Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>` (shown once here, implied in every commit step below).
 - All commands run from the repo root. If a `Run:` step fails, stop and debug (superpowers:systematic-debugging) before proceeding.
@@ -74,7 +74,7 @@ npm install firebase zustand framer-motion
 npm install -D vitest cross-env firebase-tools
 ```
 
-Note: `npm create vite` into a non-empty dir asks how to proceed — choose "Ignore files and continue" (it preserves `.git/` and `docs/`).
+Note: `npm create vite` into a non-empty dir asks how to proceed - choose "Ignore files and continue" (it preserves `.git/` and `docs/`).
 
 - [ ] **Step 2: Configure Vite + Vitest + Pages base**
 
@@ -188,7 +188,7 @@ describe('parseHash', () => {
 - [ ] **Step 6: Run test to verify it fails**
 
 Run: `npm test`
-Expected: FAIL — App does not export `parseHash`.
+Expected: FAIL - App does not export `parseHash`.
 
 - [ ] **Step 7: Implement App shell + parseHash**
 
@@ -240,8 +240,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 
 - [ ] **Step 8: Verify tests and build pass**
 
-Run: `npm test` — Expected: 2 passed.
-Run: `npm run build` — Expected: tsc clean; `dist/` emitted.
+Run: `npm test` - Expected: 2 passed.
+Run: `npm run build` - Expected: tsc clean; `dist/` emitted.
 
 - [ ] **Step 9: Commit**
 
@@ -392,7 +392,7 @@ describe('deal', () => {
 - [ ] **Step 4: Run tests to verify they fail**
 
 Run: `npm test`
-Expected: FAIL — cannot resolve `./deck`.
+Expected: FAIL - cannot resolve `./deck`.
 
 - [ ] **Step 5: Implement deck.ts**
 
@@ -442,7 +442,7 @@ git commit -m "feat: card types, badge definitions, deck build/shuffle/deal"
 
 ---
 
-### Task 3: Core rules — center plays, post builds, refills, stuck detection
+### Task 3: Core rules - center plays, post builds, refills, stuck detection
 
 **Files:**
 - Create: `src/game/rules.ts`
@@ -452,13 +452,13 @@ git commit -m "feat: card types, badge definitions, deck build/shuffle/deal"
 - Consumes: `types.ts` (`Card`, `Suit`, `FaceGroup`, `Tableau`, `PlaySource`, `CenterSpace`), `deck.ts` (test helpers)
 - Produces:
   - `faceGroup(suit: Suit): FaceGroup`
-  - `postCountForPlayers(playerCount: number): number` — 5 if 2 players else 3
+  - `postCountForPlayers(playerCount: number): number` - 5 if 2 players else 3
   - `canPlayToCenter(card: Card, stack: Card[]): boolean`
-  - `canBuildOnPost(card: Card, stack: Card[]): boolean` — false on empty stacks
-  - `refillPosts(t: Tableau): Tableau` — pure; empty post stacks take the blitz top
+  - `canBuildOnPost(card: Card, stack: Card[]): boolean` - false on empty stacks
+  - `refillPosts(t: Tableau): Tableau` - pure; empty post stacks take the blitz top
   - `sourceTop(t: Tableau, source: PlaySource): Card | null`
-  - `takeCard(t: Tableau, source: PlaySource): { next: Tableau; card: Card } | null` — removes the source top, applies `refillPosts`; null if source empty
-  - `placeOnPost(t: Tableau, source: PlaySource, postIndex: number): Tableau | null` — validated post build (null if illegal, including building from a post onto itself)
+  - `takeCard(t: Tableau, source: PlaySource): { next: Tableau; card: Card } | null` - removes the source top, applies `refillPosts`; null if source empty
+  - `placeOnPost(t: Tableau, source: PlaySource, postIndex: number): Tableau | null` - validated post build (null if illegal, including building from a post onto itself)
   - `hasLegalMove(t: Tableau, spaces: CenterSpace[]): boolean`
 
 Card shorthand used in all tests below (put at top of each test file that needs it):
@@ -631,7 +631,7 @@ describe('hasLegalMove', () => {
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `npm test`
-Expected: FAIL — cannot resolve `./rules`.
+Expected: FAIL - cannot resolve `./rules`.
 
 - [ ] **Step 3: Implement rules.ts**
 
@@ -735,7 +735,7 @@ git commit -m "feat: core rules - center plays, post builds, refills, stuck dete
 
 ---
 
-### Task 4: Wood pile mechanics — flip cycle and standstill rotation
+### Task 4: Wood pile mechanics - flip cycle and standstill rotation
 
 **Files:**
 - Create: `src/game/wood.ts`
@@ -744,8 +744,8 @@ git commit -m "feat: core rules - center plays, post builds, refills, stuck dete
 **Interfaces:**
 - Consumes: `types.ts` (`Tableau`)
 - Produces:
-  - `flipWood(t: Tableau): Tableau` — advances `woodIndex` by 3 (capped at `wood.length`); when everything is already flipped, turns the pile over (index restarts at `min(3, wood.length)`); no-op on empty wood
-  - `rotateWood(t: Tableau): Tableau` — official standstill rule: first card moves to the bottom, `woodIndex` resets to 0; no-op on wood with < 2 cards
+  - `flipWood(t: Tableau): Tableau` - advances `woodIndex` by 3 (capped at `wood.length`); when everything is already flipped, turns the pile over (index restarts at `min(3, wood.length)`); no-op on empty wood
+  - `rotateWood(t: Tableau): Tableau` - official standstill rule: first card moves to the bottom, `woodIndex` resets to 0; no-op on wood with < 2 cards
 
 - [ ] **Step 1: Write failing wood tests**
 
@@ -804,7 +804,7 @@ describe('rotateWood', () => {
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `npm test`
-Expected: FAIL — cannot resolve `./wood`.
+Expected: FAIL - cannot resolve `./wood`.
 
 - [ ] **Step 3: Implement wood.ts**
 
@@ -849,11 +849,11 @@ Firebase RTDB strips empty arrays/objects from stored data (an empty `stack` com
 **Interfaces:**
 - Consumes: `types.ts`, `rules.ts` (`canPlayToCenter`)
 - Produces:
-  - `normalizeSpace(raw: unknown): CenterSpace` — tolerates `null`/missing fields
-  - `normalizeSpaces(raw: unknown): CenterSpace[]` — always length 16
-  - `normalizeTableau(raw: unknown, postCount: number): Tableau` — restores empty arrays (RTDB drops them); `post` always has `postCount` slots
-  - `centerPlayTxn(card: Card): (raw: unknown) => CenterSpace | undefined` — returns `undefined` to abort (illegal/lost race); archives a completed 1..10 stack into `history` and empties `stack` in the same result
-  - `reconcileTableau(t: Tableau, spaces: CenterSpace[]): Tableau` — removes any of MY cards that already exist in the center (self-heal after a crash between transaction commit and tableau persist)
+  - `normalizeSpace(raw: unknown): CenterSpace` - tolerates `null`/missing fields
+  - `normalizeSpaces(raw: unknown): CenterSpace[]` - always length 16
+  - `normalizeTableau(raw: unknown, postCount: number): Tableau` - restores empty arrays (RTDB drops them); `post` always has `postCount` slots
+  - `centerPlayTxn(card: Card): (raw: unknown) => CenterSpace | undefined` - returns `undefined` to abort (illegal/lost race); archives a completed 1..10 stack into `history` and empties `stack` in the same result
+  - `reconcileTableau(t: Tableau, spaces: CenterSpace[]): Tableau` - removes any of MY cards that already exist in the center (self-heal after a crash between transaction commit and tableau persist)
 
 - [ ] **Step 1: Write failing center tests**
 
@@ -924,7 +924,7 @@ describe('reconcileTableau', () => {
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `npm test`
-Expected: FAIL — cannot resolve `./center`.
+Expected: FAIL - cannot resolve `./center`.
 
 - [ ] **Step 3: Implement center.ts**
 
@@ -1010,8 +1010,8 @@ git commit -m "feat: center-space transaction fn, RTDB normalizers, crash reconc
 **Interfaces:**
 - Consumes: `types.ts` (`Card`, `CenterSpace`, `Tableau`, `RoundScore`)
 - Produces:
-  - `scoreRound(spaces: CenterSpace[], tableaus: Record<string, Tableau>): Record<string, RoundScore>` — counts every card in `stack` AND `history` per owner; `delta = centerCount - 2 * blitzLeft`; every uid in `tableaus` gets an entry
-  - `winnerIds(scores: Record<string, number>, target: number): string[]` — uids at/above target holding the max score; `[]` if none reached target
+  - `scoreRound(spaces: CenterSpace[], tableaus: Record<string, Tableau>): Record<string, RoundScore>` - counts every card in `stack` AND `history` per owner; `delta = centerCount - 2 * blitzLeft`; every uid in `tableaus` gets an entry
+  - `winnerIds(scores: Record<string, number>, target: number): string[]` - uids at/above target holding the max score; `[]` if none reached target
 
 - [ ] **Step 1: Write failing scoring tests**
 
@@ -1059,7 +1059,7 @@ describe('winnerIds', () => {
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `npm test`
-Expected: FAIL — cannot resolve `./scoring`.
+Expected: FAIL - cannot resolve `./scoring`.
 
 - [ ] **Step 3: Implement scoring.ts**
 
@@ -1138,7 +1138,7 @@ export const isConfigured = firebaseConfig.apiKey !== 'PASTE_ME';
 
 - [ ] **Step 2: Write firebase.ts with emulator fallback**
 
-When no real config is pasted yet (or in dev), the app runs fully against the local emulator — the game is playable locally before any Firebase account exists.
+When no real config is pasted yet (or in dev), the app runs fully against the local emulator - the game is playable locally before any Firebase account exists.
 
 ```ts
 import { initializeApp } from 'firebase/app';
@@ -1170,7 +1170,7 @@ export function ensureSignedIn(): Promise<string> {
 
 - [ ] **Step 3: Write database.rules.json**
 
-Trust model (per spec): knowing a room code = membership. Tableaus and player records are owner-writable (host may also write, for dealing and score commits). Meta is writable by any signed-in user to allow room creation and host transfer — acceptable for casual play.
+Trust model (per spec): knowing a room code = membership. Tableaus and player records are owner-writable (host may also write, for dealing and score commits). Meta is writable by any signed-in user to allow room creation and host transfer - acceptable for casual play.
 
 ```json
 {
@@ -1237,10 +1237,10 @@ ui-debug.log
 
 - [ ] **Step 5: Verify emulator boots and app signs in**
 
-Prerequisite: Java 11+ on PATH (`java -version`) — the RTDB emulator is a JAR. If Java is missing, install Temurin JRE first; all emulator steps in later tasks share this prerequisite.
+Prerequisite: Java 11+ on PATH (`java -version`) - the RTDB emulator is a JAR. If Java is missing, install Temurin JRE first; all emulator steps in later tasks share this prerequisite.
 
-Run: `npm run emu` (leave running) — Expected: "All emulators ready!" with Database on 9000, Auth on 9099.
-Run (second terminal): `npm run dev`, open `http://localhost:5173` — Expected: Home renders; browser console free of Firebase errors after adding a temporary `ensureSignedIn().then(uid => console.log('uid', uid))` call in `src/main.tsx`; remove the temporary line after confirming a uid prints.
+Run: `npm run emu` (leave running) - Expected: "All emulators ready!" with Database on 9000, Auth on 9099.
+Run (second terminal): `npm run dev`, open `http://localhost:5173` - Expected: Home renders; browser console free of Firebase errors after adding a temporary `ensureSignedIn().then(uid => console.log('uid', uid))` call in `src/main.tsx`; remove the temporary line after confirming a uid prints.
 
 - [ ] **Step 6: Verify build stays clean**
 
@@ -1256,7 +1256,7 @@ git commit -m "feat: firebase init with emulator fallback, RTDB security rules"
 
 ---
 
-### Task 8: Room lifecycle — codes, create, join, watch, presence
+### Task 8: Room lifecycle - codes, create, join, watch, presence
 
 **Files:**
 - Create: `src/net/roomCodes.ts`, `src/net/rooms.ts`
@@ -1269,12 +1269,12 @@ git commit -m "feat: firebase init with emulator fallback, RTDB security rules"
   - `rooms.ts`:
     - `ROOM_TTL_MS = 24 * 60 * 60 * 1000`
     - `type JoinResult = { ok: true; code: string } | { ok: false; reason: 'not-found' | 'expired' | 'full' | 'badge-taken' | 'started' }`
-    - `createRoom(name: string, badgeId: BadgeId): Promise<string>` — signs in, writes meta (creator = host, `targetScore: 75`, `phase: 'lobby'`, `roundNumber: 0`) + player record, starts presence; returns code
-    - `joinRoom(code: string, name: string, badgeId: BadgeId): Promise<JoinResult>` — validates existence/expiry/8-cap/badge uniqueness/phase (rejoin of an existing uid is always allowed, any phase)
-    - `watchRoom(code: string, cb: (room: Room | null) => void): () => void` — single `onValue` on `rooms/{code}`, normalized via `normalizeRoom`
-    - `normalizeRoom(raw: unknown): Room | null` — exported for tests; applies `normalizeSpaces`/`normalizeTableau` (post count from player count) and defaults
+    - `createRoom(name: string, badgeId: BadgeId): Promise<string>` - signs in, writes meta (creator = host, `targetScore: 75`, `phase: 'lobby'`, `roundNumber: 0`) + player record, starts presence; returns code
+    - `joinRoom(code: string, name: string, badgeId: BadgeId): Promise<JoinResult>` - validates existence/expiry/8-cap/badge uniqueness/phase (rejoin of an existing uid is always allowed, any phase)
+    - `watchRoom(code: string, cb: (room: Room | null) => void): () => void` - single `onValue` on `rooms/{code}`, normalized via `normalizeRoom`
+    - `normalizeRoom(raw: unknown): Room | null` - exported for tests; applies `normalizeSpaces`/`normalizeTableau` (post count from player count) and defaults
     - `setTargetScore(code: string, target: number): Promise<void>`
-    - `startPresence(code: string, uid: string): void` — `.info/connected` listener + `onDisconnect(connected).set(false)`
+    - `startPresence(code: string, uid: string): void` - `.info/connected` listener + `onDisconnect(connected).set(false)`
   - RTDB paths it owns: `rooms/{code}/meta`, `rooms/{code}/players/{uid}`
 
 - [ ] **Step 1: Write failing roomCodes test**
@@ -1304,7 +1304,7 @@ describe('makeRoomCode', () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `npm test`
-Expected: FAIL — cannot resolve `./roomCodes`.
+Expected: FAIL - cannot resolve `./roomCodes`.
 
 - [ ] **Step 3: Implement roomCodes.ts**
 
@@ -1319,7 +1319,7 @@ export function makeRoomCode(rng: Rng = Math.random): string {
 }
 ```
 
-Run: `npm test` — Expected: pass.
+Run: `npm test` - Expected: pass.
 
 - [ ] **Step 4: Implement rooms.ts**
 
@@ -1469,8 +1469,8 @@ Add script to `package.json`:
 
 - [ ] **Step 6: Run both test modes**
 
-Run: `npm test` — Expected: emulator suite reported as skipped; everything else passes.
-Run: `npm run test:emu` — Expected: emulator boots, all tests including `rooms against emulator` pass. (Requires Java; if unavailable on this machine, record that and rely on `npm test`.)
+Run: `npm test` - Expected: emulator suite reported as skipped; everything else passes.
+Run: `npm run test:emu` - Expected: emulator boots, all tests including `rooms against emulator` pass. (Requires Java; if unavailable on this machine, record that and rely on `npm test`.)
 
 - [ ] **Step 7: Commit**
 
@@ -1481,7 +1481,7 @@ git commit -m "feat: room create/join/watch with presence, codes, expiry"
 
 ---
 
-### Task 9: Round flow networking — deal, plays, stuck cycle, round end, host transfer
+### Task 9: Round flow networking - deal, plays, stuck cycle, round end, host transfer
 
 The optimistic-play contract (used by the store in Task 10): UI removes the card locally first; `playToCenter` runs the RTDB transaction; on commit the caller persists the updated tableau, on abort the caller restores the pre-play tableau. Rollback animation is pure UI.
 
@@ -1492,18 +1492,18 @@ The optimistic-play contract (used by the store in Task 10): UI removes the card
 **Interfaces:**
 - Consumes: `firebase.ts`, `rooms.ts` (`normalizeRoom`), `game/*` (deal pipeline, `centerPlayTxn`, `scoreRound`, `winnerIds`, `flipWood`, `rotateWood`, `takeCard`)
 - Produces:
-  - Pure (exported for tests): `pickNextHost(players: Record<string, PlayerInfo>): string | null` — connected player with lowest `joinedAt` (uid tiebreak); `allConnectedStuck(players: Record<string, PlayerInfo>): boolean` — true when every connected player has `stuckAt != null` (false if none connected)
-  - `startRound(code: string, room: Room, rng?: Rng): Promise<void>` — HOST ONLY: builds+shuffles a deck per player, deals with `postCountForPlayers`, writes in ONE `update()`: fresh `round` (tableaus, empty spaces, `stuckRounds: 0`, `blitzedBy: null`, `scores: null`, `startedAt: serverTimestamp()`), `meta/phase: 'playing'`, `meta/roundNumber: room.meta.roundNumber + 1`, and `players/*/stuckAt: null`
-  - `playToCenter(code: string, spaceIndex: number, card: Card): Promise<boolean>` — `runTransaction(ref(rooms/{code}/round/spaces/{spaceIndex}), centerPlayTxn(card), { applyLocally: false })`; returns `committed`
-  - `persistTableau(code: string, uid: string, t: Tableau): Promise<void>` — `set` on own tableau path
+  - Pure (exported for tests): `pickNextHost(players: Record<string, PlayerInfo>): string | null` - connected player with lowest `joinedAt` (uid tiebreak); `allConnectedStuck(players: Record<string, PlayerInfo>): boolean` - true when every connected player has `stuckAt != null` (false if none connected)
+  - `startRound(code: string, room: Room, rng?: Rng): Promise<void>` - HOST ONLY: builds+shuffles a deck per player, deals with `postCountForPlayers`, writes in ONE `update()`: fresh `round` (tableaus, empty spaces, `stuckRounds: 0`, `blitzedBy: null`, `scores: null`, `startedAt: serverTimestamp()`), `meta/phase: 'playing'`, `meta/roundNumber: room.meta.roundNumber + 1`, and `players/*/stuckAt: null`
+  - `playToCenter(code: string, spaceIndex: number, card: Card): Promise<boolean>` - `runTransaction(ref(rooms/{code}/round/spaces/{spaceIndex}), centerPlayTxn(card), { applyLocally: false })`; returns `committed`
+  - `persistTableau(code: string, uid: string, t: Tableau): Promise<void>` - `set` on own tableau path
   - `clearStuck(code: string, uid: string): Promise<void>` / `declareStuck(code: string, uid: string): Promise<void>` (`stuckAt: serverTimestamp()`); `playToCenter` itself writes `round/stuckRounds: 0` on every committed play
-  - `announceBlitz(code: string, uid: string): Promise<void>` — one `update()`: `round/blitzedBy = uid`, `meta/phase = 'roundEnd'`
-  - `endRoundStalled(code: string): Promise<void>` — HOST ONLY: `meta/phase = 'roundEnd'` with `blitzedBy: null`
-  - `commitScores(code: string, room: Room): Promise<void>` — HOST ONLY, idempotent: skips if `round.scores` already set; computes `scoreRound`, writes `round/scores` + each `players/{uid}/score` (+= delta) in one `update()`; if `winnerIds` non-empty afterwards also sets `meta/phase = 'gameOver'`
-  - `nextRound(code: string, room: Room): Promise<void>` — HOST ONLY: delegates to `startRound`
-  - `rematch(code: string, room: Room): Promise<void>` — HOST ONLY: one `update()`: every `players/{uid}/score = 0`, `meta/phase = 'lobby'`, `meta/roundNumber = 0`, `round = null`
-  - `claimHost(code: string, uid: string): Promise<void>` — transaction on `meta/hostId`: only overwrites if current host is disconnected in latest snapshot passed by caller (guard is client-side; casual trust model)
-  - `incrementStuckRounds(code: string): Promise<number>` — HOST ONLY transaction, returns new value
+  - `announceBlitz(code: string, uid: string): Promise<void>` - one `update()`: `round/blitzedBy = uid`, `meta/phase = 'roundEnd'`
+  - `endRoundStalled(code: string): Promise<void>` - HOST ONLY: `meta/phase = 'roundEnd'` with `blitzedBy: null`
+  - `commitScores(code: string, room: Room): Promise<void>` - HOST ONLY, idempotent: skips if `round.scores` already set; computes `scoreRound`, writes `round/scores` + each `players/{uid}/score` (+= delta) in one `update()`; if `winnerIds` non-empty afterwards also sets `meta/phase = 'gameOver'`
+  - `nextRound(code: string, room: Room): Promise<void>` - HOST ONLY: delegates to `startRound`
+  - `rematch(code: string, room: Room): Promise<void>` - HOST ONLY: one `update()`: every `players/{uid}/score = 0`, `meta/phase = 'lobby'`, `meta/roundNumber = 0`, `round = null`
+  - `claimHost(code: string, uid: string): Promise<void>` - transaction on `meta/hostId`: only overwrites if current host is disconnected in latest snapshot passed by caller (guard is client-side; casual trust model)
+  - `incrementStuckRounds(code: string): Promise<number>` - HOST ONLY transaction, returns new value
 
 - [ ] **Step 1: Write failing pure-helper tests**
 
@@ -1540,7 +1540,7 @@ describe('allConnectedStuck', () => {
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `npm test`
-Expected: FAIL — cannot resolve `./plays`.
+Expected: FAIL - cannot resolve `./plays`.
 
 - [ ] **Step 3: Implement plays.ts**
 
@@ -1653,7 +1653,7 @@ Expected: pure helper tests pass; suite green.
 
 - [ ] **Step 5: Write emulator-gated race test**
 
-Create `src/net/plays.emu.test.ts` — proves the transaction referees a simultaneous play (the core multiplayer guarantee):
+Create `src/net/plays.emu.test.ts` - proves the transaction referees a simultaneous play (the core multiplayer guarantee):
 
 ```ts
 import { describe, it, expect } from 'vitest';
@@ -1689,8 +1689,8 @@ emu('center transactions against emulator', () => {
 
 - [ ] **Step 6: Run both test modes**
 
-Run: `npm test` — Expected: green, emulator files skipped.
-Run: `npm run test:emu` — Expected: green including the race test (skip if no Java, as in Task 8).
+Run: `npm test` - Expected: green, emulator files skipped.
+Run: `npm run test:emu` - Expected: green including the race test (skip if no Java, as in Task 8).
 
 - [ ] **Step 7: Commit**
 
@@ -1701,7 +1701,7 @@ git commit -m "feat: round dealing, transactional center plays, stuck cycle, sco
 
 ---
 
-### Task 10: Client store — snapshots, optimistic plays, host duties
+### Task 10: Client store - snapshots, optimistic plays, host duties
 
 Design: the store is created by a factory `createGameStore(deps)` so tests inject fake net functions (no vi.mock, no emulator). `src/state/store.ts` exports the factory plus the real singleton hook `useGameStore` wired to `src/net/*`. My tableau is client-authoritative during a round (only I write it); the RTDB copy is for opponents' rendering and crash recovery.
 
@@ -1717,7 +1717,7 @@ Design: the store is created by a factory `createGameStore(deps)` so tests injec
     - state: `uid: string | null; code: string | null; room: Room | null; tableau: Tableau | null; selection: PlaySource | null; lastRejected: { card: Card; at: number } | null; joinPhase: 'idle' | 'joining' | 'in-room'; joinError: string | null`
     - actions: `hostRoom(name, badgeId): Promise<string>`; `enterRoom(code, name, badgeId): Promise<JoinResult>` (rejoining players reuse their anonymous uid, so this also covers resume-after-disconnect); `leave(): void`; `select(source: PlaySource): void` (tap same source again = deselect); `playTo(target: { space: number } | { post: number }): Promise<void>` (uses `selection`; clears it); `flip(): void`; `markStuck(): void`; `setTarget(n: number): void`; `start(): void`; `next(): void`; `again(): void`
     - derived helpers (exported pure): `isHost(s): boolean`; `myPlayer(s): PlayerInfo | null`; `legalTargets(t: Tableau, source: PlaySource, spaces: CenterSpace[]): { spaces: number[]; posts: number[] }`
-  - `useGameStore` — the wired singleton
+  - `useGameStore` - the wired singleton
 - Snapshot side-effects (inside the `watchRoom` callback):
   1. adopt tableau on (re)join: if `phase === 'playing'`, my store `tableau` is null, and the snapshot has my tableau → `reconcileTableau(snapshotTableau, spaces)`, persist if it changed
   2. blitz: after MY successful center play empties my blitz → `announceBlitz` (done in `playTo`, not the watcher)
@@ -1861,7 +1861,7 @@ describe('selection', () => {
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `npm test`
-Expected: FAIL — cannot resolve `./store`.
+Expected: FAIL - cannot resolve `./store`.
 
 - [ ] **Step 3: Implement store.ts**
 
@@ -2139,7 +2139,7 @@ git commit -m "feat: game store with optimistic plays, rollback, host duties, st
 
 ---
 
-### Task 11: UI — Home, Join, Lobby, invite sharing
+### Task 11: UI - Home, Join, Lobby, invite sharing
 
 UI tasks verify manually against the emulator (checklists below); game-logic behavior is already covered by unit tests. Keep all screen files under ~150 lines.
 
@@ -2150,10 +2150,10 @@ UI tasks verify manually against the emulator (checklists below); game-logic beh
 **Interfaces:**
 - Consumes: `useGameStore`, `gameStore`, `BADGES`/`BADGE_IDS`, `Route`/`useRoute`, `peekRoom`
 - Produces:
-  - `peekRoom(code: string): Promise<Room | null>` in `rooms.ts` — one `get` + `normalizeRoom` (lets Join grey out taken badges before joining)
+  - `peekRoom(code: string): Promise<Room | null>` in `rooms.ts` - one `get` + `normalizeRoom` (lets Join grey out taken badges before joining)
   - `<BadgePicker value onChange taken>` with `taken: BadgeId[]`
-  - `<ShareInvite code>` — native share sheet or clipboard fallback
-  - `<RoomScreen code>` — phase switch: no membership -> `<Join>`, `lobby` -> `<Lobby>`, else `<Game>` placeholder (`<p>game soon</p>` until Task 12)
+  - `<ShareInvite code>` - native share sheet or clipboard fallback
+  - `<RoomScreen code>` - phase switch: no membership -> `<Join>`, `lobby` -> `<Lobby>`, else `<Game>` placeholder (`<p>game soon</p>` until Task 12)
   - localStorage keys: `bz.name`, `bz.badge` (prefill across screens)
 
 - [ ] **Step 1: Add peekRoom to rooms.ts**
@@ -2442,7 +2442,7 @@ export default function App() {
 
 - [ ] **Step 5: Verify tests + manual lobby checklist**
 
-Run: `npm test` — Expected: green (no regressions).
+Run: `npm test` - Expected: green (no regressions).
 Run: `npm run emu` (terminal 1), `npm run dev` (terminal 2), then in the browser:
 
 1. Tab A: enter name, pick Tulip, Create room → lands on `#/room/XXXXXX`, Lobby shows you as host with green dot.
@@ -2461,7 +2461,7 @@ git commit -m "feat: home/join/lobby screens with badge picker and invite sharin
 
 ---
 
-### Task 12: UI — Game screen with drag and tap play
+### Task 12: UI - Game screen with drag and tap play
 
 Portrait layout: opponents strip / 4x4 center grid / my tableau in the bottom thumb zone. Both input paths ship here: tap-select + tap-target, and pointer drag with drop hit-testing. Legal targets highlight for whichever is active.
 
@@ -2473,7 +2473,7 @@ Portrait layout: opponents strip / 4x4 center grid / my tableau in the bottom th
 - Consumes: store (`useGameStore`, `legalTargets`, `isHost`), `BADGES`, game types, `cardId`
 - Produces:
   - `watchConnected(cb: (ok: boolean) => void): () => void` in `firebase.ts` (listens to `.info/connected`)
-  - `<CardView card size? selected? dimmed?>` — `size: 'md' | 'sm'` (default `md`)
+  - `<CardView card size? selected? dimmed?>` - `size: 'md' | 'sm'` (default `md`)
   - `useDrag(onDrop)` hook returning `{ drag, startDrag }`; drop targets are any element with `data-drop="space:N"` or `data-drop="post:N"`
   - CSS classes reused by Task 14: `.card .card-back .pile-space .glow .game-grid .tableau-zone`
 
@@ -2489,7 +2489,7 @@ export function watchConnected(cb: (ok: boolean) => void): () => void {
 
 - [ ] **Step 2: CardView + game.css**
 
-`src/ui/components/CardView.tsx` — face shows the value in the suit color, the face-group glyph (boy = filled diamond, girl = open circle — colorblind-safe redundancy for the alternation rule), and the owner badge chip:
+`src/ui/components/CardView.tsx` - face shows the value in the suit color, the face-group glyph (boy = filled diamond, girl = open circle - colorblind-safe redundancy for the alternation rule), and the owner badge chip:
 
 ```tsx
 import { BADGES, type BadgeId } from '../../game/badges';
@@ -2654,7 +2654,7 @@ export function CenterGrid(props: {
 }
 ```
 
-`src/ui/components/TableauView.tsx` — my three piles; drag or tap on the playable tops:
+`src/ui/components/TableauView.tsx` - my three piles; drag or tap on the playable tops:
 
 ```tsx
 import type React from 'react';
@@ -2842,7 +2842,7 @@ export function Game() {
 }
 ```
 
-Update `src/ui/screens/RoomScreen.tsx` — replace the placeholder return:
+Update `src/ui/screens/RoomScreen.tsx` - replace the placeholder return:
 
 ```tsx
 import { Game } from './Game';
@@ -2853,7 +2853,7 @@ import { Game } from './Game';
 
 - [ ] **Step 6: Verify tests + manual game checklist**
 
-Run: `npm test` — Expected: green.
+Run: `npm test` - Expected: green.
 With emulator + dev server, two tabs (host + incognito join), start the game:
 
 1. Both tabs show 16 dashed spaces, own tableau at bottom with **5 post slots** (2-player rule), opponent chip on top with blitz count 10.
@@ -2874,7 +2874,7 @@ git commit -m "feat: game screen - center grid, tableau, opponents, drag and tap
 
 ---
 
-### Task 13: UI — Blitz splash, round-end scores, game over, rematch
+### Task 13: UI - Blitz splash, round-end scores, game over, rematch
 
 **Files:**
 - Create: `src/ui/components/BlitzSplash.tsx`, `src/ui/components/RoundEndOverlay.tsx`, `src/ui/components/GameOverOverlay.tsx`
@@ -3059,7 +3059,7 @@ export function RoomScreen({ code }: { code: string }) {
 
 - [ ] **Step 5: Verify tests + manual round-cycle checklist**
 
-Run: `npm test` — Expected: green.
+Run: `npm test` - Expected: green.
 Emulator + two tabs, play a round to completion (2-player games go quickly; temporarily setting target to 25 in the lobby speeds this up):
 
 1. Empty one blitz pile → BOTH tabs show the "BLITZ! <name>" splash, then the score sheet: +center / −2×blitz / running totals, sorted.
@@ -3111,7 +3111,7 @@ button, [data-drop], .card { touch-action: manipulation; }
 html { -webkit-text-size-adjust: 100%; }
 ```
 
-(`touch-action: none` from `.card` in game.css still wins for draggables — `manipulation` here kills double-tap zoom on the buttons and drop zones.)
+(`touch-action: none` from `.card` in game.css still wins for draggables - `manipulation` here kills double-tap zoom on the buttons and drop zones.)
 
 - [ ] **Step 2: Animated CardView**
 
@@ -3146,7 +3146,7 @@ export function CardView(props: {
 
 Call-site updates:
 - `TableauView` wood top: `<CardView ... flipKey={t.woodIndex} />` (each flip re-mounts with a 3D turn); blitz top and post tops: `layoutId={cardId(top)}` (import `cardId` from `../../game/types`).
-- `CenterGrid` top card: `layoutId={cardId(top)}` — a card played from the tableau now VISIBLY SLIDES from your pile into the space (same layoutId across containers), including for opponents' plays arriving via snapshots.
+- `CenterGrid` top card: `layoutId={cardId(top)}` - a card played from the tableau now VISIBLY SLIDES from your pile into the space (same layoutId across containers), including for opponents' plays arriving via snapshots.
 
 - [ ] **Step 3: Completion pop + rejection shake**
 
@@ -3169,7 +3169,7 @@ import { cardId } from '../../game/types';
 
 (When the 10th card lands, `history.length` increments, the keyed wrapper unmounts, and the exit pop plays while the space clears.)
 
-`Game.tsx` rejection shake — animate the tableau zone when a play bounces:
+`Game.tsx` rejection shake - animate the tableau zone when a play bounces:
 
 ```tsx
 import { motion } from 'framer-motion';
@@ -3184,7 +3184,7 @@ const lastRejected = useGameStore(s => s.lastRejected);
 
 - [ ] **Step 4: Verify feel + tests**
 
-Run: `npm test` — Expected: green (animation props don't touch logic).
+Run: `npm test` - Expected: green (animation props don't touch logic).
 Manual with emulator, two tabs:
 
 1. Playing a card slides it from your pile into the center (no teleport); opponent plays slide in on your screen too.
@@ -3202,7 +3202,7 @@ git commit -m "feat: card slide/flip/pop animations, rejection shake, reduced-mo
 
 ---
 
-### Task 15: Deploy — GitHub Pages workflow, Firebase setup guide, device pass
+### Task 15: Deploy - GitHub Pages workflow, Firebase setup guide, device pass
 
 **Files:**
 - Create: `.github/workflows/deploy.yml`, `README.md`
@@ -3317,17 +3317,17 @@ git add -A
 git commit -m "feat: GitHub Pages deploy workflow and setup docs"
 ```
 
-- [ ] **Step 5: OWNER ACTIONS (David) — go live**
+- [ ] **Step 5: OWNER ACTIONS (David) - go live**
 
 These need David's accounts; the implementer stops here and hands over:
 
 1. Firebase setup per README (paste config, deploy rules).
-2. Create the GitHub repo (suggested name `german-spree` — lowercase, no spaces), `git remote add origin ...`, push `main`, enable Pages -> GitHub Actions.
+2. Create the GitHub repo (suggested name `german-spree` - lowercase, no spaces), `git remote add origin ...`, push `main`, enable Pages -> GitHub Actions.
 3. Confirm the Actions run goes green and the site loads at the Pages URL.
 
 - [ ] **Step 6: Real-device acceptance pass (spec section 7)**
 
-On the LIVE Pages URL with the real Firebase backend — one iPhone (Safari) + one Android phone (Chrome), plus a desktop tab as a third player:
+On the LIVE Pages URL with the real Firebase backend - one iPhone (Safari) + one Android phone (Chrome), plus a desktop tab as a third player:
 
 1. Create a room on the desktop; text the invite via the phone share sheet from one phone to the other; both phones join via the link.
 2. Full 3-player round start-to-finish: no pull-to-refresh, no rubber-band scroll, no double-tap zoom, no text-selection callouts while dragging cards.
@@ -3343,7 +3343,7 @@ Record any failures as bugs and fix before calling the project done (superpowers
 ## Plan self-review notes (kept for the record)
 
 - Spec coverage: architecture/stack (T1, T7), rules incl. post-building + face groups (T2-T6), rooms/invites/presence (T8, T11), transactions + optimistic rollback (T9, T10, T12), screens (T11-T13), scoring/rounds/rematch (T6, T9, T13), stuck cycle + stalled round end (T4, T9, T10, T12), host transfer (T9, T10, T13 checklist), mobile requirements + reduced motion (T1, T12, T14, T15), deployment + Firebase setup (T7, T15), testing strategy (unit throughout, emulator-gated integration in T8/T9, device pass in T15).
-- Known simplifications vs spec, accepted: `meta` writable by any signed-in user (enables creation + host transfer under the casual trust model — noted in T7); `round/scores` writable by any member (idempotence guard is client-side).
+- Known simplifications vs spec, accepted: `meta` writable by any signed-in user (enables creation + host transfer under the casual trust model - noted in T7); `round/scores` writable by any member (idempotence guard is client-side).
 - Fixture sanity: test fixtures in T3/T5/T10 were hand-checked against the rules (refill order, alternation legality, race abort).
 
 

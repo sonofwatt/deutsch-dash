@@ -238,7 +238,7 @@ export function Lobby({ code }: { code: string }) {
         )}
         {iAmOut
           ? <button className="btn ready-btn" onClick={() => setSittingOut(false)}>
-              I'm back — deal me in
+              I'm back - deal me in
             </button>
           : <button className={`btn ready-btn${iAmAway ? ' away' : iAmReady ? ' on' : ''}`}
               onClick={toggleReady}>
@@ -246,7 +246,7 @@ export function Lobby({ code }: { code: string }) {
                   "I'm Ready" then "Ready" read as the same word twice, and people
                   could not tell which state they were looking at - the colour was
                   carrying the whole message on its own. */}
-              {iAmAway ? 'Away — tap when you are back' : iAmReady ? 'Ready!' : 'Ready?'}
+              {iAmAway ? 'Away - tap when you are back' : iAmReady ? 'Ready!' : 'Ready?'}
             </button>}
       </div>
       {/* Quiet, and below the ready button: stepping away is the rarer thing to
@@ -276,7 +276,7 @@ export function Lobby({ code }: { code: string }) {
       )}
       {!host && !tableReady(room) && (
         <p className="muted">
-          {hostConnected ? 'Waiting for everyone to be ready…' : 'Host is away — someone else can start shortly…'}
+          {hostConnected ? 'Waiting for everyone to be ready…' : 'Host is away - someone else can start shortly…'}
         </p>
       )}
       {/* A lobby nobody ever starts is a dead end too - most often a room whose
@@ -293,7 +293,7 @@ export function Lobby({ code }: { code: string }) {
               is the whole reason this is here. */}
           {host && countdown > 0 && (
             <button className="btn countdown-cancel" onClick={cancelCountdown}>
-              Cancel — back to lobby
+              Cancel - back to lobby
             </button>
           )}
         </div>
