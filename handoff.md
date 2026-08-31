@@ -1819,7 +1819,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `ef295be` | The near radius settled at 45px |
 | `aafd534` | The flick bench published beside the app |
 | `bbf3cac` | The bicycle retired for a clover |
-| `PENDING` | The kite retired for a clownfish |
+| `2e2bb62` | The kite retired for a clownfish |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
