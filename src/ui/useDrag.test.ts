@@ -212,6 +212,20 @@ describe('aimedAt', () => {
     expect(aimedAt(lone, beside(140))).toBeNull(); // 60px clear, and out of reach
   });
 
+  it('lets the end of the throw outrank ground it swept on the way', () => {
+    // Straight up a column: over space 0 early, on past it, ending 172px short of
+    // space 1 and pointing dead at it. Both are far too distant for proximity, so
+    // the cone and the sweep are the only rules left and they disagree. A space
+    // swept at the START of a flick is the oldest thing the gesture knows.
+    const column = [box(0, 100, 600), box(1, 100, 200)];
+    const past = { from: { x: 100, y: 400 }, dx: 0, dy: -400, speed: 1,
+                   path: [{ x: 100, y: 800 }, { x: 100, y: 500 }, { x: 100, y: 400 }] };
+    expect(aimedAt(column, past)).toBe(1);
+    // ...and the sweep still decides once nothing is in the cone. Same throw,
+    // with the space it was pointing at taken off the board.
+    expect(aimedAt([box(0, 100, 600)], past)).toBe(0);
+  });
+
   it('does not invent a crossing from a throw that went nowhere near', () => {
     // Up the far right of the screen. Nothing crossed, nothing in the cone.
     const lone = [box(0, 60, 300)];

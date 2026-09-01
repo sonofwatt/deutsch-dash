@@ -167,22 +167,24 @@ export function throwOf(samples: Sample[]): Throw | null {
  *    direction the throw was going. This covers the rest of the circle: a throw
  *    that overshoots a space by a hair leaves it BEHIND the release point, where
  *    the forward cone cannot see it, and it read as that space not being playable.
- * 3. **Its path ran over one, or within `FLICK_NEAR_PX` of one.** A hard flick
- *    carries the finger straight over the space it was aimed at and out the other
- *    side - off the top of the board, or onto some square the card cannot go -
- *    and the two rules above both judge where it STOPPED, so both miss it.
- *    Crossing a space is not an estimate of intent, it is the finger having been
- *    there, which is why it outranks the cone. The near radius rides along the
- *    whole path rather than sitting only on its end, so a throw that shaved past
- *    a space counts as having gone over it - the same forgiveness rule 2 gives
- *    the release point, given to every point the finger passed through. Where a
- *    path runs over several, the LAST one is taken: it is the one still ahead
- *    when the throw ended, and anything crossed earlier was closer to where the
- *    finger stopped, where rule 2 would have caught it.
- * 4. **Otherwise the line of the throw.** A flick says a direction and nothing
- *    dependable about distance - the same thumb movement means "over there"
- *    whether the space is 100px away or 600 - so the card goes to the legal space
- *    nearest that line.
+ * 3. **It was pointing at one**, within `FLICK_MAX_AIM_DEG`. A flick says a
+ *    direction and nothing dependable about distance - the same thumb movement
+ *    means "over there" whether the space is 100px away or 600 - so the card goes
+ *    to the legal space nearest that line.
+ * 4. **And last, its path ran over one, or within `FLICK_NEAR_PX` of one.** A
+ *    hard flick carries the finger straight over the space it was aimed at and
+ *    out the other side, off the top of the board or onto some square the card
+ *    cannot go, and the three rules above all judge where the throw ENDED UP, so
+ *    all three miss it. The near radius rides along the whole path rather than
+ *    sitting only on its end, so a throw that shaved past a space counts as
+ *    having gone over it: the forgiveness rule 2 gives the release point, given
+ *    to every point the finger passed through.
+ *
+ *    **It is last on purpose.** A space swept at the START of a flick is the
+ *    oldest thing the gesture knows and the flick carried on past it, so anything
+ *    the end of the throw has to say - where it stopped, what it stopped near,
+ *    where it was pointing - outranks it. Where a path sweeps several spaces the
+ *    LAST is taken, for the same reason.
  *
  * Candidates are already filtered to LEGAL spaces by the caller, which is what
  * makes all three forgiving in the way they need to be: aim at a space that is
@@ -204,18 +206,8 @@ export function aimedAt(candidates: SpaceBox[], t: Throw): number | null {
     .sort((a, b) => a.d - b.d)[0];
   if (near) return near.c.index;
 
-  // 3. The path RAN OVER one on its way to wherever it stopped. Last one crossed
-  //    wins: it was still in front of the throw when the throw ended.
-  const crossed = candidates
-    .map(c => ({ c, at: crossedBy(pathOf(t), c, FLICK_NEAR_PX) }))
-    .filter((x): x is { c: SpaceBox; at: number } => x.at !== null)
-    .sort((a, b) => b.at - a.at)[0];
-  if (crossed) return crossed.c.index;
-
-  // 4. Otherwise the line of the throw. A flick says a direction and nothing
-  //    dependable about distance, so the card goes to the legal space nearest that
-  //    line - and to nothing at all if none is near it, which is the wild-flick
-  //    case and is deliberate.
+  // 3. The line of the throw. A flick says a direction and nothing dependable
+  //    about distance, so the card goes to the legal space nearest that line.
   const aim = Math.atan2(t.dy, t.dx);
   const scored = candidates.flatMap(c => {
     const dx = c.cx - t.from.x, dy = c.cy - t.from.y;
@@ -228,12 +220,21 @@ export function aimedAt(candidates: SpaceBox[], t: Throw): number | null {
     return [{ index: c.index, off, d }];
   });
   const inCone = scored.filter(c => c.off <= FLICK_MAX_AIM_DEG);
-  if (inCone.length === 0) return null;
-  const bestAngle = Math.min(...inCone.map(c => c.off));
-  // Among the ones aimed at equally well - a column of spaces straight ahead is
-  // the case - the nearest is the one meant.
-  return inCone.filter(c => c.off <= bestAngle + AIM_TIE_DEG)
-    .sort((a, b) => a.d - b.d)[0].index;
+  if (inCone.length > 0) {
+    const bestAngle = Math.min(...inCone.map(c => c.off));
+    // Among the ones aimed at equally well - a column of spaces straight ahead is
+    // the case - the nearest is the one meant.
+    return inCone.filter(c => c.off <= bestAngle + AIM_TIE_DEG)
+      .sort((a, b) => a.d - b.d)[0].index;
+  }
+
+  // 4. And last, the ground the throw covered. Last one swept wins - and nothing
+  //    at all if it swept nothing, which is the wild-flick case and is deliberate.
+  const crossed = candidates
+    .map(c => ({ c, at: crossedBy(pathOf(t), c, FLICK_NEAR_PX) }))
+    .filter((x): x is { c: SpaceBox; at: number } => x.at !== null)
+    .sort((a, b) => b.at - a.at)[0];
+  return crossed ? crossed.c.index : null;
 }
 
 /**

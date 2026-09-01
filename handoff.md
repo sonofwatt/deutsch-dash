@@ -1,3 +1,8 @@
+**Nothing is pending right now.** The sweep order was the first rule to go
+through the gate: bench on 2026-08-31, shipped 2026-09-01. The banner and the
+`pending` tag are still in `flick-bench.html`, unused, because the next one
+should cost a flag and not a rebuild.
+
 # Project Handoff - Deutsch Dash
 
 _Last updated: 2026-08-28. Working tree clean, CI green including the emulator
@@ -726,28 +731,31 @@ Three signals, tried in this order (`useDrag.ts`, then the `nearest` branch of
    table as the space simply not being playable. `edgeDistance` is zero anywhere
    inside a space, so one measure covers both rules; a centre-to-centre one would
    call a throw that stopped just inside a big slot "half a card away".
-3. **Its PATH ran over one, or within `FLICK_NEAR_PX` of one** (`crossedBy`). A
-   hard flick carries the finger straight over the space it was aimed at and out
-   the far side, off the top of the board or onto a square the card cannot go,
-   and rules 1 and 2 both judge where the throw STOPPED, so both miss it. This is
-   not an estimate of intent, it is the finger having been there, which is why it
-   outranks the cone. The path is the whole sample window, so it follows a hooked
-   flick round its corner rather than cutting the straight line from start to
-   end. **The near radius rides along the whole path** rather than sitting only
+3. **It was POINTING at one**, within `FLICK_MAX_AIM_DEG`, now **30** (a
+   half-angle, so a 60 degree cone in front). It was 45 while direction was the
+   last thing between a throw and nothing at all; rule 4 took that job, so a
+   narrower cone can ask the player to point at something.
+4. **And last, its PATH ran over one, or within `FLICK_NEAR_PX` of one**
+   (`crossedBy`). A hard flick carries the finger straight over the space it was
+   aimed at and out the far side, off the top of the board or onto a square the
+   card cannot go, and the three rules above all judge where the throw ENDED UP,
+   so all three miss it. The path is the whole sample window, so it follows a
+   hooked flick round its corner rather than cutting the straight line from start
+   to end. **The near radius rides along the whole path** rather than sitting only
    on its end, so a throw that shaved past a space counts as having gone over it:
    the forgiveness rule 2 gives the release point, given to every point the
    finger passed through. That band is measured properly and not by fattening the
    box - `nearRun` takes the closest approach between the segment and the
    rectangle, so a corner is reached diagonally and a point 35px out on the
-   diagonal stays outside a 30px band. Where a path runs over several spaces the
-   LAST is taken: it was still ahead of the throw when the throw ended, and
-   anything crossed earlier is nearer where the finger stopped, where rule 2
-   would have caught it.
-4. **Otherwise the line of the throw**, within `FLICK_MAX_AIM_DEG`, now **30**
-   (a half-angle, so a 60 degree cone in front). It was 45 while direction was
-   the last thing between a throw and nothing at all. Rule 3 took that job, so
-   the cone went back to being the fallback it reads as, and a narrower one asks
-   the player to point at something.
+   diagonal stays outside a 30px band.
+
+   **It is LAST on purpose**, and it was third for a day before a bench session
+   said otherwise. A space swept at the START of a flick is the oldest thing the
+   gesture knows and the flick carried on past it, so anything the end of the
+   throw has to say outranks it. Where a path sweeps several spaces the LAST is
+   taken, for the same reason. The practical effect is that the sweep is rare:
+   the cone catches most throws first, and what is left for the sweep is a throw
+   with no legal space ahead of it at all, which is the case it was added for.
 
 **The near radius came down from 45 to 30 when rule 3 arrived.** Proximity had
 been carrying the overshoot case alone and had to be generous to do it; the path
@@ -1925,6 +1933,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `fc0355e` | A new flick rule waits on the bench until the table approves it |
 | `edd3875` | The bench tries the sweep last, and says so; the game has not moved |
 | `ab1c651` | The bench colours every legal slot by what the throw did to it |
+| `PENDING` | The sweep ships as the last resort, behind the cone |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.

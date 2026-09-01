@@ -76,6 +76,10 @@ canvas{position:absolute;inset:0;pointer-events:none;z-index:3}
   aspect-ratio:2.5/3.5;border-radius:9px;background:var(--surface);border:1px solid var(--line);
   box-shadow:0 6px 18px rgb(0 0 0/.28);display:grid;place-items:center;font-weight:800;
   font-size:20px;color:var(--trace)}
+/* .pending and .tag.pend are the gate's labelling, kept warm rather than deleted:
+   a rule that is on this bench and NOT in the game gets a banner above the
+   verdict saying so, and sets pending:true on its return from aimedAt to earn the
+   tag beside `played`. Nothing is pending since the sweep order shipped. */
 .pending{display:flex;gap:9px;align-items:flex-start;padding:10px 12px;border-radius:10px;
   font-size:12.5px;line-height:1.4;background:color-mix(in srgb,var(--warn) 12%,transparent);
   border:1px solid color-mix(in srgb,var(--warn) 45%,transparent);color:var(--ink)}
@@ -147,16 +151,6 @@ button.act:hover{border-color:var(--soft)}
   <span><i style="background:var(--warn)"></i>the near radius</span>
   <span>a slot the path swept is a last resort, only once nothing else matches</span>
   <span>tap a slot to make it legal or not</span>
-</div>
-
-<div class="pending">
-  <span><b>Not in the game yet.</b> One rule here is waiting on a verdict from this
-  bench before it goes anywhere near a real table. Anything it decides is marked
-  <b>pending</b>.<br>
-  <b>Sweep order.</b> Here, the ground the throw covered is the LAST thing tried,
-  after the stop point, the near radius and the cone. In the game it is still
-  tried before the cone, so a slot swept early in a flick can beat a slot the
-  throw ended up pointing at. That is the difference being judged.</span>
 </div>
 
 <div class="verdict" id="verdict"><span class="tag">waiting</span><span class="why">Throw a card.</span></div>
@@ -319,7 +313,7 @@ function aimedAt(cands, t) {
   // knows, and the flick went on past it, so anything the end of the throw has to
   // say outranks it. Last one swept still wins among these.
   const over = scored.filter(c => c.crossed !== null).sort((a,b) => b.crossed - a.crossed)[0];
-  if (over) return { pick:over.i, scored, pending:true, bestAngle: over.off,
+  if (over) return { pick:over.i, scored, bestAngle: over.off,
                      rule:`lay under the path the throw took, inside ${S.nearPx}px of it` };
   return { pick:null, scored };
 }
