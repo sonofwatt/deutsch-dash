@@ -266,7 +266,7 @@ export function Game() {
         <span className="head-btns">
           <button className="side-swap" onClick={swapSides}
             aria-label={`Move the wood pile to the ${woodSide === 'right' ? 'left' : 'right'}`}
-            title="Swap Blitz and wood">⇄</button>
+            title="Swap Dash and wood">⇄</button>
           {/* Two taps, never one. This now ends the player's round outright and
               forfeits its score, which is far too much to hang on one stray
               thumb in the corner of a board being played at speed. The armed

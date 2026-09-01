@@ -116,7 +116,7 @@ export function commentary(input: CommentaryInput): Remark[] {
   }
   if (blitzedBy && input.durationMs != null && seconds > 0 && seconds <= 60) {
     add('speed-blitz', 95, [
-      `${nameOf(blitzedBy)} blitzed in ${plural(seconds, 'second')}. Everyone else was still reading their cards.`,
+      `${nameOf(blitzedBy)} dashed in ${plural(seconds, 'second')}. Everyone else was still reading their cards.`,
       `${plural(seconds, 'second')}. ${nameOf(blitzedBy)} came to play; the rest came to watch.`,
       `${plural(seconds, 'second')}. Some of you are still deciding which pile to look at.`,
       `${plural(seconds, 'second')}. Blink and you missed it, which several of you did.`,
@@ -158,7 +158,7 @@ export function commentary(input: CommentaryInput): Remark[] {
   }
   if (blitzedBy && (scores?.[blitzedBy]?.centerCount ?? 0) >= 8) {
     add('perfect', 84, [
-      `${nameOf(blitzedBy)} emptied the Blitz pile AND left ${scores![blitzedBy].centerCount} cards in the middle. Show-off.`,
+      `${nameOf(blitzedBy)} emptied the Dash pile AND left ${scores![blitzedBy].centerCount} cards in the middle. Show-off.`,
       `${nameOf(blitzedBy)} did both jobs at once. Insufferable.`,
       `${nameOf(blitzedBy)} won the round and the board. Leave something for the others.`,
       `${nameOf(blitzedBy)} did the lot. Deal with it - because ${nameOf(blitzedBy)} certainly did.`,
@@ -185,10 +185,10 @@ export function commentary(input: CommentaryInput): Remark[] {
   const hoarder = ids.find(id => id !== blitzedBy && (scores?.[id]?.blitzLeft ?? 0) >= 8);
   if (hoarder) {
     add('barely-started', 46, [
-      `${nameOf(hoarder)} finished with ${scores![hoarder].blitzLeft} cards still in the Blitz pile. Was it a nice nap?`,
-      `${nameOf(hoarder)}'s Blitz pile is basically untouched. Bold strategy.`,
-      `${nameOf(hoarder)} guarded that Blitz pile like it was evidence.`,
-      `${nameOf(hoarder)} is still holding ${scores![hoarder].blitzLeft} Blitz cards. Blitz-erly disappointing.`,
+      `${nameOf(hoarder)} finished with ${scores![hoarder].blitzLeft} cards still in the Dash pile. Was it a nice nap?`,
+      `${nameOf(hoarder)}'s Dash pile is basically untouched. Bold strategy.`,
+      `${nameOf(hoarder)} guarded that Dash pile like it was evidence.`,
+      `${nameOf(hoarder)} is still holding ${scores![hoarder].blitzLeft} Dash cards. Dash-edly disappointing.`,
     ], [hoarder]);
   }
 
@@ -370,9 +370,9 @@ export function commentary(input: CommentaryInput): Remark[] {
   }
   if (blitzedBy && players[blitzedBy]?.isBot) {
     add('bot-blitz', 60, [
-      `${nameOf(blitzedBy)} blitzed. It is a bot. It does not even want the points. That's embarrassing... For you.`,
+      `${nameOf(blitzedBy)} dashed. It is a bot. It does not even want the points. That's embarrassing... For you.`,
       `Beaten to it by ${nameOf(blitzedBy)}, who is made of arithmetic.`,
-      `${nameOf(blitzedBy)} blitzed, felt nothing, and moved on. Be more like ${nameOf(blitzedBy)}.`,
+      `${nameOf(blitzedBy)} dashed, felt nothing, and moved on. Be more like ${nameOf(blitzedBy)}.`,
       `Beaten by ${nameOf(blitzedBy)}, who is a program. No hard feelings, because it has none.`,
     ], [blitzedBy]);
   }
@@ -422,7 +422,7 @@ export function commentary(input: CommentaryInput): Remark[] {
     if (stats.fastest && stats.fastest.round !== roundNumber && players[stats.fastest.uid]
         && blitzedBy && input.durationMs != null && standing('standing-record')) {
       add('standing-record', 48, [
-        `${nameOf(stats.fastest.uid)}'s ${Math.round(stats.fastest.ms / 1000)}-second blitz is still the one to beat.`,
+        `${nameOf(stats.fastest.uid)}'s ${Math.round(stats.fastest.ms / 1000)}-second dash is still the one to beat.`,
         `Nobody has got near ${nameOf(stats.fastest.uid)}'s ${Math.round(stats.fastest.ms / 1000)} seconds yet.`,
       ], [stats.fastest.uid]);
     }
@@ -438,7 +438,7 @@ export function commentary(input: CommentaryInput): Remark[] {
       if (quiet) {
         add('never-blitzed', 44, [
           `${nameOf(quiet)} has yet to end a single round. There is still time. Probably.`,
-          `${plural(games, 'round')} and ${nameOf(quiet)} has not called Blitz once.`,
+          `${plural(games, 'round')} and ${nameOf(quiet)} has not called Dash once.`,
         ], [quiet]);
       }
     }

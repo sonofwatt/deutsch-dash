@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { MotionConfig } from 'framer-motion';
+import { honoursReducedMotion } from './ui/platform';
 import { Home } from './ui/screens/Home';
 import { RoomScreen } from './ui/screens/RoomScreen';
 import { Keeper } from './ui/screens/Keeper';
@@ -41,11 +42,14 @@ export default function App() {
     if (route.screen === 'home' && s.joinPhase !== 'idle') s.leave();
     if (route.screen === 'room' && s.code && s.code !== route.code) s.leave();
   }, [route]);
+  // Phones let the OS decide; a desktop animates regardless. See
+  // honoursReducedMotion for why the two are not treated alike.
+  const motion = honoursReducedMotion() ? 'user' : 'never';
   // Before the config gate on purpose: the scorepad is pure local arithmetic and
   // works in a deployment with no Firebase at all.
   if (route.screen === 'keeper') {
     return (
-      <MotionConfig reducedMotion="user">
+      <MotionConfig reducedMotion={motion}>
         <Keeper />
         <span className="corner-btns"><ThemeToggle /></span>
       </MotionConfig>
@@ -63,7 +67,7 @@ export default function App() {
     );
   }
   return (
-    <MotionConfig reducedMotion="user">
+    <MotionConfig reducedMotion={motion}>
       {route.screen === 'room' ? <RoomScreen code={route.code} /> : <Home />}
       {!boardUp && <span className="corner-btns"><ThemeToggle /></span>}
     </MotionConfig>

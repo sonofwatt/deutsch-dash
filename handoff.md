@@ -470,6 +470,23 @@ painted, re-measuring on `visualViewport` events. On a browser that was already
 right the correction is zero. The `translate(-50%, -55%)` lift is intentional -
 it keeps the card out from under the thumb.
 
+### Dash on screen, blitz in the code
+
+**Every string a player reads says Dash.** The splash, the pile label, the score
+screen's "X dashed!", the scorepad's "Stop the clock when somebody calls Dash",
+the ⚡ row's screen-reader label, the thumb-swap button's tooltip, and eight
+commentary lines including the pun, which is now "Dash-edly disappointing".
+
+**Every identifier still says blitz, deliberately.** `round/blitzedBy` is a live
+key in the database and in `database.rules.json`, `PlaySource` has a `blitz` kind,
+`Tableau.blitz` is the pile, and `RoundScore.blitzLeft` is what the scoring reads.
+Renaming those is a data migration on rooms that are mid-round, for a word nobody
+can see. Around 500 mentions of blitz survive in the source; the sweep was for the
+ones on screen, and `grep` for a quoted or JSX-text blitz comes back empty.
+
+Test names and code comments still say Blitz pile where they mean the mechanic.
+That is the game's own vocabulary talking to whoever reads the code next.
+
 ### The card in the air leaves the pile it came from
 
 **Every pile takes its top card off while that card is being dragged**, and shows
@@ -496,6 +513,37 @@ the card on the Dash pile and on all five posts before, and none of them do afte
 The regression is pinned in `render.test.ts`, which reads each pile's own markup
 rather than the whole tableau - card values repeat across piles, and an assertion
 that just greps the page passes for the wrong reason.
+
+### Reduced motion, and the Windows false positive
+
+**A phone's reduced-motion preference is honoured. A desktop's is overridden.**
+
+Reported as the wood flip and the falling emojis not working in Brave on Windows.
+Neither is a Brave bug and neither is a bug at all: both are CSS animations behind
+`@media (prefers-reduced-motion: reduce)`, and that machine was asking for reduced
+motion. Confirmed by computing `animationName` under both settings - every one of
+them resolves to `none` under `reduce` and to its keyframes without it.
+
+The override exists because of where Windows puts that switch. It is Settings >
+Accessibility > Visual effects > **Animation effects**, a general polish and
+performance toggle that people turn off for reasons having nothing to do with
+motion sensitivity, and Chromium reports it as a preference all the same. A
+phone's sits in Accessibility and means what it says, so it is left alone. This is
+a deliberate override of a stated preference and the reason is the false positive,
+not convenience.
+
+**The switch is the absence of `data-platform`.** `platform.ts` stamps `ios` or
+`android` and writes nothing for a desktop, so `[data-platform]` inside a
+reduced-motion block means "a phone asked, and meant it". Every such block carries
+that prefix; `honoursReducedMotion()` reads the same attribute so `MotionConfig`
+cannot disagree with the CSS.
+
+`motionOverride.test.ts` measures all of it in a browser: animations run on a
+desktop under `reduce`, stop on ios and android under `reduce`, and run on a phone
+without it. It also **parses both stylesheets** and fails on any reduced-motion
+rule that forgot the prefix, because the list it measures is hand-written and a
+block added later would not be on it. Both halves were checked by removing the
+prefix from one rule and watching them go red.
 
 ### Where the OS gets to the swipe first
 
@@ -1999,6 +2047,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `cba9fe2` | The stuck band measured off the piles; dash on the pile; Fish |
 | `3d20a59` | A layout suite that measures the band in a real browser |
 | `40f4d9a` | A dragged card leaves the pile it came from, on every pile |
+| `PENDING` | A desktop animates whatever the OS says; Dash everywhere on screen |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.

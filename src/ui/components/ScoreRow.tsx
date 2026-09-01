@@ -56,7 +56,7 @@ export function ScoreRow(
       <span className="score-total">{player.score}</span>
       {/* Who emptied their Blitz pile, said once, on the row it belongs to. The
           column is always there so the totals stay in line down the sheet. */}
-      <span className="score-blitz" aria-label={blitzed ? 'Blitzed this round' : undefined}>
+      <span className="score-blitz" aria-label={blitzed ? 'Dashed this round' : undefined}>
         {blitzed ? '\u26a1' + EMOJI : ''}
       </span>
     </motion.div>

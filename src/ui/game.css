@@ -139,7 +139,7 @@
    only thing standing between a flashing board and somebody who asked for
    stillness. They get the same one-second mark, held steady instead of pulsed. */
 @media (prefers-reduced-motion: reduce) {
-  .pile-space.hint { animation: none; outline-color: var(--hint);
+  [data-platform] .pile-space.hint { animation: none; outline-color: var(--hint);
     box-shadow: 0 0 0 6px color-mix(in srgb, var(--hint) 34%, transparent);
     background: color-mix(in srgb, var(--hint) 22%, transparent); }
 }
@@ -335,7 +335,7 @@
 }
 /* Same reasoning as the hint and the race face: MotionConfig does not reach CSS
    keyframes, so the still frame has to be the correct one - nothing at all. */
-@media (prefers-reduced-motion: reduce) { .open-glow { animation: none; } }
+@media (prefers-reduced-motion: reduce) { [data-platform] .open-glow { animation: none; } }
 
 /* Who won the race for this space. One second, then it is simply gone: the
    animation's own end state is the timer, so no effect has to clear anything.
@@ -373,8 +373,8 @@
 /* Reduced motion keeps both faces and drops the movement - which one you got is
    the information here, the moving is only how it carries. */
 @media (prefers-reduced-motion: reduce) {
-  .race-angry { animation: race-flash-still 1s ease-out forwards; }
-  .race-angel { animation: race-flash-still 1.5s ease-out forwards; }
+  [data-platform] .race-angry { animation: race-flash-still 1s ease-out forwards; }
+  [data-platform] .race-angel { animation: race-flash-still 1.5s ease-out forwards; }
   @keyframes race-flash-still { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
 }
 
@@ -468,7 +468,7 @@
 }
 /* The cards still arrive and still land in order; they just stop turning. */
 @media (prefers-reduced-motion: reduce) {
-  .wood-deal > * { animation-name: none; }
+  [data-platform] .wood-deal > * { animation-name: none; }
 }
 
 /* The way back in for a player a forced start left behind. It sits in the track

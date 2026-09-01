@@ -12,7 +12,7 @@
     "test:watch": "vitest",
     "test:emu": "node scripts/with-java.mjs firebase emulators:exec --only database,auth --project demo-blitz \"cross-env EMULATOR=1 vitest run\"",
     "emu": "node scripts/with-java.mjs firebase emulators:start --only database,auth --project demo-blitz",
-    "test:layout": "cross-env LAYOUT=1 vitest run src/ui/components/tableauLayout.test.ts"
+    "test:layout": "cross-env LAYOUT=1 vitest run"
   },
   "dependencies": {
     "firebase": "^12.18.0",

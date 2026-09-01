@@ -175,10 +175,10 @@ export function Keeper() {
         <p className="keep-clock">{mmss(elapsed)}</p>
         <p className="muted" style={{ textAlign: 'center' }}>
           {elapsed < TIMED_MIN_MS
-            ? 'Playing. Stop the clock when somebody calls Blitz.'
+            ? 'Playing. Stop the clock when somebody calls Dash.'
             : 'Playing…'}
         </p>
-        <button className="btn btn-primary" onClick={stopRound}>Blitz! Count the cards</button>
+        <button className="btn btn-primary" onClick={stopRound}>Dash! Count the cards</button>
         <a className="muted keep-back" href="#/">Leave (score is saved)</a>
       </div>
     );
@@ -190,7 +190,7 @@ export function Keeper() {
       <div className="screen stack">
         <h1 className="title">Round {roundNumber}</h1>
         <p className="muted">
-          Cards you got into the middle, and cards left in your Blitz pile.
+          Cards you got into the middle, and cards left in your Dash pile.
           {game.pendingMs != null && ` Round took ${mmss(game.pendingMs)}.`}
         </p>
         {game.players.map(p => {
@@ -225,7 +225,7 @@ export function Keeper() {
                     onChange={ev => setEntries(s => ({ ...s, [p.id]: { ...e, center: ev.target.value } }))} />
                 </label>
                 <div className="keep-field">
-                  <span className="muted">Left in Blitz</span>
+                  <span className="muted">Left in Dash</span>
                   {/* Ten cards, so single steps are up to ten taps for one
                       player and the pile is usually counted in threes anyway.
                       The coarse pair sits OUTSIDE the fine one: the value stays

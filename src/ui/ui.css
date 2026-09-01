@@ -80,7 +80,14 @@
   60%  { transform: scale(1.06); opacity: 1; }
   to   { transform: scale(1); opacity: 1; }
 }
-@media (prefers-reduced-motion: reduce) { .countdown-num { animation: none; } }
+/* Reduced motion is honoured on a PHONE and overridden on a desktop, which is
+   what `[data-platform]` selects: platform.ts stamps ios or android and leaves a
+   desktop with no attribute at all. See honoursReducedMotion for why the two are
+   not treated alike - Windows exposes this as a general polish switch and reports
+   it as a preference, and it took these animations off a desktop mid-game. */
+@media (prefers-reduced-motion: reduce) {
+  [data-platform] .countdown-num { animation: none; }
+}
 .dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; }
 .dot.off { background: var(--line); }
 .chip { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center;
@@ -337,10 +344,10 @@
 /* MotionConfig reducedMotion does not reach CSS keyframes, so this is on its own:
    same glyphs, same message, parked instead of moving. */
 @media (prefers-reduced-motion: reduce) {
-  .spark { animation: none; opacity: .9;
+  [data-platform] .spark { animation: none; opacity: .9;
     transform: translate(-50%, -50%) rotate(var(--a)) translateX(var(--d))
                rotate(calc(-1 * var(--a))); }
-  .faller { animation: none; opacity: .9; top: 16vh; }
+  [data-platform] .faller { animation: none; opacity: .9; top: 16vh; }
 }
 
 /* The build, at the foot of the home and lobby screens. Deliberately the
