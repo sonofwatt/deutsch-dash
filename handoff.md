@@ -2047,7 +2047,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `cba9fe2` | The stuck band measured off the piles; dash on the pile; Fish |
 | `3d20a59` | A layout suite that measures the band in a real browser |
 | `40f4d9a` | A dragged card leaves the pile it came from, on every pile |
-| `PENDING` | A desktop animates whatever the OS says; Dash everywhere on screen |
+| `404cafd` | A desktop animates whatever the OS says; Dash everywhere on screen |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
