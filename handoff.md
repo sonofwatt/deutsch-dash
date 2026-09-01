@@ -726,16 +726,23 @@ Three signals, tried in this order (`useDrag.ts`, then the `nearest` branch of
    table as the space simply not being playable. `edgeDistance` is zero anywhere
    inside a space, so one measure covers both rules; a centre-to-centre one would
    call a throw that stopped just inside a big slot "half a card away".
-3. **Its PATH ran over one** (`crossedBy`). A hard flick carries the finger
-   straight over the space it was aimed at and out the far side, off the top of
-   the board or onto a square the card cannot go, and rules 1 and 2 both judge
-   where the throw STOPPED, so both miss it. This is not an estimate of intent,
-   it is the finger having been there, which is why it outranks the cone. The
-   path is the whole sample window, so it follows a hooked flick round its corner
-   rather than cutting the straight line from start to end. Where a path runs
-   over several spaces the LAST is taken: it was still ahead of the throw when
-   the throw ended, and anything crossed earlier is nearer where the finger
-   stopped, where rule 2 would have caught it.
+3. **Its PATH ran over one, or within `FLICK_NEAR_PX` of one** (`crossedBy`). A
+   hard flick carries the finger straight over the space it was aimed at and out
+   the far side, off the top of the board or onto a square the card cannot go,
+   and rules 1 and 2 both judge where the throw STOPPED, so both miss it. This is
+   not an estimate of intent, it is the finger having been there, which is why it
+   outranks the cone. The path is the whole sample window, so it follows a hooked
+   flick round its corner rather than cutting the straight line from start to
+   end. **The near radius rides along the whole path** rather than sitting only
+   on its end, so a throw that shaved past a space counts as having gone over it:
+   the forgiveness rule 2 gives the release point, given to every point the
+   finger passed through. That band is measured properly and not by fattening the
+   box - `nearRun` takes the closest approach between the segment and the
+   rectangle, so a corner is reached diagonally and a point 35px out on the
+   diagonal stays outside a 30px band. Where a path runs over several spaces the
+   LAST is taken: it was still ahead of the throw when the throw ended, and
+   anything crossed earlier is nearer where the finger stopped, where rule 2
+   would have caught it.
 4. **Otherwise the line of the throw**, within `FLICK_MAX_AIM_DEG`, now **30**
    (a half-angle, so a 60 degree cone in front). It was 45 while direction was
    the last thing between a throw and nothing at all. Rule 3 took that job, so
@@ -745,7 +752,10 @@ Three signals, tried in this order (`useDrag.ts`, then the `nearest` branch of
 **The near radius came down from 45 to 30 when rule 3 arrived.** Proximity had
 been carrying the overshoot case alone and had to be generous to do it; the path
 rule takes that job and takes it exactly, so the radius went back to meaning
-"stopped basically on it" rather than a blind circle round the release point.
+"stopped basically on it" rather than a blind circle round the release point. It
+is now ONE number doing two jobs - the circle at the release point, and the width
+of the band swept along the path - so moving it moves both, which is why the
+bench's near-radius slider is the strongest knob on the page.
 
 **`spaceCentres` returns boxes, not points**, because rules 1, 2 and 3 all need
 the width and height.
@@ -783,15 +793,40 @@ whenever the algorithm moves**, or it quietly stops being a mirror and starts
 being a lie. `noindex`, no analytics, no storage: the sliders live in the tester's
 own browser and nothing is sent anywhere.
 
-**The board is a real board, at any table size.** A row of seat buttons rebuilds
-it for 2 to 8 players, and the bench ports `spaceCountForPlayers` and
-`gridColumns` to do it, so 2 players is the 3 x 3 square and 8 is 32 spaces laid
-out the way a phone lays them out. A slot that big or that small changes what the
-near radius and the cone can reach, which is why the size had to be a knob and
-not a picture. Two departures from the game, both deliberate: the mock board's
-height is taken from the viewport rather than from what is left after a head and
-a hand, and the board is NOT rebuilt on resize - a phone fires that whenever the
-address bar moves, and a rebuild throws away the throw being looked at.
+**The board is the real board, at any table size.** A row of seat buttons
+rebuilds it for 2 to 8 players. The first cut of this guessed at the box and got
+the shape wrong - it drew a 4-player board at six columns where the game draws
+four - so the numbers were MEASURED off the running game at 393 x 851 instead,
+and the bench reproduces them:
+
+| players | spaces | cols | slot | board box |
+| --- | --- | --- | --- | --- |
+| 2 | 9 | 3 | 96.0px | 333.7 x 514.1 |
+| 3 | 12 | 4 | 79.3px | 333.7 x 469.3 |
+| 4 | 16 | 4 | 73.7px | 333.7 x 469.3 |
+| 5 | 20 | 5 | 62.3px | 333.7 x 469.3 |
+| 6 | 24 | 5 | 58.2px | 333.7 x 469.3 |
+| 7 | 28 | 6 | 58.2px | 377.0 x 469.3 |
+| 8 | 32 | 7 | 49.1px | 377.0 x 469.3 |
+
+`gridColumns` and `slotFor` are ported, and the box is the only input they need.
+It changes exactly twice down that table: the rails leave the flow at seven
+players so the board takes the full width, and a table with ONE opponent has a
+shorter strip above it so the board takes more height. Everything else falls out
+of the algorithm, which is why every column count and every slot size above
+reproduces to a tenth of a pixel. Three details had to be right for that: the gap
+is `clamp(4px, 1.4vw, 10px)` off the tester's own screen and not a fixed 7px; the
+slot cap is 96px, which is what a 2-player board actually hits; and the caption
+row reserves **40px**, not the `CAPTION_PX` of 34 the game's own source says,
+because 40 is what the real board leaves. The rig is `min(100vw, 430px)` so that
+on a phone it IS the screen - the box is a fraction of it, so a rig narrower than
+the screen makes every slot too small.
+
+Two departures from the game, both deliberate. The board is not rebuilt on
+resize: a phone fires that whenever the address bar moves, and a rebuild throws
+away the throw being looked at. And there is no head or opponent strip above the
+board, only the height they would have taken, because the gesture only cares how
+far the board sits from the hand.
 
 **A cancelled pointer commits the throw.** `pointercancel` fires when the OS takes
 the gesture away mid-air - an iOS home swipe, an Android back swipe, a second
@@ -1852,6 +1887,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `8113014` | The fish badge labelled for the glyph the phones draw |
 | `e0a8ed2` | A throw takes a space it flew over; the near radius down to 30 |
 | `20999f3` | The cone down to 30 degrees; the bench board at any table size |
+| `PENDING` | The near radius swept along the path; the bench board measured off the game |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.

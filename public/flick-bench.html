@@ -37,9 +37,15 @@ body{margin:0;background:var(--bg);color:var(--ink);
 header h1{margin:0;font-size:22px;font-weight:800;letter-spacing:-.02em}
 header p{margin:2px 0 0;color:var(--soft);font-size:13px}
 .rig{position:relative;background:var(--surface);border:1px solid var(--line);
-  border-radius:12px;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}
+  border-radius:12px;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;
+  /* A phone screen, not a widget: the board's box is measured off this, so on a
+     phone the rig has to BE the screen or every slot comes out too small. */
+  width:min(100vw,430px);margin-inline:auto}
 canvas{position:absolute;inset:0;pointer-events:none;z-index:3}
-.board{display:grid;gap:7px;padding:12px;justify-content:center}
+.board{display:grid;place-content:center;margin:0 auto}
+/* The drop zone's caption row. Nothing is drawn in it, but it is board as far as
+   a thrown card is concerned, and it is what pushes the grid up off the hand. */
+.caption{height:40px}
 .slot{border:2px dashed var(--slot);background:var(--slotfill);border-radius:9px;
   aspect-ratio:2.5/3.5;display:grid;place-items:center;font-size:11px;font-weight:700;
   color:var(--soft);cursor:pointer}
@@ -113,6 +119,7 @@ button.act:hover{border-color:var(--soft)}
 
 <div class="rig" id="rig">
   <div class="board" id="board"></div>
+  <div class="caption"></div>
   <div class="hand"><div class="card" id="card">7</div></div>
   <canvas id="cv"></canvas>
 </div>
@@ -123,7 +130,7 @@ button.act:hover{border-color:var(--soft)}
   <span><i style="background:color-mix(in srgb,var(--aim) 35%,transparent)"></i>the cone</span>
   <span><i style="background:var(--ok)"></i>bearing to a legal slot</span>
   <span><i style="background:var(--warn)"></i>the near radius</span>
-  <span>a slot the path ran over is taken even if the throw ended past it</span>
+  <span>a slot the path ran over, or passed within the near radius of, is taken even if the throw ended past it</span>
   <span>tap a slot to make it legal or not</span>
 </div>
 
@@ -172,7 +179,7 @@ const DEFAULTS = {
   tieDeg:     { v:8,   min:0,   max:30,  step:1,   label:'Tie band (deg)',
     hint:'Slots within this of the best angle count as equally aimed at; the nearest wins.' },
   nearPx:     { v:30,  min:0,   max:160, step:5,   label:'Near radius (px)',
-    hint:'How close the throw can END to a slot and have it count, in ANY direction. Measured to the slot edge, so 0px means it landed on it.' },
+    hint:'How close the throw can END to a slot and have it count, in ANY direction, AND how wide a band the path itself sweeps. Measured to the slot edge, so 0px means it has to land on one or run right over it.' },
 };
 const S = {};
 for (const k in DEFAULTS) S[k] = DEFAULTS[k].v;
@@ -222,14 +229,42 @@ function insideRun(a, b, c) {
           && clip(-dy, a.y - (c.cy - c.h/2)) && clip(dy, (c.cy + c.h/2) - a.y);
   return ok ? [t0, t1] : null;
 }
-// How far along the path the finger was when it last LEFT this slot, or null.
-function crossedBy(path, c) {
+// How far along a->b the closest point to p sits, as a fraction of it.
+function closestOn(a, b, p) {
+  const dx = b.x - a.x, dy = b.y - a.y, len2 = dx*dx + dy*dy;
+  if (len2 === 0) return 0;
+  return Math.max(0, Math.min(1, ((p.x - a.x)*dx + (p.y - a.y)*dy) / len2));
+}
+// Where along a->b it last came within pad of the box, or null. Two convex shapes
+// that miss each other are nearest at a corner of one, so four box corners and
+// two segment ends is the whole question.
+function nearRun(a, b, c, pad) {
+  const through = insideRun(a, b, c);
+  if (through) return through[1];
+  if (pad <= 0) return null;
+  let bestGap = Infinity, bestAt = 0;
+  const hx = c.w/2, hy = c.h/2;
+  for (const k of [[-1,-1],[1,-1],[-1,1],[1,1]]) {
+    const cx = c.cx + k[0]*hx, cy = c.cy + k[1]*hy;
+    const at = closestOn(a, b, { x:cx, y:cy });
+    const gap = Math.hypot(a.x + (b.x-a.x)*at - cx, a.y + (b.y-a.y)*at - cy);
+    if (gap < bestGap) { bestGap = gap; bestAt = at; }
+  }
+  for (const e of [[0,a],[1,b]]) {
+    const gap = edgeDistance(e[1], c);
+    if (gap < bestGap) { bestGap = gap; bestAt = e[0]; }
+  }
+  return bestGap <= pad ? bestAt : null;
+}
+// How far along the path the finger was when it last left this slot, or null.
+// pad widens the path into a band that far to either side of it.
+function crossedBy(path, c, pad) {
   let travelled = 0, last = null;
   for (let i = 1; i < path.length; i++) {
     const a = path[i-1], b = path[i];
     const len = Math.hypot(b.x - a.x, b.y - a.y);
-    const run = insideRun(a, b, c);
-    if (run) last = travelled + run[1] * len;
+    const at = nearRun(a, b, c, pad);
+    if (at !== null) last = travelled + at * len;
     travelled += len;
   }
   return last;
@@ -241,14 +276,14 @@ function aimedAt(cands, t) {
     const d = Math.hypot(dx, dy);
     let off = d < 1 ? 0 : Math.abs(Math.atan2(dy, dx) - aim) * 180 / Math.PI;
     if (off > 180) off = 360 - off;
-    return { i:c.i, off, d, edge: edgeDistance(t.from, c), crossed: crossedBy(t.path || [{x:t.from.x-t.dx, y:t.from.y-t.dy}, t.from], c) };
+    return { i:c.i, off, d, edge: edgeDistance(t.from, c), crossed: crossedBy(t.path || [{x:t.from.x-t.dx, y:t.from.y-t.dy}, t.from], c, S.nearPx) };
   });
   // 1 and 2: it ended on a slot, or near enough to one. Any direction.
   const near = scored.filter(c => c.edge <= S.nearPx).sort((a,b) => a.edge - b.edge)[0];
   if (near) return { pick:near.i, scored, rule: near.edge === 0 ? 'landed on it' : `${near.edge.toFixed(0)}px from its edge`, bestAngle: near.off };
   // 3: the path ran over one. Last one crossed wins.
   const over = scored.filter(c => c.crossed !== null).sort((a,b) => b.crossed - a.crossed)[0];
-  if (over) return { pick:over.i, scored, rule:'lay under the path the throw took', bestAngle: over.off };
+  if (over) return { pick:over.i, scored, rule:`lay under the path the throw took, inside ${S.nearPx}px of it`, bestAngle: over.off };
   // 4: the line of the throw.
   const inCone = scored.filter(c => c.off <= S.coneDeg);
   if (!inCone.length) return { pick:null, scored };
@@ -262,30 +297,51 @@ function aimedAt(cands, t) {
 // game has, and gridColumns decides what shape they take in the room available.
 // Both ported from the game, so an 8-player board here is the board an 8-player
 // game gets - which is the whole reason the throw needs testing against it.
-const GAP = 7, PAD = 12, CARD_RATIO = 1.4, MAX_SLOT = 96, MIN_COLS = 2, MAX_COLS = 8;
-// The room the mock board gets. The game's own board is whatever is left after
-// the head and the hand, so this tracks the viewport rather than being a fixed
-// number: on a phone it lands near what a phone really gives the board, which
-// matters because the COLUMN COUNT is chosen from it. Read once per rebuild.
-function boardHeight() { return Math.round(Math.min(360, Math.max(200, innerHeight * 0.4))); }
+// Measured off the real game at 393 x 851, then reproduced rather than guessed:
+// every column count and slot size in the table below comes out of these numbers.
+//
+//   players  spaces  cols  slot     board box
+//   2        9       3     96.0px   333.7 x 514.1
+//   3        12      4     79.3px   333.7 x 469.3
+//   4        16      4     73.7px   333.7 x 469.3
+//   5        20      5     62.3px   333.7 x 469.3
+//   6        24      5     58.2px   333.7 x 469.3
+//   7        28      6     58.2px   377.0 x 469.3
+//   8        32      7     49.1px   377.0 x 469.3
+//
+// The box is what changes, and only twice: the rails leave the flow at seven
+// players so the board gets the full width, and a table with ONE opponent has a
+// shorter strip above the board so the board gets more height.
+const CARD_RATIO = 1.4, MAX_SLOT = 96, MIN_COLS = 2, MAX_COLS = 8;
+// The caption row under the grid, plus the gap above it. The game's own constant
+// is 34; 40 is what the real board actually reserves, and matching the board is
+// the point of this file.
+const CAPTION = 40;
 
+// --gap in the game is clamp(4px, 1.4vw, 10px), so it is the tester's screen
+// that sets it, not this rig.
+function gapPx() { return Math.min(10, Math.max(4, innerWidth * 0.014)); }
+function boardBox(players) {
+  return { w: rig.getBoundingClientRect().width * (players >= 7 ? 0.959 : 0.849),
+           h: innerHeight * (players === 2 ? 0.604 : 0.551) };
+}
 function spaceCountForPlayers(players) {
   // Two players is the one size 4 x players lays out badly. A ninth space makes
   // it a 3 x 3 square, and costs nothing because the ratio is a floor.
   return players === 2 ? 9 : Math.min(32, 4 * players);
 }
-function slotFor(count, cols, box) {
+function slotFor(count, cols, box, gap) {
   const rows = Math.ceil(count / cols);
-  const w = (box.w - (cols - 1) * GAP) / cols;
-  const h = (box.h - (rows - 1) * GAP) / rows / CARD_RATIO;
+  const w = (box.w - (cols - 1) * gap) / cols;
+  const h = (box.h - CAPTION - (rows - 1) * gap) / rows / CARD_RATIO;
   return Math.min(w, h, MAX_SLOT);
 }
-function gridColumns(count, box) {
+function gridColumns(count, box, gap) {
   const hi = Math.max(1, Math.min(MAX_COLS, count));
   const lo = Math.min(MIN_COLS, hi);
   const tried = [];
   for (let cols = lo; cols <= hi; cols++)
-    tried.push({ cols, slot: slotFor(count, cols, box), waste: cols * Math.ceil(count / cols) - count });
+    tried.push({ cols, slot: slotFor(count, cols, box, gap), waste: cols * Math.ceil(count / cols) - count });
   const best = Math.max(...tried.map(c => c.slot));
   return tried.filter(c => c.slot > best - 1)
               .sort((a, b) => a.waste - b.waste || a.cols - b.cols)[0].cols;
@@ -302,14 +358,18 @@ function markSlot(el, i) {
 }
 function buildBoard() {
   const count = spaceCountForPlayers(players);
-  const box = { w: rig.getBoundingClientRect().width - PAD * 2, h: boardHeight() };
-  const cols = gridColumns(count, box);
-  const size = Math.max(26, Math.floor(slotFor(count, cols, box)));
+  const gap = gapPx();
+  const box = boardBox(players);
+  const cols = gridColumns(count, box, gap);
+  const size = slotFor(count, cols, box, gap);
   // Three legal slots, spread across the board rather than bunched, so there is
   // something to aim at near the top, the middle and the far side at every size.
   legal = new Set([Math.floor(count * 0.1), Math.floor(count * 0.45), count - 2]
                   .filter(i => i >= 0 && i < count));
-  board.style.gridTemplateColumns = `repeat(${cols}, ${size}px)`;
+  board.style.width = Math.round(box.w) + 'px';
+  board.style.height = Math.round(box.h - CAPTION) + 'px';
+  board.style.gap = gap.toFixed(2) + 'px';
+  board.style.gridTemplateColumns = `repeat(${cols}, ${size.toFixed(2)}px)`;
   board.innerHTML = '';
   slots = [];
   for (let i = 0; i < count; i++) {
@@ -328,7 +388,7 @@ function buildBoard() {
   const v = document.getElementById('verdict');
   v.className = 'verdict';
   v.innerHTML = `<span class="tag">waiting</span><span class="why">${players} players, `
-    + `${count} spaces, ${cols} columns. Throw a card.</span>`;
+    + `${count} spaces, ${cols} columns, ${Math.round(size)}px slots. Throw a card.</span>`;
   document.getElementById('readout').innerHTML = '';
   sizeCanvas();
 }
@@ -439,7 +499,7 @@ function evaluate(pts, log) {
   if (!t.ok) { verdict = 'miss'; why = t.why; }
   else {
     aim = aimedAt(candidates(), t.best);
-    if (aim.pick == null) { verdict = 'miss'; why = `A throw, but no legal slot is inside the ${S.coneDeg}° cone, within ${S.nearPx}px of where it stopped, or anywhere under the path it took.`; }
+    if (aim.pick == null) { verdict = 'miss'; why = `A throw, but no legal slot is inside the ${S.coneDeg}° cone, within ${S.nearPx}px of where it stopped, or within ${S.nearPx}px of the path it took.`; }
     else { verdict = 'hit'; why = `Slot ${aim.pick}, chosen because it ${aim.rule}.`; }
   }
   shown = { t, aim };

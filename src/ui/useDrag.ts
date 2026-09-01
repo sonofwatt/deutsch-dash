@@ -167,14 +167,18 @@ export function throwOf(samples: Sample[]): Throw | null {
  *    direction the throw was going. This covers the rest of the circle: a throw
  *    that overshoots a space by a hair leaves it BEHIND the release point, where
  *    the forward cone cannot see it, and it read as that space not being playable.
- * 3. **Its path ran over one.** A hard flick carries the finger straight over the
- *    space it was aimed at and out the other side - off the top of the board, or
- *    onto some square the card cannot go - and the two rules above both judge
- *    where it STOPPED, so both miss it. Crossing a space is not an estimate of
- *    intent, it is the finger having been there, which is why it outranks the
- *    cone. Where a path runs over several, the LAST one is taken: it is the one
- *    still ahead when the throw ended, and anything crossed earlier was closer to
- *    where the finger stopped, where rule 2 would have caught it.
+ * 3. **Its path ran over one, or within `FLICK_NEAR_PX` of one.** A hard flick
+ *    carries the finger straight over the space it was aimed at and out the other
+ *    side - off the top of the board, or onto some square the card cannot go -
+ *    and the two rules above both judge where it STOPPED, so both miss it.
+ *    Crossing a space is not an estimate of intent, it is the finger having been
+ *    there, which is why it outranks the cone. The near radius rides along the
+ *    whole path rather than sitting only on its end, so a throw that shaved past
+ *    a space counts as having gone over it - the same forgiveness rule 2 gives
+ *    the release point, given to every point the finger passed through. Where a
+ *    path runs over several, the LAST one is taken: it is the one still ahead
+ *    when the throw ended, and anything crossed earlier was closer to where the
+ *    finger stopped, where rule 2 would have caught it.
  * 4. **Otherwise the line of the throw.** A flick says a direction and nothing
  *    dependable about distance - the same thumb movement means "over there"
  *    whether the space is 100px away or 600 - so the card goes to the legal space
@@ -203,7 +207,7 @@ export function aimedAt(candidates: SpaceBox[], t: Throw): number | null {
   // 3. The path RAN OVER one on its way to wherever it stopped. Last one crossed
   //    wins: it was still in front of the throw when the throw ended.
   const crossed = candidates
-    .map(c => ({ c, at: crossedBy(pathOf(t), c) }))
+    .map(c => ({ c, at: crossedBy(pathOf(t), c, FLICK_NEAR_PX) }))
     .filter((x): x is { c: SpaceBox; at: number } => x.at !== null)
     .sort((a, b) => b.at - a.at)[0];
   if (crossed) return crossed.c.index;
@@ -266,19 +270,57 @@ function insideRun(a: Point, b: Point, c: SpaceBox): [number, number] | null {
   return ok ? [t0, t1] : null;
 }
 
+/** How far along a->b the closest point to `p` sits, as a fraction of it. */
+function closestOn(a: Point, b: Point, p: Point): number {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const len2 = dx * dx + dy * dy;
+  if (len2 === 0) return 0;
+  return Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2));
+}
+
+/**
+ * Where along a->b it last came within `pad` of the box, as a fraction of it, or
+ * null if it never did. `pad` of 0 is the plain question of whether it went over.
+ *
+ * Two convex shapes that do not touch are nearest each other at a corner of one,
+ * so the closest approach is either a box corner against the segment or a segment
+ * end against the box. Four corners and two ends is the whole of it.
+ */
+function nearRun(a: Point, b: Point, c: SpaceBox, pad: number): number | null {
+  const through = insideRun(a, b, c);
+  if (through) return through[1];
+  if (pad <= 0) return null;
+  let bestGap = Infinity, bestAt = 0;
+  const half = { x: c.w / 2, y: c.h / 2 };
+  for (const corner of [{ x: c.cx - half.x, y: c.cy - half.y }, { x: c.cx + half.x, y: c.cy - half.y },
+                        { x: c.cx - half.x, y: c.cy + half.y }, { x: c.cx + half.x, y: c.cy + half.y }]) {
+    const at = closestOn(a, b, corner);
+    const gap = Math.hypot(a.x + (b.x - a.x) * at - corner.x, a.y + (b.y - a.y) * at - corner.y);
+    if (gap < bestGap) { bestGap = gap; bestAt = at; }
+  }
+  for (const end of [{ at: 0, p: a }, { at: 1, p: b }]) {
+    const gap = edgeDistance(end.p, c);
+    if (gap < bestGap) { bestGap = gap; bestAt = end.at; }
+  }
+  return bestGap <= pad ? bestAt : null;
+}
+
 /**
  * How far along the path the finger was when it last LEFT this space, or null if
- * it never touched it. A distance rather than a flag, so several spaces crossed
+ * it never came near it. A distance rather than a flag, so several spaces crossed
  * by one throw can be put in the order they were crossed.
+ *
+ * `pad` widens the path into a band that far to either side, which is what makes
+ * a throw that shaved past a space count as having gone over it.
  */
-export function crossedBy(path: Point[], c: SpaceBox): number | null {
+export function crossedBy(path: Point[], c: SpaceBox, pad = 0): number | null {
   let travelled = 0;
   let last: number | null = null;
   for (let i = 1; i < path.length; i++) {
     const a = path[i - 1], b = path[i];
     const len = Math.hypot(b.x - a.x, b.y - a.y);
-    const run = insideRun(a, b, c);
-    if (run) last = travelled + run[1] * len;
+    const at = nearRun(a, b, c, pad);
+    if (at !== null) last = travelled + at * len;
     travelled += len;
   }
   return last;

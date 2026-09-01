@@ -201,6 +201,17 @@ describe('aimedAt', () => {
     expect(aimedAt(stack, back)).toBe(0);
   });
 
+  it('counts a path that shaved PAST a space, within the near radius of it', () => {
+    // Straight up, 20px clear of space 0's right edge and never over it. It ends
+    // 173px from the space so proximity misses, and the space is behind the throw
+    // so the cone misses: the band around the path is the only thing that sees it.
+    const lone = [box(0, 60, 300)];
+    const beside = (x: number) => ({ from: { x, y: 100 }, dx: 0, dy: -600, speed: 1,
+                                     path: [{ x, y: 700 }, { x, y: 100 }] });
+    expect(aimedAt(lone, beside(100))).toBe(0);    // 20px clear of the edge
+    expect(aimedAt(lone, beside(140))).toBeNull(); // 60px clear, and out of reach
+  });
+
   it('does not invent a crossing from a throw that went nowhere near', () => {
     // Up the far right of the screen. Nothing crossed, nothing in the cone.
     const lone = [box(0, 60, 300)];
@@ -254,6 +265,24 @@ describe('crossedBy', () => {
 
   it('counts a path that runs along inside the space without leaving it', () => {
     expect(crossedBy(line([95, 90], [105, 110]), b)).toBeGreaterThan(0);
+  });
+
+  it('widens the path by pad, and measures that gap from the space EDGE', () => {
+    // b spans x 80..120. A path up x=140 is 20px clear of it.
+    const beside = line([140, 400], [140, 0]);
+    expect(crossedBy(beside, b)).toBeNull();          // no pad, no contact
+    expect(crossedBy(beside, b, 10)).toBeNull();      // 10 does not reach 20
+    expect(crossedBy(beside, b, 30)).not.toBeNull();  // 30 does
+  });
+
+  it('reaches a corner diagonally rather than squaring the space off', () => {
+    // b's top-right corner is (120, 70). A point out on the diagonal from it is
+    // further away than either axis alone says, and the band has to know that: a
+    // box simply widened by 30 on each axis would reach x 150 and y 40 and
+    // swallow (145, 45), which is 35px from the corner and out of a 30px band.
+    const dot = (x: number, y: number) => line([x, y], [x + 1, y]);
+    expect(crossedBy(dot(141, 49), b, 30)).not.toBeNull();  // 29.7px out
+    expect(crossedBy(dot(145, 45), b, 30)).toBeNull();      // 35.4px out
   });
 });
 
