@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:emu": "node scripts/with-java.mjs firebase emulators:exec --only database,auth --project demo-blitz \"cross-env EMULATOR=1 vitest run\"",
-    "emu": "node scripts/with-java.mjs firebase emulators:start --only database,auth --project demo-blitz"
+    "emu": "node scripts/with-java.mjs firebase emulators:start --only database,auth --project demo-blitz",
+    "test:layout": "cross-env LAYOUT=1 vitest run src/ui/components/tableauLayout.test.ts"
   },
   "dependencies": {
     "firebase": "^12.18.0",
@@ -29,6 +30,7 @@
     "cross-env": "^10.1.0",
     "firebase-tools": "^15.28.1",
     "oxlint": "^1.75.0",
+    "playwright": "^1.62.1",
     "typescript": "~6.0.2",
     "vite": "^8.2.0",
     "vitest": "^4.1.11"

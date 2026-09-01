@@ -37,6 +37,13 @@ jobs:
         with:
           path: ~/.cache/firebase/emulators
           key: firebase-emulators-${{ runner.os }}
+      # Chromium for the layout suite, keyed on the Playwright version so a bump
+      # fetches the browser that version expects rather than reusing the old one.
+      - name: Cache the Playwright browser
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - run: npm ci
       # test:emu, NOT `npm test`. It runs the same 15 files plus the emulator, so
       # it is a strict superset - and it is the only run in which the rules tests
@@ -45,6 +52,11 @@ jobs:
       # database.rules.json would sail through CI unnoticed. The guard in
       # src/net/emulatorCoverage.test.ts fails if this line ever goes away.
       - run: npm run test:emu
+      # The only tests that measure anything rather than reading markup. They need
+      # a browser, so it is fetched here and cached above; without this step they
+      # SKIP and report green, which is what tableauLayoutCoverage.test.ts guards.
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:layout
       - run: npm run build
       # v4 of this one stopped putting hidden files in the artifact. `dist` has
       # none, checked, so there is nothing here for that to drop.

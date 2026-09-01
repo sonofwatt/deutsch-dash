@@ -981,9 +981,22 @@ in `wood.test.ts` with the worked numbers.
     was every window wider than the pile row, and it made the game unplayable on
     a desktop while looking perfect on every phone it was tested on.
 
-  `.tableau-row` exists solely to be the thing this is measured against. Probed at
-  393, 1280 and 1600: no overlap at any of them, and `elementFromPoint` on the
-  middle of the wood card returns the card rather than the band.
+  `.tableau-row` exists solely to be the thing this is measured against.
+- **`tableauLayout.test.ts` is the only test in the repo that measures anything**,
+  and it exists because of the two reports above. Everything else here renders to
+  a STRING, and a string has no geometry: `render.test.ts` proved the note was in
+  the markup and in the right order the entire time the note was sitting on top of
+  the wood pile. This one renders the real component with the real stylesheets into
+  a real Chromium and asks two questions at 360, 393, 1280 and 1600, both thumbs:
+  does the band overlap any card, and does `elementFromPoint` on the middle of the
+  face-down wood return the card or the band. Reinstating the old CSS fails 12 of
+  its 18 - and passes at 393, which is exactly why the bug shipped.
+
+  It is gated on `LAYOUT=1` like the emulator suites, so `npm test` stays under
+  three seconds and needs no browser binary. CI runs `npm run test:layout` after
+  installing Chromium, and `tableauLayoutCoverage.test.ts` fails if that step ever
+  leaves the workflow - the same guard, and the same reasoning, as
+  `emulatorCoverage.test.ts`.
 - **It sizes off the card, not off a number.** `font-size` and padding are
   `clamp()`s of `--hand-card`, because the band is one card tall and a few cards
   wide, so a card is the only thing on screen that knows how much room there is. A
@@ -1957,6 +1970,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `e9bf58c` | The sweep ships as the last resort, behind the cone |
 | `0eb22c1` | Every CI action onto a major that runs on Node 24 |
 | `cba9fe2` | The stuck band measured off the piles; dash on the pile; Fish |
+| `PENDING` | A layout suite that measures the band in a real browser |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
