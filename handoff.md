@@ -1933,7 +1933,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `fc0355e` | A new flick rule waits on the bench until the table approves it |
 | `edd3875` | The bench tries the sweep last, and says so; the game has not moved |
 | `ab1c651` | The bench colours every legal slot by what the throw did to it |
-| `PENDING` | The sweep ships as the last resort, behind the cone |
+| `e9bf58c` | The sweep ships as the last resort, behind the cone |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
