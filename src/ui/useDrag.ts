@@ -85,9 +85,15 @@ export const FLICK_MIN_SPEED = 0.3;
 export const FLICK_MIN_TRAVEL = 18;
 /**
  * How far off the line of the throw a space may sit and still count as aimed at.
- * A half-angle, so 45 is a 90 degree cone in front of the throw.
+ * A half-angle, so 30 is a 60 degree cone in front of the throw.
+ *
+ * Tightened from 45 once the path rule below was carrying the overshoot case. A
+ * wide cone is only needed while direction is the last thing standing between a
+ * throw and nothing at all; with the path rule in front of it, the cone is back
+ * to being the FALLBACK it reads as, and a narrower one asks the player to
+ * actually point at something.
  */
-export const FLICK_MAX_AIM_DEG = 45;
+export const FLICK_MAX_AIM_DEG = 30;
 /** Two spaces this close in bearing are both "aimed at"; the nearer one wins. */
 const AIM_TIE_DEG = 8;
 /**

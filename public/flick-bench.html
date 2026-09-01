@@ -46,6 +46,11 @@ canvas{position:absolute;inset:0;pointer-events:none;z-index:3}
 .slot.legal{border-style:solid;border-color:var(--ok);
   background:color-mix(in srgb,var(--ok) 14%,var(--slotfill));color:var(--ok)}
 .slot.won{box-shadow:0 0 0 4px color-mix(in srgb,var(--ok) 45%,transparent)}
+.seats{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0 0 10px}
+.seatlabel{font-size:12px;color:var(--soft);flex-basis:100%;margin:0 0 2px}
+.seat{min-width:34px;padding:6px 0;text-align:center}
+.seat.on{border-color:var(--ok);color:var(--ok);
+  background:color-mix(in srgb,var(--ok) 14%,transparent)}
 .hand{display:flex;gap:8px;justify-content:center;padding:10px 12px 14px;
   border-top:1px dashed var(--line)}
 .card{width:54px;aspect-ratio:2.5/3.5;border-radius:9px;background:var(--surface);
@@ -104,6 +109,8 @@ button.act:hover{border-color:var(--soft)}
      nothing is sent anywhere; the sliders only affect your own browser.</p>
 </header>
 
+<div class="seats" id="seats"><span class="seatlabel">Players at the table</span></div>
+
 <div class="rig" id="rig">
   <div class="board" id="board"></div>
   <div class="hand"><div class="card" id="card">7</div></div>
@@ -160,8 +167,8 @@ const DEFAULTS = {
     hint:'Below this it is a drag, not a throw. A thumb flick runs about 1 to 3.' },
   minTravel:  { v:18,  min:4,   max:80,  step:2,   label:'Travel floor (px)',
     hint:'Total distance inside the window. Guards a fast tap with a shaky finger.' },
-  coneDeg:    { v:45,  min:10,  max:90,  step:5,   label:'Cone (deg)',
-    hint:'A half-angle: 45 is a 90 degree cone in front of the throw. Only slots inside it are judged on bearing.' },
+  coneDeg:    { v:30,  min:10,  max:90,  step:5,   label:'Cone (deg)',
+    hint:'A half-angle: 30 is a 60 degree cone in front of the throw. Only slots inside it are judged on bearing.' },
   tieDeg:     { v:8,   min:0,   max:30,  step:1,   label:'Tie band (deg)',
     hint:'Slots within this of the best angle count as equally aimed at; the nearest wins.' },
   nearPx:     { v:30,  min:0,   max:160, step:5,   label:'Near radius (px)',
@@ -251,25 +258,93 @@ function aimedAt(cands, t) {
 }
 
 // ---- the mock board --------------------------------------------------------
-const COLS = 4, ROWS = 4;
+// Sized the way a real table is: spaceCountForPlayers decides how many spaces a
+// game has, and gridColumns decides what shape they take in the room available.
+// Both ported from the game, so an 8-player board here is the board an 8-player
+// game gets - which is the whole reason the throw needs testing against it.
+const GAP = 7, PAD = 12, CARD_RATIO = 1.4, MAX_SLOT = 96, MIN_COLS = 2, MAX_COLS = 8;
+// The room the mock board gets. The game's own board is whatever is left after
+// the head and the hand, so this tracks the viewport rather than being a fixed
+// number: on a phone it lands near what a phone really gives the board, which
+// matters because the COLUMN COUNT is chosen from it. Read once per rebuild.
+function boardHeight() { return Math.round(Math.min(360, Math.max(200, innerHeight * 0.4))); }
+
+function spaceCountForPlayers(players) {
+  // Two players is the one size 4 x players lays out badly. A ninth space makes
+  // it a 3 x 3 square, and costs nothing because the ratio is a floor.
+  return players === 2 ? 9 : Math.min(32, 4 * players);
+}
+function slotFor(count, cols, box) {
+  const rows = Math.ceil(count / cols);
+  const w = (box.w - (cols - 1) * GAP) / cols;
+  const h = (box.h - (rows - 1) * GAP) / rows / CARD_RATIO;
+  return Math.min(w, h, MAX_SLOT);
+}
+function gridColumns(count, box) {
+  const hi = Math.max(1, Math.min(MAX_COLS, count));
+  const lo = Math.min(MIN_COLS, hi);
+  const tried = [];
+  for (let cols = lo; cols <= hi; cols++)
+    tried.push({ cols, slot: slotFor(count, cols, box), waste: cols * Math.ceil(count / cols) - count });
+  const best = Math.max(...tried.map(c => c.slot));
+  return tried.filter(c => c.slot > best - 1)
+              .sort((a, b) => a.waste - b.waste || a.cols - b.cols)[0].cols;
+}
+
 const board = document.getElementById('board');
-board.style.gridTemplateColumns = `repeat(${COLS}, 52px)`;
-const legal = new Set([1, 4, 11]);
-const slots = [];
-for (let i = 0; i < COLS * ROWS; i++) {
-  const el = document.createElement('div');
-  el.className = 'slot' + (legal.has(i) ? ' legal' : '');
+let legal = new Set();
+let slots = [];
+let players = 4;
+
+function markSlot(el, i) {
+  el.classList.toggle('legal', legal.has(i));
   el.textContent = legal.has(i) ? 'legal' : '';
-  el.addEventListener('click', () => {
-    if (legal.has(i)) legal.delete(i); else legal.add(i);
-    el.classList.toggle('legal', legal.has(i));
-    el.textContent = legal.has(i) ? 'legal' : '';
-    draw();
+}
+function buildBoard() {
+  const count = spaceCountForPlayers(players);
+  const box = { w: rig.getBoundingClientRect().width - PAD * 2, h: boardHeight() };
+  const cols = gridColumns(count, box);
+  const size = Math.max(26, Math.floor(slotFor(count, cols, box)));
+  // Three legal slots, spread across the board rather than bunched, so there is
+  // something to aim at near the top, the middle and the far side at every size.
+  legal = new Set([Math.floor(count * 0.1), Math.floor(count * 0.45), count - 2]
+                  .filter(i => i >= 0 && i < count));
+  board.style.gridTemplateColumns = `repeat(${cols}, ${size}px)`;
+  board.innerHTML = '';
+  slots = [];
+  for (let i = 0; i < count; i++) {
+    const el = document.createElement('div');
+    el.className = 'slot';
+    markSlot(el, i);
+    el.addEventListener('click', () => {
+      if (legal.has(i)) legal.delete(i); else legal.add(i);
+      markSlot(el, i); draw();
+    });
+    board.appendChild(el); slots.push(el);
+  }
+  // Every stored coordinate belonged to the old board, so the last throw is no
+  // longer a statement about anything. Start clean rather than redraw a lie.
+  samples = []; last = null; shown = null;
+  const v = document.getElementById('verdict');
+  v.className = 'verdict';
+  v.innerHTML = `<span class="tag">waiting</span><span class="why">${players} players, `
+    + `${count} spaces, ${cols} columns. Throw a card.</span>`;
+  document.getElementById('readout').innerHTML = '';
+  sizeCanvas();
+}
+for (let n = 2; n <= 8; n++) {
+  const btn = document.createElement('button');
+  btn.className = 'act seat' + (n === players ? ' on' : '');
+  btn.textContent = n;
+  btn.addEventListener('click', () => {
+    players = n;
+    document.querySelectorAll('.seat').forEach(b => b.classList.toggle('on', b === btn));
+    buildBoard();
   });
-  board.appendChild(el); slots.push(el);
+  document.getElementById('seats').appendChild(btn);
 }
 document.getElementById('allslots').addEventListener('click', () => {
-  slots.forEach((el, i) => { legal.add(i); el.classList.add('legal'); el.textContent = 'legal'; });
+  slots.forEach((el, i) => { legal.add(i); markSlot(el, i); });
   draw();
 });
 
@@ -476,8 +551,12 @@ function draw() {
   ctx.closePath(); ctx.fillStyle = css('--aim'); ctx.fill();
   ctx.fillStyle = css('--aim'); ctx.beginPath(); ctx.arc(o.x, o.y, 5, 0, 7); ctx.fill();
 }
-sizeCanvas();
-document.getElementById('readout').innerHTML = row('samples', 0);
+// Last, because it touches the canvas and the gesture's own state, all of which
+// is declared below the board it builds.
+// Not on resize: a phone fires that every time the address bar moves, and a
+// rebuild throws away the throw you were looking at. The shape follows the
+// player count, and the player count only changes when somebody asks.
+buildBoard();
 })();
 </script>
 

@@ -736,8 +736,11 @@ Three signals, tried in this order (`useDrag.ts`, then the `nearest` branch of
    over several spaces the LAST is taken: it was still ahead of the throw when
    the throw ended, and anything crossed earlier is nearer where the finger
    stopped, where rule 2 would have caught it.
-4. **Otherwise the line of the throw**, within `FLICK_MAX_AIM_DEG`, now **45**
-   (a half-angle, so a 90 degree cone in front).
+4. **Otherwise the line of the throw**, within `FLICK_MAX_AIM_DEG`, now **30**
+   (a half-angle, so a 60 degree cone in front). It was 45 while direction was
+   the last thing between a throw and nothing at all. Rule 3 took that job, so
+   the cone went back to being the fallback it reads as, and a narrower one asks
+   the player to point at something.
 
 **The near radius came down from 45 to 30 when rule 3 arrived.** Proximity had
 been carrying the overshoot case alone and had to be generous to do it; the path
@@ -772,12 +775,23 @@ with the app: `public/flick-bench.html`, served at `/deutsch-dash/flick-bench.ht
 Vite copies `public/` verbatim, so it needs no route and no link from the game.
 
 It ports `throwOf` and `aimedAt` **verbatim**, traces the thumb, draws the cone and
-the near radius, and puts every threshold on a slider with a readout saying which
-one a throw failed on. It is the only way any of these numbers has been judged
-against a real thumb, and the numbers a tester reports are the numbers the game
-uses. **Rebuild it from `src/ui/useDrag.ts` whenever the algorithm moves**, or it
-quietly stops being a mirror and starts being a lie. `noindex`, no analytics, no
-storage: the sliders live in the tester's own browser and nothing is sent anywhere.
+the near radius, marks the slots a path crossed, and puts every threshold on a
+slider with a readout saying which one a throw failed on. It is the only way any
+of these numbers has been judged against a real thumb, and the numbers a tester
+reports are the numbers the game uses. **Rebuild it from `src/ui/useDrag.ts`
+whenever the algorithm moves**, or it quietly stops being a mirror and starts
+being a lie. `noindex`, no analytics, no storage: the sliders live in the tester's
+own browser and nothing is sent anywhere.
+
+**The board is a real board, at any table size.** A row of seat buttons rebuilds
+it for 2 to 8 players, and the bench ports `spaceCountForPlayers` and
+`gridColumns` to do it, so 2 players is the 3 x 3 square and 8 is 32 spaces laid
+out the way a phone lays them out. A slot that big or that small changes what the
+near radius and the cone can reach, which is why the size had to be a knob and
+not a picture. Two departures from the game, both deliberate: the mock board's
+height is taken from the viewport rather than from what is left after a head and
+a hand, and the board is NOT rebuilt on resize - a phone fires that whenever the
+address bar moves, and a rebuild throws away the throw being looked at.
 
 **A cancelled pointer commits the throw.** `pointercancel` fires when the OS takes
 the gesture away mid-air - an iOS home swipe, an Android back swipe, a second
@@ -1837,6 +1851,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `2e2bb62` | The kite retired for a clownfish |
 | `8113014` | The fish badge labelled for the glyph the phones draw |
 | `e0a8ed2` | A throw takes a space it flew over; the near radius down to 30 |
+| `PENDING` | The cone down to 30 degrees; the bench board at any table size |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
