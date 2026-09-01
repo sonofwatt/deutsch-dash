@@ -16,13 +16,13 @@
 :root{
   --bg:#f4f2ec; --surface:#ffffff; --ink:#23211c; --soft:#7a766c; --line:#e3e0d7;
   --chip:#efece4; --slot:#6f6a5b; --slotfill:#ebe8e0;
-  --aim:#7c3aed; --ok:#16a34a; --no:#d92d20; --warn:#b45309;
+  --aim:#7c3aed; --ok:#16a34a; --no:#d92d20; --warn:#b45309; --maybe:#ca8a04;
   --trace:#2563eb;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#171613; --surface:#1e1d19; --ink:#f2f0ea; --soft:#a29d92; --line:#37342d;
   --chip:#26241f; --slot:#8b8577; --slotfill:#1f1e19;
-  --aim:#b79cff; --ok:#5bd08a; --no:#ff7a6d; --warn:#e9c25a; --trace:#7ea6ff;
+  --aim:#b79cff; --ok:#5bd08a; --no:#ff7a6d; --warn:#e9c25a; --maybe:#f0cf6a; --trace:#7ea6ff;
 }}
 :root[data-theme="dark"]{
   --bg:#171613; --surface:#1e1d19; --ink:#f2f0ea; --soft:#a29d92; --line:#37342d;
@@ -52,6 +52,14 @@ canvas{position:absolute;inset:0;pointer-events:none;z-index:3}
 .slot.legal{border-style:solid;border-color:var(--ok);
   background:color-mix(in srgb,var(--ok) 14%,var(--slotfill));color:var(--ok)}
 .slot.won{box-shadow:0 0 0 4px color-mix(in srgb,var(--ok) 45%,transparent)}
+/* After a throw, every legal slot says what happened to it. Declared under
+   .legal so they win on source order at the same specificity. */
+.slot.pick{border-style:solid;border-width:3px;border-color:var(--ok);
+  background:color-mix(in srgb,var(--ok) 22%,var(--slotfill));color:var(--ok)}
+.slot.maybe{border-style:solid;border-color:var(--maybe);
+  background:color-mix(in srgb,var(--maybe) 18%,var(--slotfill));color:var(--maybe)}
+.slot.cold{border-style:solid;border-color:var(--no);
+  background:color-mix(in srgb,var(--no) 12%,var(--slotfill));color:var(--no)}
 .seats{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0 0 10px}
 .seatlabel{font-size:12px;color:var(--soft);flex-basis:100%;margin:0 0 2px}
 .seat{min-width:34px;padding:6px 0;text-align:center}
@@ -133,7 +141,9 @@ button.act:hover{border-color:var(--soft)}
   <span><i style="background:var(--trace)"></i>your thumb</span>
   <span><i style="background:var(--aim)"></i>the throw it measured</span>
   <span><i style="background:color-mix(in srgb,var(--aim) 35%,transparent)"></i>the cone</span>
-  <span><i style="background:var(--ok)"></i>bearing to a legal slot</span>
+  <span><i style="background:var(--ok)"></i>the slot it chose</span>
+  <span><i style="background:var(--maybe)"></i>in reach, not chosen</span>
+  <span><i style="background:var(--no)"></i>legal, out of reach</span>
   <span><i style="background:var(--warn)"></i>the near radius</span>
   <span>a slot the path swept is a last resort, only once nothing else matches</span>
   <span>tap a slot to make it legal or not</span>
@@ -400,7 +410,10 @@ function buildBoard() {
     markSlot(el, i);
     el.addEventListener('click', () => {
       if (legal.has(i)) legal.delete(i); else legal.add(i);
-      markSlot(el, i); draw();
+      markSlot(el, i);
+      // The candidate set just changed, so the last throw has to be judged again
+      // or the colours are describing a board that no longer exists.
+      if (last) evaluate(last, false); else draw();
     });
     board.appendChild(el); slots.push(el);
   }
@@ -514,6 +527,27 @@ function candidates() {
   });
 }
 
+// Whether any rule could still have reached this slot. The same test the readout
+// and the bearing lines use, so a slot, its row and its line never disagree.
+function inReach(c) {
+  return c.edge <= S.nearPx || c.crossed !== null || c.off <= S.coneDeg;
+}
+/**
+ * What the throw did to every legal slot: the one it chose, the ones it could
+ * have chosen, and the ones nothing could reach. Illegal slots stay as they are -
+ * they were never in the running, which is a different thing from being missed.
+ */
+function paintSlots(aim) {
+  for (const el of slots) el.classList.remove('pick', 'maybe', 'cold', 'won');
+  if (!aim) return;
+  for (const c of aim.scored) {
+    const el = slots[c.i];
+    if (!el) continue;
+    if (aim.pick === c.i) el.classList.add('pick', 'won');
+    else el.classList.add(inReach(c) ? 'maybe' : 'cold');
+  }
+}
+
 let shown = null;
 function evaluate(pts, log) {
   const t = throwOf(pts);
@@ -526,14 +560,13 @@ function evaluate(pts, log) {
            + (aim.pending ? ' Nothing else matched, so this is the pending rule deciding it.' : ''); }
   }
   shown = { t, aim };
+  paintSlots(aim);
   const v = document.getElementById('verdict');
   v.className = 'verdict ' + verdict;
   v.innerHTML = `<span class="tag">${verdict === 'hit' ? 'played' : 'no play'}</span>`
     + (aim && aim.pending ? '<span class="tag pend">pending</span>' : '')
     + `<span class="why">${why}</span>`;
   readout(pts, t, aim);
-  slots.forEach(el => el.classList.remove('won'));
-  if (aim && aim.pick != null) slots[aim.pick].classList.add('won');
   if (log) addLog(verdict, t, aim);
   draw();
 }
@@ -564,9 +597,8 @@ function readout(pts, t, aim) {
     html += row('legal slots', `${aim.scored.length}, ${inCone} in the cone`,
                 inCone ? 'good' : 'bad');
     for (const c of [...aim.scored].sort((a,b) => a.edge - b.edge).slice(0, 4)) {
-      const reach = c.edge <= S.nearPx || c.crossed !== null || c.off <= S.coneDeg;
       html += row(`slot ${c.i}`, `${c.off.toFixed(0)}° off, ${c.edge.toFixed(0)} px from edge`
-                  + (c.crossed !== null ? ', crossed' : ''), reach ? 'good' : 'bad');
+                  + (c.crossed !== null ? ', swept' : ''), inReach(c) ? 'good' : 'bad');
     }
   }
   document.getElementById('readout').innerHTML = html;
@@ -617,9 +649,9 @@ function draw() {
     for (const c of shown.aim.scored) {
       const s = slots[c.i].getBoundingClientRect(), r = rig.getBoundingClientRect();
       const cx = s.left + s.width/2 - r.left, cy = s.top + s.height/2 - r.top;
-      const on = c.edge <= S.nearPx || c.crossed !== null || c.off <= S.coneDeg;
-      ctx.strokeStyle = on ? css('--ok') : css('--soft');
-      ctx.lineWidth = shown.aim.pick === c.i ? 3 : 1.2;
+      const on = inReach(c), chosen = shown.aim.pick === c.i;
+      ctx.strokeStyle = chosen ? css('--ok') : on ? css('--maybe') : css('--no');
+      ctx.lineWidth = chosen ? 3 : 1.2;
       ctx.setLineDash(on ? [] : [4, 4]);
       ctx.beginPath(); ctx.moveTo(o.x, o.y); ctx.lineTo(cx, cy); ctx.stroke();
       ctx.setLineDash([]);

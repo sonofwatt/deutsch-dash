@@ -785,8 +785,13 @@ with the app: `public/flick-bench.html`, served at `/deutsch-dash/flick-bench.ht
 Vite copies `public/` verbatim, so it needs no route and no link from the game.
 
 It ports `throwOf` and `aimedAt` **verbatim**, traces the thumb, draws the cone and
-the near radius, marks the slots a path crossed, and puts every threshold on a
-slider with a readout saying which one a throw failed on. It is the only way any
+the near radius, and puts every threshold on a slider with a readout saying which
+one a throw failed on. After a throw every LEGAL slot is coloured by what happened
+to it - **green** for the one it chose, **yellow** for one a rule could still have
+reached, **red** for one nothing could reach - and its bearing line takes the same
+colour, so a slot, its row in the readout and its line never disagree. Illegal
+slots stay grey: they were never in the running, which is a different thing from
+being missed. It is the only way any
 of these numbers has been judged against a real thumb, and the numbers a tester
 reports are the numbers the game uses. `noindex`, no analytics, no storage: the
 sliders live in the tester's own browser and nothing is sent anywhere.
@@ -1919,6 +1924,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `000f212` | The near radius swept along the path; the bench board measured off the game |
 | `fc0355e` | A new flick rule waits on the bench until the table approves it |
 | `edd3875` | The bench tries the sweep last, and says so; the game has not moved |
+| `PENDING` | The bench colours every legal slot by what the throw did to it |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
