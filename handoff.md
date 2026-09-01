@@ -1887,7 +1887,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `8113014` | The fish badge labelled for the glyph the phones draw |
 | `e0a8ed2` | A throw takes a space it flew over; the near radius down to 30 |
 | `20999f3` | The cone down to 30 degrees; the bench board at any table size |
-| `PENDING` | The near radius swept along the path; the bench board measured off the game |
+| `000f212` | The near radius swept along the path; the bench board measured off the game |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
