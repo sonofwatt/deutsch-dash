@@ -1956,7 +1956,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `ab1c651` | The bench colours every legal slot by what the throw did to it |
 | `e9bf58c` | The sweep ships as the last resort, behind the cone |
 | `0eb22c1` | Every CI action onto a major that runs on Node 24 |
-| `PENDING` | The stuck band measured off the piles; dash on the pile; Fish |
+| `cba9fe2` | The stuck band measured off the piles; dash on the pile; Fish |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
