@@ -1970,7 +1970,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `e9bf58c` | The sweep ships as the last resort, behind the cone |
 | `0eb22c1` | Every CI action onto a major that runs on Node 24 |
 | `cba9fe2` | The stuck band measured off the piles; dash on the pile; Fish |
-| `PENDING` | A layout suite that measures the band in a real browser |
+| `3d20a59` | A layout suite that measures the band in a real browser |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
