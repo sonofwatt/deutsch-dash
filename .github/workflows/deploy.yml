@@ -16,21 +16,24 @@ jobs:
     env:
       GITHUB_PAGES_BASE: /${{ github.event.repository.name }}/
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      # Every action here is on a major that runs on Node 24. The runner deprecated
+      # Node 20 on 2025-09-19 and has been forcing those actions onto 24 with a
+      # warning since; when it stops forcing, a v4 pinned here would simply fail.
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
       # The emulator suite is the ONLY thing that exercises database.rules.json,
       # and `firebase emulators:exec` needs a JVM to run the database emulator.
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '21'
       # The database emulator jar (~30MB) is fetched on first run; cache it so a
       # slow or flaky CDN cannot turn the rules tests into a red build.
       - name: Cache Firebase emulator jars
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/firebase/emulators
           key: firebase-emulators-${{ runner.os }}
@@ -43,7 +46,9 @@ jobs:
       # src/net/emulatorCoverage.test.ts fails if this line ever goes away.
       - run: npm run test:emu
       - run: npm run build
-      - uses: actions/upload-pages-artifact@v3
+      # v4 of this one stopped putting hidden files in the artifact. `dist` has
+      # none, checked, so there is nothing here for that to drop.
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: dist
   deploy:
@@ -54,4 +59,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

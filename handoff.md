@@ -1934,6 +1934,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `edd3875` | The bench tries the sweep last, and says so; the game has not moved |
 | `ab1c651` | The bench colours every legal slot by what the throw did to it |
 | `e9bf58c` | The sweep ships as the last resort, behind the cone |
+| `PENDING` | Every CI action onto a major that runs on Node 24 |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
