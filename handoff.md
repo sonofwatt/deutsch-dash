@@ -788,10 +788,27 @@ It ports `throwOf` and `aimedAt` **verbatim**, traces the thumb, draws the cone 
 the near radius, marks the slots a path crossed, and puts every threshold on a
 slider with a readout saying which one a throw failed on. It is the only way any
 of these numbers has been judged against a real thumb, and the numbers a tester
-reports are the numbers the game uses. **Rebuild it from `src/ui/useDrag.ts`
-whenever the algorithm moves**, or it quietly stops being a mirror and starts
-being a lie. `noindex`, no analytics, no storage: the sliders live in the tester's
-own browser and nothing is sent anywhere.
+reports are the numbers the game uses. `noindex`, no analytics, no storage: the
+sliders live in the tester's own browser and nothing is sent anywhere.
+
+**A NEW RULE GOES ON THE BENCH AND STOPS THERE** until the table says to ship it.
+Asked for on 2026-08-31, after the swept near radius went into the game and the
+bench in one commit: every push deploys, so a rule that lands in `useDrag.ts` is
+live at the next playtest, on the phones of people trying to play a game rather
+than test one. The bench exists so that a rule meets a real thumb before it meets
+a real table, and putting it in both at once spends that for nothing.
+
+So the mirror rule now runs ONE WAY. **The bench may be ahead of the game; it must
+never be behind it.**
+
+- A new rule: bench first, `useDrag.ts` only on approval. While it is pending it
+  has to be LABELLED in the bench UI as not in the game yet, or a tester cannot
+  tell which of the two they are judging.
+- Tuning a number both already share - the near radius, the cone, the speed
+  floor - is not a new rule and does not need the gate. Those move in both at
+  once, which is the whole point of the sliders.
+- Anything that lands in `useDrag.ts` still has to reach the bench in the same
+  change, or the bench falls behind and starts being a lie.
 
 **The board is the real board, at any table size.** A row of seat buttons
 rebuilds it for 2 to 8 players. The first cut of this guessed at the box and got
@@ -1888,6 +1905,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `e0a8ed2` | A throw takes a space it flew over; the near radius down to 30 |
 | `20999f3` | The cone down to 30 degrees; the bench board at any table size |
 | `000f212` | The near radius swept along the path; the bench board measured off the game |
+| `PENDING` | A new flick rule waits on the bench until the table approves it |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
