@@ -1918,7 +1918,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `20999f3` | The cone down to 30 degrees; the bench board at any table size |
 | `000f212` | The near radius swept along the path; the bench board measured off the game |
 | `fc0355e` | A new flick rule waits on the bench until the table approves it |
-| `PENDING` | The bench tries the sweep last, and says so; the game has not moved |
+| `edd3875` | The bench tries the sweep last, and says so; the game has not moved |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
