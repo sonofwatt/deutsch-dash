@@ -803,7 +803,19 @@ never be behind it.**
 
 - A new rule: bench first, `useDrag.ts` only on approval. While it is pending it
   has to be LABELLED in the bench UI as not in the game yet, or a tester cannot
-  tell which of the two they are judging.
+  tell which of the two they are judging. There is a `.pending` banner under the
+  rig that says what differs and why, and any verdict the pending rule decided
+  carries a second `pending` tag beside `played`.
+
+**Pending right now: the sweep is the LAST resort on the bench, and the third
+rule in the game.** Asked for on 2026-08-31: a slot swept at the start of a flick
+is the oldest thing the gesture knows, and the flick carried on past it, so
+anything the END of the throw has to say - where it stopped, what it stopped near,
+where it was pointing - outranks it. On the bench the order is stop point, near
+radius, cone, then sweep. In `useDrag.ts` the sweep still sits at 3, ahead of the
+cone, and the four-rule list above describes THAT, which is the shipped order
+until this is judged. Shipping it is a matter of moving one block below the cone
+block in `aimedAt` and swapping the two rules in that list.
 - Tuning a number both already share - the near radius, the cone, the speed
   floor - is not a new rule and does not need the gate. Those move in both at
   once, which is the whole point of the sliders.
@@ -1906,6 +1918,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `20999f3` | The cone down to 30 degrees; the bench board at any table size |
 | `000f212` | The near radius swept along the path; the bench board measured off the game |
 | `fc0355e` | A new flick rule waits on the bench until the table approves it |
+| `PENDING` | The bench tries the sweep last, and says so; the game has not moved |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.

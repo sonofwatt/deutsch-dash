@@ -68,6 +68,11 @@ canvas{position:absolute;inset:0;pointer-events:none;z-index:3}
   aspect-ratio:2.5/3.5;border-radius:9px;background:var(--surface);border:1px solid var(--line);
   box-shadow:0 6px 18px rgb(0 0 0/.28);display:grid;place-items:center;font-weight:800;
   font-size:20px;color:var(--trace)}
+.pending{display:flex;gap:9px;align-items:flex-start;padding:10px 12px;border-radius:10px;
+  font-size:12.5px;line-height:1.4;background:color-mix(in srgb,var(--warn) 12%,transparent);
+  border:1px solid color-mix(in srgb,var(--warn) 45%,transparent);color:var(--ink)}
+.pending b{color:var(--warn)}
+.tag.pend{background:color-mix(in srgb,var(--warn) 22%,transparent);color:var(--warn)}
 .verdict{display:flex;align-items:center;gap:10px;padding:11px 13px;border-radius:10px;
   border:1px solid var(--line);background:var(--surface);font-weight:700;font-size:15px}
 .verdict .tag{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
@@ -130,8 +135,18 @@ button.act:hover{border-color:var(--soft)}
   <span><i style="background:color-mix(in srgb,var(--aim) 35%,transparent)"></i>the cone</span>
   <span><i style="background:var(--ok)"></i>bearing to a legal slot</span>
   <span><i style="background:var(--warn)"></i>the near radius</span>
-  <span>a slot the path ran over, or passed within the near radius of, is taken even if the throw ended past it</span>
+  <span>a slot the path swept is a last resort, only once nothing else matches</span>
   <span>tap a slot to make it legal or not</span>
+</div>
+
+<div class="pending">
+  <span><b>Not in the game yet.</b> One rule here is waiting on a verdict from this
+  bench before it goes anywhere near a real table. Anything it decides is marked
+  <b>pending</b>.<br>
+  <b>Sweep order.</b> Here, the ground the throw covered is the LAST thing tried,
+  after the stop point, the near radius and the cone. In the game it is still
+  tried before the cone, so a slot swept early in a flick can beat a slot the
+  throw ended up pointing at. That is the difference being judged.</span>
 </div>
 
 <div class="verdict" id="verdict"><span class="tag">waiting</span><span class="why">Throw a card.</span></div>
@@ -278,18 +293,25 @@ function aimedAt(cands, t) {
     if (off > 180) off = 360 - off;
     return { i:c.i, off, d, edge: edgeDistance(t.from, c), crossed: crossedBy(t.path || [{x:t.from.x-t.dx, y:t.from.y-t.dy}, t.from], c, S.nearPx) };
   });
-  // 1 and 2: it ended on a slot, or near enough to one. Any direction.
+  // The three PRIMARY indicators first, all of them about where the throw ended
+  // up rather than where it had been: 1 and 2, it stopped on a slot or near
+  // enough to one, and 3, it was pointing at one.
   const near = scored.filter(c => c.edge <= S.nearPx).sort((a,b) => a.edge - b.edge)[0];
   if (near) return { pick:near.i, scored, rule: near.edge === 0 ? 'landed on it' : `${near.edge.toFixed(0)}px from its edge`, bestAngle: near.off };
-  // 3: the path ran over one. Last one crossed wins.
-  const over = scored.filter(c => c.crossed !== null).sort((a,b) => b.crossed - a.crossed)[0];
-  if (over) return { pick:over.i, scored, rule:`lay under the path the throw took, inside ${S.nearPx}px of it`, bestAngle: over.off };
-  // 4: the line of the throw.
   const inCone = scored.filter(c => c.off <= S.coneDeg);
-  if (!inCone.length) return { pick:null, scored };
-  const bestAngle = Math.min(...inCone.map(c => c.off));
-  const pick = inCone.filter(c => c.off <= bestAngle + S.tieDeg).sort((a,b) => a.d - b.d)[0];
-  return { pick:pick.i, scored, bestAngle, rule:`${pick.off.toFixed(0)}° off the line` };
+  if (inCone.length) {
+    const bestAngle = Math.min(...inCone.map(c => c.off));
+    const pick = inCone.filter(c => c.off <= bestAngle + S.tieDeg).sort((a,b) => a.d - b.d)[0];
+    return { pick:pick.i, scored, bestAngle, rule:`${pick.off.toFixed(0)}° off the line` };
+  }
+  // 4, and only once the other three have found nothing: the ground the throw
+  // covered. A slot swept at the START of a flick is the oldest thing the gesture
+  // knows, and the flick went on past it, so anything the end of the throw has to
+  // say outranks it. Last one swept still wins among these.
+  const over = scored.filter(c => c.crossed !== null).sort((a,b) => b.crossed - a.crossed)[0];
+  if (over) return { pick:over.i, scored, pending:true, bestAngle: over.off,
+                     rule:`lay under the path the throw took, inside ${S.nearPx}px of it` };
+  return { pick:null, scored };
 }
 
 // ---- the mock board --------------------------------------------------------
@@ -499,13 +521,16 @@ function evaluate(pts, log) {
   if (!t.ok) { verdict = 'miss'; why = t.why; }
   else {
     aim = aimedAt(candidates(), t.best);
-    if (aim.pick == null) { verdict = 'miss'; why = `A throw, but no legal slot is inside the ${S.coneDeg}° cone, within ${S.nearPx}px of where it stopped, or within ${S.nearPx}px of the path it took.`; }
-    else { verdict = 'hit'; why = `Slot ${aim.pick}, chosen because it ${aim.rule}.`; }
+    if (aim.pick == null) { verdict = 'miss'; why = `A throw, but no legal slot is within ${S.nearPx}px of where it stopped, inside the ${S.coneDeg}° cone, or within ${S.nearPx}px of the path it took.`; }
+    else { verdict = 'hit'; why = `Slot ${aim.pick}, chosen because it ${aim.rule}.`
+           + (aim.pending ? ' Nothing else matched, so this is the pending rule deciding it.' : ''); }
   }
   shown = { t, aim };
   const v = document.getElementById('verdict');
   v.className = 'verdict ' + verdict;
-  v.innerHTML = `<span class="tag">${verdict === 'hit' ? 'played' : 'no play'}</span><span class="why">${why}</span>`;
+  v.innerHTML = `<span class="tag">${verdict === 'hit' ? 'played' : 'no play'}</span>`
+    + (aim && aim.pending ? '<span class="tag pend">pending</span>' : '')
+    + `<span class="why">${why}</span>`;
   readout(pts, t, aim);
   slots.forEach(el => el.classList.remove('won'));
   if (aim && aim.pick != null) slots[aim.pick].classList.add('won');
