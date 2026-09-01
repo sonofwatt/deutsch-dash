@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseDrop, nearestOf, ghostFix, GHOST_ANCHOR, throwOf, aimedAt,
+import { parseDrop, nearestOf, ghostFix, GHOST_ANCHOR, throwOf, aimedAt, crossedBy,
   edgeDistance, FLICK_MAX_AIM_DEG } from './useDrag';
 
 describe('parseDrop', () => {
@@ -160,8 +160,53 @@ describe('aimedAt', () => {
     // proximity can pick it.
     const lone = [box(0, 60, 300)];
     const near = (gap: number) => ({ from: { x: 60, y: 300 - 28 - gap }, dx: 400, dy: -8, speed: 1 });
-    expect(aimedAt(lone, near(40))).toBe(0);
-    expect(aimedAt(lone, near(70))).toBeNull();
+    expect(aimedAt(lone, near(20))).toBe(0);
+    expect(aimedAt(lone, near(60))).toBeNull();
+  });
+
+  it('takes a space the throw FLEW OVER on its way past', () => {
+    // Straight up the column space 0 sits in and out the top of the board. It
+    // stopped 152px above the space, so proximity cannot see it, and the space is
+    // now behind the throw, so the cone cannot either. The finger went over it.
+    const lone = [box(0, 60, 300)];
+    const over = { from: { x: 60, y: 120 }, dx: 0, dy: -580, speed: 1,
+                   path: [{ x: 60, y: 700 }, { x: 60, y: 120 }] };
+    expect(aimedAt(lone, over)).toBe(0);
+  });
+
+  it('takes the LAST space a path crossed, not the first', () => {
+    // Both are in the column, one above the other, and the throw went over both.
+    // The far one was still ahead of the throw when it ended.
+    const stack = [box(0, 60, 300), box(3, 60, 180)];
+    const over = { from: { x: 60, y: 120 }, dx: 0, dy: -580, speed: 1,
+                   path: [{ x: 60, y: 700 }, { x: 60, y: 120 }] };
+    expect(aimedAt(stack, over)).toBe(3);
+  });
+
+  it('follows the path round a corner, not the straight line of the throw', () => {
+    // Up, then hard left, ending out past the board's left edge. Only the second
+    // leg goes over space 0, and a start-to-end straight line would miss it.
+    const lone = [box(0, 60, 300)];
+    const hook = { from: { x: 0, y: 290 }, dx: -190, dy: -110, speed: 1,
+                   path: [{ x: 200, y: 700 }, { x: 200, y: 400 }, { x: 0, y: 290 }] };
+    expect(aimedAt(lone, hook)).toBe(0);
+  });
+
+  it('still prefers where the throw STOPPED to what it crossed getting there', () => {
+    // Over space 3 and back down to a hair under space 0. Crossing is evidence,
+    // but stopping on something is a decision, so proximity is asked first.
+    const stack = [box(0, 60, 300), box(3, 60, 180)];
+    const back = { from: { x: 60, y: 350 }, dx: 0, dy: -400, speed: 1,
+                   path: [{ x: 60, y: 700 }, { x: 60, y: 160 }, { x: 60, y: 350 }] };
+    expect(aimedAt(stack, back)).toBe(0);
+  });
+
+  it('does not invent a crossing from a throw that went nowhere near', () => {
+    // Up the far right of the screen. Nothing crossed, nothing in the cone.
+    const lone = [box(0, 60, 300)];
+    const wide = { from: { x: 380, y: 120 }, dx: 0, dy: -580, speed: 1,
+                   path: [{ x: 380, y: 700 }, { x: 380, y: 120 }] };
+    expect(aimedAt(lone, wide)).toBeNull();
   });
 
   it('lands on a legal space even when the throw was aimed between them', () => {
@@ -182,6 +227,33 @@ describe('aimedAt', () => {
     expect(aimedAt(edge(FLICK_MAX_AIM_DEG - 2), up)).toBe(9);
     expect(aimedAt(edge(-(FLICK_MAX_AIM_DEG - 2)), up)).toBe(9);
     expect(aimedAt(edge(FLICK_MAX_AIM_DEG + 4), up)).toBeNull();
+  });
+});
+
+describe('crossedBy', () => {
+  const b = { index: 0, cx: 100, cy: 100, w: 40, h: 60 };
+  const line = (...pts: [number, number][]) => pts.map(([x, y]) => ({ x, y }));
+
+  it('is null for a path that never touches the space', () => {
+    expect(crossedBy(line([0, 0], [0, 400]), b)).toBeNull();
+    expect(crossedBy(line([100, 100]), b)).toBeNull();   // one point is not a path
+  });
+
+  it('measures how far along the path the space was left behind', () => {
+    // Straight up the middle of it from below: enters at y=130, leaves at y=70,
+    // which is 330px into a 400px path.
+    expect(crossedBy(line([100, 400], [100, 0]), b)).toBeCloseTo(330);
+  });
+
+  it('takes the LAST time the path left it, not the first', () => {
+    // Up through it, back down into it, and out the bottom again.
+    const there = crossedBy(line([100, 400], [100, 0]), b)!;
+    const andBack = crossedBy(line([100, 400], [100, 0], [100, 400]), b)!;
+    expect(andBack).toBeGreaterThan(there);
+  });
+
+  it('counts a path that runs along inside the space without leaving it', () => {
+    expect(crossedBy(line([95, 90], [105, 110]), b)).toBeGreaterThan(0);
   });
 });
 

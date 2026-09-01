@@ -116,6 +116,7 @@ button.act:hover{border-color:var(--soft)}
   <span><i style="background:color-mix(in srgb,var(--aim) 35%,transparent)"></i>the cone</span>
   <span><i style="background:var(--ok)"></i>bearing to a legal slot</span>
   <span><i style="background:var(--warn)"></i>the near radius</span>
+  <span>a slot the path ran over is taken even if the throw ended past it</span>
   <span>tap a slot to make it legal or not</span>
 </div>
 
@@ -163,8 +164,8 @@ const DEFAULTS = {
     hint:'A half-angle: 45 is a 90 degree cone in front of the throw. Only slots inside it are judged on bearing.' },
   tieDeg:     { v:8,   min:0,   max:30,  step:1,   label:'Tie band (deg)',
     hint:'Slots within this of the best angle count as equally aimed at; the nearest wins.' },
-  nearPx:     { v:45,  min:0,   max:160, step:5,   label:'Near radius (px)',
-    hint:'How close the throw can END to a slot and have it count, in ANY direction. Measured to the slot edge, so 0px means it landed on it. This is what covers the rest of the circle.' },
+  nearPx:     { v:30,  min:0,   max:160, step:5,   label:'Near radius (px)',
+    hint:'How close the throw can END to a slot and have it count, in ANY direction. Measured to the slot edge, so 0px means it landed on it.' },
 };
 const S = {};
 for (const k in DEFAULTS) S[k] = DEFAULTS[k].v;
@@ -185,7 +186,7 @@ function throwOf(samples) {
     const d = Math.hypot(dx, dy);
     if (d < S.segPx) continue;
     const speed = d / dt;
-    if (!best || speed > best.speed) best = { from:last, dx, dy, speed, dt, d };
+    if (!best || speed > best.speed) best = { from:last, dx, dy, speed, dt, d, path:win };
   }
   if (!best) return { ok:false, why:'No stretch in the window was long enough to measure.', travel };
   if (best.speed < S.minSpeed)
@@ -199,6 +200,33 @@ function edgeDistance(p, c) {
   const dy = Math.max(Math.abs(p.y - c.cy) - c.h / 2, 0);
   return Math.hypot(dx, dy);
 }
+// The part of a->b inside the box, as fractions along it, or null. Liang-Barsky.
+function insideRun(a, b, c) {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  let t0 = 0, t1 = 1;
+  const clip = (p, q) => {
+    if (p === 0) return q >= 0;
+    const r = q / p;
+    if (p < 0) { if (r > t1) return false; if (r > t0) t0 = r; }
+    else { if (r < t0) return false; if (r < t1) t1 = r; }
+    return true;
+  };
+  const ok = clip(-dx, a.x - (c.cx - c.w/2)) && clip(dx, (c.cx + c.w/2) - a.x)
+          && clip(-dy, a.y - (c.cy - c.h/2)) && clip(dy, (c.cy + c.h/2) - a.y);
+  return ok ? [t0, t1] : null;
+}
+// How far along the path the finger was when it last LEFT this slot, or null.
+function crossedBy(path, c) {
+  let travelled = 0, last = null;
+  for (let i = 1; i < path.length; i++) {
+    const a = path[i-1], b = path[i];
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    const run = insideRun(a, b, c);
+    if (run) last = travelled + run[1] * len;
+    travelled += len;
+  }
+  return last;
+}
 function aimedAt(cands, t) {
   const aim = Math.atan2(t.dy, t.dx);
   const scored = cands.map(c => {
@@ -206,12 +234,15 @@ function aimedAt(cands, t) {
     const d = Math.hypot(dx, dy);
     let off = d < 1 ? 0 : Math.abs(Math.atan2(dy, dx) - aim) * 180 / Math.PI;
     if (off > 180) off = 360 - off;
-    return { i:c.i, off, d, edge: edgeDistance(t.from, c) };
+    return { i:c.i, off, d, edge: edgeDistance(t.from, c), crossed: crossedBy(t.path || [{x:t.from.x-t.dx, y:t.from.y-t.dy}, t.from], c) };
   });
   // 1 and 2: it ended on a slot, or near enough to one. Any direction.
   const near = scored.filter(c => c.edge <= S.nearPx).sort((a,b) => a.edge - b.edge)[0];
   if (near) return { pick:near.i, scored, rule: near.edge === 0 ? 'landed on it' : `${near.edge.toFixed(0)}px from its edge`, bestAngle: near.off };
-  // 3: the line of the throw.
+  // 3: the path ran over one. Last one crossed wins.
+  const over = scored.filter(c => c.crossed !== null).sort((a,b) => b.crossed - a.crossed)[0];
+  if (over) return { pick:over.i, scored, rule:'lay under the path the throw took', bestAngle: over.off };
+  // 4: the line of the throw.
   const inCone = scored.filter(c => c.off <= S.coneDeg);
   if (!inCone.length) return { pick:null, scored };
   const bestAngle = Math.min(...inCone.map(c => c.off));
@@ -333,7 +364,7 @@ function evaluate(pts, log) {
   if (!t.ok) { verdict = 'miss'; why = t.why; }
   else {
     aim = aimedAt(candidates(), t.best);
-    if (aim.pick == null) { verdict = 'miss'; why = `A throw, but no legal slot is inside the ${S.coneDeg}° cone or within ${S.nearPx}px of where it stopped.`; }
+    if (aim.pick == null) { verdict = 'miss'; why = `A throw, but no legal slot is inside the ${S.coneDeg}° cone, within ${S.nearPx}px of where it stopped, or anywhere under the path it took.`; }
     else { verdict = 'hit'; why = `Slot ${aim.pick}, chosen because it ${aim.rule}.`; }
   }
   shown = { t, aim };
@@ -373,9 +404,9 @@ function readout(pts, t, aim) {
     html += row('legal slots', `${aim.scored.length}, ${inCone} in the cone`,
                 inCone ? 'good' : 'bad');
     for (const c of [...aim.scored].sort((a,b) => a.edge - b.edge).slice(0, 4)) {
-      const reach = c.edge <= S.nearPx || c.off <= S.coneDeg;
-      html += row(`slot ${c.i}`, `${c.off.toFixed(0)}° off, ${c.edge.toFixed(0)} px from edge`,
-                  reach ? 'good' : 'bad');
+      const reach = c.edge <= S.nearPx || c.crossed !== null || c.off <= S.coneDeg;
+      html += row(`slot ${c.i}`, `${c.off.toFixed(0)}° off, ${c.edge.toFixed(0)} px from edge`
+                  + (c.crossed !== null ? ', crossed' : ''), reach ? 'good' : 'bad');
     }
   }
   document.getElementById('readout').innerHTML = html;
@@ -426,7 +457,7 @@ function draw() {
     for (const c of shown.aim.scored) {
       const s = slots[c.i].getBoundingClientRect(), r = rig.getBoundingClientRect();
       const cx = s.left + s.width/2 - r.left, cy = s.top + s.height/2 - r.top;
-      const on = c.edge <= S.nearPx || c.off <= S.coneDeg;
+      const on = c.edge <= S.nearPx || c.crossed !== null || c.off <= S.coneDeg;
       ctx.strokeStyle = on ? css('--ok') : css('--soft');
       ctx.lineWidth = shown.aim.pick === c.i ? 3 : 1.2;
       ctx.setLineDash(on ? [] : [4, 4]);

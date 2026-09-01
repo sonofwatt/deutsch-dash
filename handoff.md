@@ -716,21 +716,36 @@ Three signals, tried in this order (`useDrag.ts`, then the `nearest` branch of
    catches a throw that OVERSHOT - aim from a release point past the board points
    back down at it, so the aim finds nothing and the release decides instead.
 
-**`aimedAt` itself has three rules, and the first two are the forgiving ones.**
+**`aimedAt` itself has four rules, and only the last one is a guess.**
 
 1. **It ended ON a space.** That is where they put it; nothing else is weighed.
-2. **It ended within `FLICK_NEAR_PX` (45px) of one**, measured to the space's
+2. **It ended within `FLICK_NEAR_PX` (30px) of one**, measured to the space's
    EDGE, in ANY direction. This is what covers the rest of the circle. The cone
    only looks forward, so a throw that overshoots a space by a hair leaves it
    BEHIND the release point where the cone cannot see it at all - reported from a
    table as the space simply not being playable. `edgeDistance` is zero anywhere
    inside a space, so one measure covers both rules; a centre-to-centre one would
    call a throw that stopped just inside a big slot "half a card away".
-3. **Otherwise the line of the throw**, within `FLICK_MAX_AIM_DEG`, now **45**
+3. **Its PATH ran over one** (`crossedBy`). A hard flick carries the finger
+   straight over the space it was aimed at and out the far side, off the top of
+   the board or onto a square the card cannot go, and rules 1 and 2 both judge
+   where the throw STOPPED, so both miss it. This is not an estimate of intent,
+   it is the finger having been there, which is why it outranks the cone. The
+   path is the whole sample window, so it follows a hooked flick round its corner
+   rather than cutting the straight line from start to end. Where a path runs
+   over several spaces the LAST is taken: it was still ahead of the throw when
+   the throw ended, and anything crossed earlier is nearer where the finger
+   stopped, where rule 2 would have caught it.
+4. **Otherwise the line of the throw**, within `FLICK_MAX_AIM_DEG`, now **45**
    (a half-angle, so a 90 degree cone in front).
 
-**`spaceCentres` returns boxes, not points**, because rules 1 and 2 need the
-width and height.
+**The near radius came down from 45 to 30 when rule 3 arrived.** Proximity had
+been carrying the overshoot case alone and had to be generous to do it; the path
+rule takes that job and takes it exactly, so the radius went back to meaning
+"stopped basically on it" rather than a blind circle round the release point.
+
+**`spaceCentres` returns boxes, not points**, because rules 1, 2 and 3 all need
+the width and height.
 
 **The candidates are always the LEGAL spaces**, which is what makes it forgiving
 in the way the table asked for: aim at a space that is full, or at a pile this
@@ -1821,6 +1836,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `bbf3cac` | The bicycle retired for a clover |
 | `2e2bb62` | The kite retired for a clownfish |
 | `8113014` | The fish badge labelled for the glyph the phones draw |
+| `PENDING` | A throw takes a space it flew over; the near radius down to 30 |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.

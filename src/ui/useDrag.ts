@@ -52,8 +52,16 @@ export function ghostFix(
 /** One pointer position and when it was there. `t` is milliseconds, any origin. */
 export interface Sample extends Point { t: number }
 
-/** A throw at the board: where it left from, and which way it was going. */
-export interface Throw { from: Point; dx: number; dy: number; speed: number }
+/**
+ * A throw at the board: where it left from, which way it was going, and the
+ * ground the finger actually covered getting there.
+ *
+ * `path` is the sample window, oldest first, ending at `from`. It is what lets a
+ * throw claim a space it FLEW OVER rather than one it stopped near, and it is
+ * optional so a Throw can still be written out by hand in a test; without it the
+ * path is taken to be the single stretch that `dx, dy` describes.
+ */
+export interface Throw { from: Point; dx: number; dy: number; speed: number; path?: Point[] }
 
 /**
  * The tail of a real flick is its SLOWEST part - a thumb decelerates before it
@@ -92,8 +100,13 @@ const AIM_TIE_DEG = 8;
  * so a throw that overshoots a space by a hair leaves it behind the release point
  * and out of the cone entirely - which read as the space not being playable at
  * all. Proximity does not care which way the throw was pointing.
+ *
+ * It came down from 45 to 30 when the path rule below arrived. Proximity was
+ * carrying the overshoot case on its own and had to be generous about it; the
+ * path rule takes that job and takes it exactly, so this can go back to meaning
+ * "stopped basically on it" without a big blind circle around the release point.
  */
-export const FLICK_NEAR_PX = 45;
+export const FLICK_NEAR_PX = 30;
 
 /**
  * The throw a gesture was, or null if it was not one.
@@ -128,7 +141,7 @@ export function throwOf(samples: Sample[]): Throw | null {
     const travel = Math.hypot(dx, dy);
     if (travel < MIN_SEGMENT_PX) continue;   // too small to carry a direction
     const speed = travel / dt;
-    if (!best || speed > best.speed) best = { from: last, dx, dy, speed };
+    if (!best || speed > best.speed) best = { from: last, dx, dy, speed, path: window };
   }
   if (!best || best.speed < FLICK_MIN_SPEED) return null;
   // Upward only. The board is above the hand on every screen, so a throw down or
@@ -141,14 +154,22 @@ export function throwOf(samples: Sample[]): Throw | null {
 /**
  * Which of these candidates the throw was aimed at, or null if none of them was.
  *
- * Three rules, in this order, and the first two are the forgiving ones:
+ * Four rules, in this order, and only the last one is a guess:
  *
  * 1. **It ended on a space.** That is where they put it; nothing else is weighed.
  * 2. **It ended within `FLICK_NEAR_PX` of one**, measured to the edge, whatever
  *    direction the throw was going. This covers the rest of the circle: a throw
  *    that overshoots a space by a hair leaves it BEHIND the release point, where
  *    the forward cone cannot see it, and it read as that space not being playable.
- * 3. **Otherwise the line of the throw.** A flick says a direction and nothing
+ * 3. **Its path ran over one.** A hard flick carries the finger straight over the
+ *    space it was aimed at and out the other side - off the top of the board, or
+ *    onto some square the card cannot go - and the two rules above both judge
+ *    where it STOPPED, so both miss it. Crossing a space is not an estimate of
+ *    intent, it is the finger having been there, which is why it outranks the
+ *    cone. Where a path runs over several, the LAST one is taken: it is the one
+ *    still ahead when the throw ended, and anything crossed earlier was closer to
+ *    where the finger stopped, where rule 2 would have caught it.
+ * 4. **Otherwise the line of the throw.** A flick says a direction and nothing
  *    dependable about distance - the same thumb movement means "over there"
  *    whether the space is 100px away or 600 - so the card goes to the legal space
  *    nearest that line.
@@ -173,7 +194,15 @@ export function aimedAt(candidates: SpaceBox[], t: Throw): number | null {
     .sort((a, b) => a.d - b.d)[0];
   if (near) return near.c.index;
 
-  // 3. Otherwise the line of the throw. A flick says a direction and nothing
+  // 3. The path RAN OVER one on its way to wherever it stopped. Last one crossed
+  //    wins: it was still in front of the throw when the throw ended.
+  const crossed = candidates
+    .map(c => ({ c, at: crossedBy(pathOf(t), c) }))
+    .filter((x): x is { c: SpaceBox; at: number } => x.at !== null)
+    .sort((a, b) => b.at - a.at)[0];
+  if (crossed) return crossed.c.index;
+
+  // 4. Otherwise the line of the throw. A flick says a direction and nothing
   //    dependable about distance, so the card goes to the legal space nearest that
   //    line - and to nothing at all if none is near it, which is the wild-flick
   //    case and is deliberate.
@@ -195,6 +224,58 @@ export function aimedAt(candidates: SpaceBox[], t: Throw): number | null {
   // the case - the nearest is the one meant.
   return inCone.filter(c => c.off <= bestAngle + AIM_TIE_DEG)
     .sort((a, b) => a.d - b.d)[0].index;
+}
+
+/**
+ * The ground a throw covered, oldest point first. `throwOf` records the whole
+ * sample window; a Throw written by hand has only the stretch `dx, dy` describes,
+ * which is the same line with the wobble taken out.
+ */
+function pathOf(t: Throw): Point[] {
+  return t.path && t.path.length > 1
+    ? t.path
+    : [{ x: t.from.x - t.dx, y: t.from.y - t.dy }, t.from];
+}
+
+/**
+ * The part of segment a->b that lies inside the box, as the fraction of the way
+ * along it that the segment enters and leaves, or null if it never does.
+ * Liang-Barsky: clip against each of the four edges in turn and see what survives.
+ */
+function insideRun(a: Point, b: Point, c: SpaceBox): [number, number] | null {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  let t0 = 0, t1 = 1;
+  // `p` is how fast this edge is being approached and `q` how much room is left.
+  // p === 0 is a segment parallel to the edge: it never crosses, so all that
+  // matters is whether it started on the inside of it.
+  const clip = (p: number, q: number) => {
+    if (p === 0) return q >= 0;
+    const r = q / p;
+    if (p < 0) { if (r > t1) return false; if (r > t0) t0 = r; }
+    else { if (r < t0) return false; if (r < t1) t1 = r; }
+    return true;
+  };
+  const ok = clip(-dx, a.x - (c.cx - c.w / 2)) && clip(dx, (c.cx + c.w / 2) - a.x)
+          && clip(-dy, a.y - (c.cy - c.h / 2)) && clip(dy, (c.cy + c.h / 2) - a.y);
+  return ok ? [t0, t1] : null;
+}
+
+/**
+ * How far along the path the finger was when it last LEFT this space, or null if
+ * it never touched it. A distance rather than a flag, so several spaces crossed
+ * by one throw can be put in the order they were crossed.
+ */
+export function crossedBy(path: Point[], c: SpaceBox): number | null {
+  let travelled = 0;
+  let last: number | null = null;
+  for (let i = 1; i < path.length; i++) {
+    const a = path[i - 1], b = path[i];
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    const run = insideRun(a, b, c);
+    if (run) last = travelled + run[1] * len;
+    travelled += len;
+  }
+  return last;
 }
 
 export function parseDrop(el: Element | null): DropTarget | null {
