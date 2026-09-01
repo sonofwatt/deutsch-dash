@@ -963,11 +963,32 @@ in `wood.test.ts` with the worked numbers.
 - **It lives in the tableau, not under the grid.** The wood column is two cards
   tall and the posts are one, so the row already carries an empty band above them
   - and that is a foot away from the pile the message is about, where the drop
-  zone's caption row was not. The note is absolutely positioned inside
-  `.tableau-zone`, so it still costs no layout, and it is inset from whichever end
-  the wood is on because that is the one column the band does not span
-  (`wood-left` / `wood-right` on the zone). Measured on both sides: it overlaps no
-  card either way.
+  zone's caption row was not. The note is absolutely positioned, so it still costs
+  no layout, and it is inset from whichever end the wood is on because that is the
+  one column the band does not span (`wood-left` / `wood-right` on the zone).
+- **It is positioned against `.tableau-row`, NOT `.tableau-zone`, and that
+  distinction is the whole of a bug it was reported for.** The zone is as wide as
+  the screen and centres the piles inside it; the row shrink-wraps the piles, so
+  the row's edges ARE the outer piles' edges. Positioned against the zone,
+  `right: calc(--hand-card + --tgap)` only lines up when the piles happen to fill
+  the width, which they do on a phone and do NOT on any wider window. On a 1280px
+  desktop the band ran 60px past the wood column and sat straight over it:
+
+  - the note **collided with the wood pile**, reported as exactly that; and
+  - worse, with nothing to say the band is an INVISIBLE drop target at `z-index:
+    2`, so it covered the face-down wood card and ate the click. Reported as
+    "cannot click the wood pile to flip on Brave" - nothing to do with Brave. It
+    was every window wider than the pile row, and it made the game unplayable on
+    a desktop while looking perfect on every phone it was tested on.
+
+  `.tableau-row` exists solely to be the thing this is measured against. Probed at
+  393, 1280 and 1600: no overlap at any of them, and `elementFromPoint` on the
+  middle of the wood card returns the card rather than the band.
+- **It sizes off the card, not off a number.** `font-size` and padding are
+  `clamp()`s of `--hand-card`, because the band is one card tall and a few cards
+  wide, so a card is the only thing on screen that knows how much room there is. A
+  fixed 14px wrapped to two lines on a 360px phone and looked lost on a desktop.
+  Probed at 360, 393 and 1280 with the real string: no spill, no card overlapped.
 - The drop zone's caption row now only ever says "drop anywhere here", which is
   what it was for.
 - **With nothing to say, that band becomes a drop target** (`data-drop="nearest"`,
@@ -1935,6 +1956,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `ab1c651` | The bench colours every legal slot by what the throw did to it |
 | `e9bf58c` | The sweep ships as the last resort, behind the cone |
 | `0eb22c1` | Every CI action onto a major that runs on Node 24 |
+| `PENDING` | The stuck band measured off the piles; dash on the pile; Fish |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.

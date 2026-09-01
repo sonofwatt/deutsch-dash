@@ -64,7 +64,7 @@ export function TableauView(props: {
         {/* The count used to be a bubble pinned to the card's corner, over the
             card art. Every pile now says how many cards it holds in the same
             place, in the same way: on the label underneath. */}
-        <div className="pile-label">blitz {t.blitz.length}</div>
+        <div className="pile-label">dash {t.blitz.length}</div>
       </div>
   );
 
@@ -153,13 +153,19 @@ export function TableauView(props: {
   // zone element reaches that far.
   return (
     <div className={`tableau-zone wood-${props.woodSide}`} data-hand>
+      {/* The piles are their own row inside the zone. The zone centres it and
+          carries the edge guards; the row is exactly as wide as the piles, which
+          is what the note below is positioned against. */}
+      <div className="tableau-row">
       {ends}
       {/* The stuck note lives HERE, in the band above the post piles that the
-          wood column's two-card height leaves empty. It is absolutely positioned,
-          so it costs no layout at all - it was in the drop zone's caption row
-          under the grid, which is a long way from the pile it is talking about.
-          Inset from whichever end the wood is on, because that is the one column
-          the band does not span. */}
+          wood column's two-card height leaves empty. It is absolutely positioned
+          INSIDE the pile row, so it costs no layout at all and it is measured
+          against the piles rather than the zone - the zone is as wide as the
+          screen and the row is only as wide as the cards, and positioning this
+          against the zone put it straight over the wood pile on any window wider
+          than the row. Inset from whichever end the wood is on, because that is
+          the one column the band does not span. */}
       {props.stuck ? (
         props.onSinkWood
           ? <button className="wood-note" onClick={props.onSinkWood}>
@@ -174,6 +180,7 @@ export function TableauView(props: {
            finger. Invisible, and it covers no card (see .wood-note's geometry). */
         <div className="wood-note drop-band" data-drop="nearest" aria-hidden="true" />
       )}
+      </div>
     </div>
   );
 }

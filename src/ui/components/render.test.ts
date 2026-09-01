@@ -39,7 +39,7 @@ describe('TableauView', () => {
   });
   it('labels every pile with the cards it holds, the whole pile not the remainder', () => {
     const html = renderTableau(tableau());
-    expect(html).toContain('>blitz 2<');   // 2 in the Blitz pile
+    expect(html).toContain('>dash 2<');   // 2 in the Blitz pile
     expect(html).toContain('>2<');         // a 2-card post says 2, not "+1"
     expect(html).toContain('>1<');         // and a single card says so rather than nothing
     expect(html).toContain('>wood 12<');
@@ -54,21 +54,21 @@ describe('TableauView', () => {
     // Wood is the pile touched most - every flip of three is another tap - so it
     // sits under the right thumb. Order is a deliberate choice, so pin it.
     const html = renderTableau(tableau());
-    expect(html.indexOf('>blitz ')).toBeGreaterThan(-1);
+    expect(html.indexOf('>dash ')).toBeGreaterThan(-1);
     expect(html.indexOf('>wood ')).toBeGreaterThan(-1);
-    expect(html.indexOf('>blitz ')).toBeLessThan(html.indexOf('>wood '));
+    expect(html.indexOf('>dash ')).toBeLessThan(html.indexOf('>wood '));
   });
   it('puts the wood under whichever thumb the player asked for', () => {
     const right = renderToStaticMarkup(createElement(TableauView, {
       t: tableau(), badgeId: 'tulip' as const, selection: null, postHighlight: [],
       onSelect: noop, onFlip: noop, onTapPost: noop, startDrag: noop, woodSide: 'left' as const,
     }));
-    expect(right.indexOf('>wood ')).toBeLessThan(right.indexOf('>blitz '));
+    expect(right.indexOf('>wood ')).toBeLessThan(right.indexOf('>dash '));
     // ...and the posts do not move with it: shuffling four positions to fix one
     // would cost more muscle memory than it buys.
     const labels = [...right.matchAll(/<div class="pile-label">([^<]*)</g)].map(m => m[1]);
     expect(labels[0]).toMatch(/^wood /);
-    expect(labels[labels.length - 1]).toMatch(/^blitz /);
+    expect(labels[labels.length - 1]).toMatch(/^dash /);
     expect(labels.slice(1, -1)).toEqual(['2', '1', ' ']);
   });
 

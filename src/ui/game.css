@@ -275,12 +275,15 @@
 /* Sized to its own row rather than to a fraction of the viewport, the same way
    the grid is. --piles and --tgap come from Game.tsx, which is the only place
    that knows how many post piles this round dealt. */
-.tableau-zone { display: flex; gap: var(--tgap); align-items: flex-end;
-  justify-content: center; --card-w: var(--hand-card);
+.tableau-zone { display: flex; justify-content: center;
   padding-bottom: calc(4px + var(--tableau-lift));
   /* Only the part of the guard the page's own padding does not already cover. */
   padding-left: max(0px, var(--edge-guard) - var(--page-l));
   padding-right: max(0px, var(--edge-guard) - var(--page-r)); }
+/* The piles themselves. Shrink-wrapped, so its edges ARE the outer piles' edges,
+   which is the whole reason it exists: .wood-note is positioned against it. */
+.tableau-row { display: flex; gap: var(--tgap); align-items: flex-end;
+  position: relative; --card-w: var(--hand-card); }
 .pile-label { font-size: 10px; text-align: center; color: var(--ink-soft); margin-top: 3px; }
 
 /* Recycle affordance: the empty draw slot, once the face-down wood is exhausted.
@@ -492,13 +495,17 @@
 
    Inset from whichever end the wood is on, because that is the one column the
    band does not span; the tableau carries wood-left / wood-right for it. */
-.tableau-zone { position: relative; }
 .wood-note { position: absolute; top: 0; height: calc(var(--hand-card) * 1.4);
   display: grid; place-items: center; text-align: center; z-index: 2;
-  padding: 0 10px; border-radius: var(--radius);
+  border-radius: var(--radius); overflow: hidden;
   border: 1px solid var(--warn-ink); background: color-mix(in srgb, var(--warn) 14%, var(--bg));
-  color: var(--warn-ink); font-weight: 700; font-size: 14px; line-height: 1.15;
-  cursor: pointer; }
+  color: var(--warn-ink); font-weight: 700; line-height: 1.15; cursor: pointer;
+  /* Sized off the card, not off a number. The band it sits in is one card tall
+     and a few cards wide, so a card is the only thing on screen that knows how
+     much room there is: 14px was two lines on a small phone and lost in the
+     middle of a desktop. */
+  padding: 0 clamp(6px, calc(var(--hand-card) * .16), 14px);
+  font-size: clamp(10px, calc(var(--hand-card) * .26), 15px); }
 .wood-note.quiet { border-style: dashed; cursor: default; font-weight: 600; }
 /* The same band with nothing to say: a drop target and nothing to look at. */
 .wood-note.drop-band { border: 0; background: none; }
