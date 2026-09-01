@@ -72,6 +72,48 @@ describe('TableauView', () => {
     expect(labels.slice(1, -1)).toEqual(['2', '1', ' ']);
   });
 
+  it('takes the dragged card off the pile it came from, whichever pile that is', () => {
+    // A card in the air is already under the finger. Leaving a copy on its pile
+    // draws the same card twice and reads as the drag having failed - reported
+    // from a table as exactly that, off the Dash pile. What shows instead is the
+    // card underneath, because that is what the player is trying to look at.
+    const held = (dragging: PlaySource) => renderToStaticMarkup(createElement(TableauView, {
+      t: tableau(), badgeId: 'tulip' as const, selection: null, postHighlight: [],
+      onSelect: noop, onFlip: noop, onTapPost: noop, startDrag: noop, dragging,
+    }));
+    // Card values repeat across piles - the wood deals a 3 and so does post 1 - so
+    // every assertion below reads ONE pile's own markup rather than the whole
+    // tableau. `values` is what that pile is showing, in order.
+    const values = (html: string, drop: string) => {
+      const from = drop === 'blitz' ? 0 : html.indexOf(`data-drop="${drop}"`);
+      const slice = html.slice(from, html.indexOf('pile-label', from));
+      return [...slice.matchAll(/class="card-v">(\d+)</g)].map(m => m[1]);
+    };
+    // These stacks read bottom-first, so the LAST entry is the one on top. Dash is
+    // 9 red under 4 blue: lift the 4 and the 9 is what is left showing.
+    expect(values(held({ kind: 'blitz' }), 'blitz')).toEqual(['9']);
+    // Post 0 is 8 red under 7 green, so lifting the 7 reveals the 8. Post 1 holds
+    // one card, so lifting it leaves the empty slot and nothing to look at.
+    const post0 = held({ kind: 'post', index: 0 });
+    expect(values(post0, 'post:0')).toEqual(['8']);
+    expect(values(held({ kind: 'post', index: 1 }), 'post:1')).toEqual([]);
+    // ...and lifting off one post leaves every other pile exactly as it was.
+    expect(values(post0, 'blitz')).toEqual(['4']);      // Dash still shows its top
+    expect(values(post0, 'post:1')).toEqual(['3']);     // and so does post 1
+  });
+
+  it('leaves nothing to grab on a pile whose card is already in the air', () => {
+    // The handlers go with the card. Dragging the revealed one would be starting a
+    // second drag from a pile that is already mid-play.
+    const dash = renderToStaticMarkup(createElement(TableauView, {
+      t: tableau(), badgeId: 'tulip' as const, selection: null, postHighlight: [],
+      onSelect: noop, onFlip: noop, onTapPost: noop, startDrag: noop,
+      dragging: { kind: 'blitz' } as PlaySource,
+    }));
+    // The count is untouched: the play commits on the drop, not on the lift.
+    expect(dash).toContain('>dash 2<');
+  });
+
   it('offers the recycle control only once the face-down wood runs out', () => {
     expect(renderTableau(tableau({ woodIndex: 3 }))).not.toContain('recycle-slot');
     // The empty draw slot IS the control - there is no button on the face-up card,

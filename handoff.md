@@ -470,6 +470,33 @@ painted, re-measuring on `visualViewport` events. On a browser that was already
 right the correction is zero. The `translate(-50%, -55%)` lift is intentional -
 it keeps the card out from under the thumb.
 
+### The card in the air leaves the pile it came from
+
+**Every pile takes its top card off while that card is being dragged**, and shows
+whatever is under it instead. The card is already following the finger; drawing it
+a second time on the pile it came from puts the same card on screen twice and
+reads as the drag having failed. Reported from a table as exactly that, off the
+Dash pile.
+
+Only the wood did this at first, on the reasoning that it is the one pile showing
+a RUN of face-up cards and so has something to fall back to. That was the wrong
+line to draw: the Dash pile and the posts have a card underneath too, and where
+they do not, an empty slot is the honest answer. `TableauView` now reads
+`props.dragging` for all of them.
+
+Two things it deliberately does not do. The pile's **label does not change** - the
+play commits on the drop, not on the lift, so the pile still holds the card and
+still counts it. And the revealed card carries **no `layoutId` and no handlers**:
+it is not moving anywhere, and starting a second drag from a pile already mid-play
+is not a thing to offer.
+
+Reproduced and fixed on all three, because "at least on Brave" turned out to mean
+everywhere: desktop Chromium, Pixel 7 Chrome and iPhone 14 WebKit all duplicated
+the card on the Dash pile and on all five posts before, and none of them do after.
+The regression is pinned in `render.test.ts`, which reads each pile's own markup
+rather than the whole tableau - card values repeat across piles, and an assertion
+that just greps the page passes for the wrong reason.
+
 ### Where the OS gets to the swipe first
 
 Two gestures the page never sees, both reported from real tables, and both cost
@@ -1971,6 +1998,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `0eb22c1` | Every CI action onto a major that runs on Node 24 |
 | `cba9fe2` | The stuck band measured off the piles; dash on the pile; Fish |
 | `3d20a59` | A layout suite that measures the band in a real browser |
+| `PENDING` | A dragged card leaves the pile it came from, on every pile |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.

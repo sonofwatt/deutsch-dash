@@ -11,10 +11,16 @@ export function TableauView(props: {
   onSelect: (s: PlaySource) => void; onFlip: () => void; onTapPost: (i: number) => void;
   startDrag: (e: React.PointerEvent, card: Card, source: PlaySource) => void;
   /**
-   * What is currently in the air, if anything. Only the wood acts on it: it is the
-   * one pile that shows a run of face-up cards, so a card lifted off it leaves
-   * something behind to look at. Optional, like every prop here - render.test.ts
-   * builds these as complete literals and tsc -b typechecks it.
+   * What is currently in the air, if anything. EVERY pile acts on it: a card being
+   * dragged is already under the finger, so leaving a copy of it on the pile it
+   * came from draws the same card twice and reads as the drag having failed.
+   * Reported from a table as exactly that, off the Dash pile.
+   *
+   * The play has not happened yet - it commits on the drop - so the pile still
+   * HOLDS the card and still counts it on its label. This is only what the player
+   * would see if it were gone, which is the thing they are trying to look at.
+   * Optional, like every prop here - render.test.ts builds these as complete
+   * literals and tsc -b typechecks it.
    */
   dragging?: PlaySource | null;
   /** This player has no move. Optional, like every prop here. */
@@ -40,6 +46,10 @@ export function TableauView(props: {
   // player is holding taken off it.
   const beneath = dealt.slice(0, -1);
   const draggingWood = props.dragging?.kind === 'wood';
+  const draggingBlitz = props.dragging?.kind === 'blitz';
+  // What is under the card in the air, for a pile that shows only its top card.
+  // Null when it was the last one, and then the slot is simply empty.
+  const under = (stack: Card[]) => stack[stack.length - 2] ?? null;
   // Every wood card has been turned over at least once: the next flip recycles the
   // pile from the start and deals 3 again (or whatever is left, see flipWood).
   // Tapping the empty draw slot is the recycle. It carries no glyph: a ↻ on the
@@ -54,7 +64,13 @@ export function TableauView(props: {
   const blitzGroup = (
       <div key="blitz">
         <PileStack layers={depthLayers(t.blitz.length)}>
-          {blitzTop ? (
+          {/* Nothing to grab while one is already in the air, and no layoutId: the
+              card revealed underneath is not moving anywhere. */}
+          {draggingBlitz
+            ? (under(t.blitz)
+                ? <CardView key={cardId(under(t.blitz)!)} card={under(t.blitz)!} badgeId={badgeId} />
+                : <div className="pile-space" />)
+            : blitzTop ? (
             <div onClick={() => props.onSelect({ kind: 'blitz' })}
               onPointerDown={e => props.startDrag(e, blitzTop, { kind: 'blitz' })}>
               <CardView key={cardId(blitzTop)} card={blitzTop} badgeId={badgeId} selected={isSel({ kind: 'blitz' })} layoutId={cardId(blitzTop)} />
@@ -71,12 +87,18 @@ export function TableauView(props: {
   const postGroups = t.post.map((stack, i) => {
         const top = stack[stack.length - 1] ?? null;
         const source: PlaySource = { kind: 'post', index: i };
+        const lifted = props.dragging?.kind === 'post' && props.dragging.index === i;
+        const shown = lifted ? under(stack) : top;
         return (
           <div key={i}>
             <PileStack layers={depthLayers(stack.length)} data-drop={`post:${i}`}
               onClick={() => props.onTapPost(i)}>
               <div className={`pile-space${props.postHighlight.includes(i) ? ' glow' : ''}`}>
-                {top && (
+                {/* Same as the Dash pile: while this post's card is in the air, show
+                    what is under it, with nothing to grab and no layoutId. */}
+                {lifted ? (shown &&
+                  <CardView key={cardId(shown)} card={shown} badgeId={badgeId} />
+                ) : top && (
                   <div onClick={e => { e.stopPropagation(); props.onSelect(source); }}
                     onPointerDown={e => props.startDrag(e, top, source)}>
                     <CardView key={cardId(top)} card={top} badgeId={badgeId} selected={isSel(source)} layoutId={cardId(top)} />
