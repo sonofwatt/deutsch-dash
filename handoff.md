@@ -1836,7 +1836,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `bbf3cac` | The bicycle retired for a clover |
 | `2e2bb62` | The kite retired for a clownfish |
 | `8113014` | The fish badge labelled for the glyph the phones draw |
-| `PENDING` | A throw takes a space it flew over; the near radius down to 30 |
+| `e0a8ed2` | A throw takes a space it flew over; the near radius down to 30 |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
