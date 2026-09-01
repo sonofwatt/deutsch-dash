@@ -1851,7 +1851,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `2e2bb62` | The kite retired for a clownfish |
 | `8113014` | The fish badge labelled for the glyph the phones draw |
 | `e0a8ed2` | A throw takes a space it flew over; the near radius down to 30 |
-| `PENDING` | The cone down to 30 degrees; the bench board at any table size |
+| `20999f3` | The cone down to 30 degrees; the bench board at any table size |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
