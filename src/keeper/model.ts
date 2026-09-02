@@ -6,7 +6,7 @@ import type { RoundScore } from '../game/types';
 export interface KeeperPlayer { id: string; name: string; badgeId: BadgeId }
 
 /**
- * A game of Dutch Blitz played with real cards, where the phone is only the
+ * A game played with real cards at a real table, where the phone is only the
  * scorepad. No room, no network, no accounts - it lives in localStorage on the
  * one device that gets passed around.
  *

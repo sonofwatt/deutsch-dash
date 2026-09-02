@@ -54,9 +54,9 @@ emu('rooms against emulator', () => {
 // connection is treated as an owner and bypasses .write/.validate entirely."
 // That conclusion was wrong. The real cause was a databaseURL namespace bug
 // in src/net/firebase.ts: the app's emulator config pointed at
-// `?ns=demo-blitz`, a namespace the emulator never loads database.rules.json
+// `?ns=demo-dash`, a namespace the emulator never loads database.rules.json
 // into (so it defaults to fully open), while firebase.json's declared rules
-// are only auto-loaded into `demo-blitz-default-rtdb`. Every "unauthenticated
+// are only auto-loaded into `demo-dash-default-rtdb`. Every "unauthenticated
 // write succeeded" / "invalid write succeeded" probe that led to the old
 // conclusion was run against that open, ruleless namespace. Now that
 // firebase.ts points at the correct namespace, the regular client SDK DOES
@@ -84,14 +84,14 @@ emu('server-side player cap and badge uniqueness (database.rules.json)', () => {
 
   beforeAll(async () => {
     testEnv = await initializeTestEnvironment({
-      // Deliberately NOT 'demo-blitz' (the app's real projectId/demoConfig,
+      // Deliberately NOT 'demo-dash' (the app's real projectId/demoConfig,
       // see ./firebase): @firebase/rules-unit-testing's .database() pushes
       // the given `rules` directly into `?ns=<projectId>` (its own source
       // comment says so - "otherwise the RTDB SDK will by default use
       // `${projectId}-default-rtdb`, which is treated as a different DB").
       // Confirmed empirically that this matters: with this projectId set to
-      // 'demo-blitz', temporarily reverting src/net/firebase.ts's emulator
-      // databaseURL to the old buggy `?ns=demo-blitz` (the Finding-1 bug)
+      // 'demo-dash', temporarily reverting src/net/firebase.ts's emulator
+      // databaseURL to the old buggy `?ns=demo-dash` (the Finding-1 bug)
       // did NOT make the new 'app writes under real security rules' canary
       // test below fail when the full suite ran - because THIS beforeAll,
       // running first in the same file, had already pushed real rules into
@@ -100,7 +100,7 @@ emu('server-side player cap and badge uniqueness (database.rules.json)', () => {
       // describe block's rules-injection completely out of any namespace
       // the app itself (or the tests that drive it as a real client) ever
       // touches, so a regression in EITHER place is caught independently.
-      projectId: 'demo-blitz-rules-test',
+      projectId: 'demo-dash-rules-test',
       database: { host: '127.0.0.1', port: 9000, rules: readFileSync(rulesPath, 'utf8') },
     });
     hostCtx = testEnv.authenticatedContext(HOST);
@@ -299,7 +299,7 @@ emu('server-side player cap and badge uniqueness (database.rules.json)', () => {
 // first describe block in this file, none of which asserts a rejection).
 //
 // Every test below drives ordinary firebase/database client connections -
-// no @firebase/rules-unit-testing here - against demo-blitz-default-rtdb,
+// no @firebase/rules-unit-testing here - against demo-dash-default-rtdb,
 // the exact namespace src/net/firebase.ts now points the emulator config at.
 // ---------------------------------------------------------------------------
 
@@ -488,7 +488,7 @@ emu('app writes under real security rules (regular client SDK, correct namespace
       'ordinary client SDK. Either database.rules.json stopped protecting this path, or ' +
       "- the exact Finding-1 bug - the app's emulator databaseURL " +
       "(src/net/firebase.ts) is no longer pointed at the namespace database.rules.json " +
-      'is actually loaded into (?ns=demo-blitz-default-rtdb).',
+      'is actually loaded into (?ns=demo-dash-default-rtdb).',
     ).toBe(true);
   });
 

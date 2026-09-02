@@ -18,7 +18,7 @@ export const configMissing = !isConfigured && !usingEmulator;
 // Exported so emulator tests can spin up a *second* signed-in identity
 // (initializeApp(demoConfig, 'secondary')) against the exact same
 // namespace the app itself uses - see rooms.emu.test.ts.
-export const demoConfig = { apiKey: 'demo', projectId: 'demo-blitz', databaseURL: 'http://127.0.0.1:9000?ns=demo-blitz-default-rtdb' };
+export const demoConfig = { apiKey: 'demo', projectId: 'demo-dash', databaseURL: 'http://127.0.0.1:9000?ns=demo-dash-default-rtdb' };
 
 // An unconfigured production build must still initialize with SOMETHING routable
 // (the demo config) rather than crash on firebaseConfig's placeholder databaseURL -

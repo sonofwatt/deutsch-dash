@@ -4,7 +4,7 @@ import type { RoundScore } from '../game/types';
 const KEY = 'bz.keeper';
 
 /**
- * The scorepad's whole persistence layer. A game of Dutch Blitz outlasts a
+ * The scorepad's whole persistence layer. A game at a real table outlasts a
  * screen lock, a stray back-swipe and a browser deciding to reload the tab, and
  * losing forty minutes of scores to any of those would be the end of using this.
  *

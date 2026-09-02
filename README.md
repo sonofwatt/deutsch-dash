@@ -1,6 +1,6 @@
 # Deutsch Dash
 
-A mobile-first multiplayer Dutch Blitz card game for 2-8 players. Create a room,
+A mobile-first multiplayer card game for 2-8 players. Create a room,
 text the invite link, race to empty your Dash pile. React + Firebase Realtime
 Database, hosted on GitHub Pages.
 

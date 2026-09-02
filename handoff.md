@@ -30,7 +30,7 @@ editing a test to match - a version whose test has to be re-pinned every time is
 one somebody will eventually bump without running them. Bump it in the commit that
 earns it, or it will drift the way the test count did.
 
-A mobile-first multiplayer Dutch Blitz game for 2-8 players, plus AI opponents.
+A mobile-first multiplayer card game for 2-8 players, plus AI opponents.
 Host creates a room, texts the invite link, everyone plays in their phone
 browser. React + Firebase Realtime Database, static hosting on GitHub Pages,
 anonymous auth. No server of our own.
@@ -138,7 +138,7 @@ skipped deploy makes race flashes and rivalry commentary silently vanish.
 ### Firebase and the emulator
 
 - The emulator database URL in `src/net/firebase.ts` must stay
-  `?ns=demo-blitz-default-rtdb`. The emulator only auto-loads
+  `?ns=demo-dash-default-rtdb`. The emulator only auto-loads
   `database.rules.json` into the `<project>-default-rtdb` namespace; any other
   namespace serves fully-open rules. **This bug already happened once** and
   silently ran every emulator test with rules disabled.
@@ -496,14 +496,27 @@ in progress reloads with a NaN in the penalty column and nobody credited with th
 dash - and a scorepad that loses forty minutes of scores is a scorepad nobody
 uses twice.
 
-**Two things still say blitz on purpose.** The physical game is called Dutch
-Blitz and is named as such where the lineage is the point - the README's first
-line, the scorepad's doc comment, `rankMove`'s reasoning. And the emulator's
-project id is `demo-blitz`, which is infrastructure rather than vocabulary: it is
-load-bearing in four places that have to agree (see the namespace trap above),
-and the forensic comments in `rooms.emu.test.ts` narrate a real bug by quoting
-the old URL. Renaming it would buy nothing and could silently turn the rules off
-in the tests.
+**The word is gone from the working repo, including the places that were held
+back once.** The emulator project is `demo-dash` now, which moved four values
+that have to agree or the rules silently stop being enforced: the `--project`
+flag in both `package.json` emulator scripts, and `projectId` plus the `?ns=`
+of `demoConfig` in `src/net/firebase.ts`. The forensic comments in
+`rooms.emu.test.ts` were retargeted with it, so their reproduction recipes still
+run; `demo-dash-rules-test` stays deliberately distinct from the app's own
+namespace for the reason spelled out there. The CANARY is what proves the move
+landed - it fails if the app's databaseURL and the namespace the rules load into
+ever part company again, so `npm run test:emu` is the check, not reading the
+diff.
+
+**The game this one descends from is no longer named in the repo.** It was in the
+README's opening line, the scorepad's two doc comments and `rankMove`'s
+reasoning; each now says what it meant without the borrowed name. The one
+survivor is the FAQ link under the deferred post-pile move, where the URL is the
+citation and changing it would break the evidence.
+
+**Three rows in the History table below still say Blitz.** They are the record of
+commits that shipped under that name. Rewriting them would make the table
+disagree with the log it indexes.
 
 ### The card in the air leaves the pile it came from
 
@@ -636,7 +649,7 @@ chain offers a text glyph first.
 
 ### There is a second, offline app inside this one
 
-`#/keeper` is a scorepad for people playing Dutch Blitz with a real deck. No
+`#/keeper` is a scorepad for people playing at a table with a real deck. No
 room, no account, no network: `src/keeper/` is the model and its localStorage,
 and `Keeper.tsx` is the whole interface. It is routed **before** the
 `configMissing` gate in `App.tsx` on purpose, so it works in a deployment with no
@@ -1736,11 +1749,13 @@ it counts.
 
 Not being built for now. The spec stands if it comes back.
 
-**It is a house rule, confirmed at the source.** Dutch Blitz's own FAQ says of the
-post piles: "You can move one card at a time - you cannot shift entire piles."
-(https://dutchblitz.com/pages/policies-faq). The design spec's one-card-at-a-time
-wording is therefore correct as written, and shipping this would need a lobby
-toggle rather than being a silent change to everyone's game.
+**It is a house rule, confirmed at the source.** The FAQ of the game this one
+descends from says of the post piles: "You can move one card at a time - you
+cannot shift entire piles." (https://dutchblitz.com/pages/policies-faq - the
+link is the citation, and the only place that name still appears.) The design
+spec's one-card-at-a-time wording is therefore correct as written, and shipping
+this would need a lobby toggle rather than being a silent change to everyone's
+game.
 
 Today only the top card of a post pile can move (`placeOnPost`). The request:
 tap-and-hold a pile, see its cards in a row, tap which to move, tap a destination.
@@ -1843,7 +1858,7 @@ refused:
 
 ```
 curl -X PUT -H 'authorization: Bearer owner' -d '"roundEnd"' \
-  'http://127.0.0.1:9000/rooms/<CODE>/meta/phase.json?ns=demo-blitz-default-rtdb'
+  'http://127.0.0.1:9000/rooms/<CODE>/meta/phase.json?ns=demo-dash-default-rtdb'
 ```
 
 Write `round/scores` and `players/$uid/score` yourself and the score sheet shows
@@ -2067,6 +2082,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `40f4d9a` | A dragged card leaves the pile it came from, on every pile |
 | `404cafd` | A desktop animates whatever the OS says; Dash everywhere on screen |
 | `21aceac` | The code says dash too: keys, types, CSS, tests |
+| `PENDING` | The emulator project and the borrowed game name follow |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.

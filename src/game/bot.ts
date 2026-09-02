@@ -72,7 +72,7 @@ export function botMoves(t: Tableau, spaces: CenterSpace[]): BotAction[] {
 }
 
 /**
- * How good a move is, in Dutch Blitz terms: the only way to win a round is to
+ * How good a move is, in this game's terms: the only way to win a round is to
  * empty the Dash pile, so anything that takes a card off it - or empties a post
  * so the Dash pile refills it - beats an otherwise identical wood play.
  */
