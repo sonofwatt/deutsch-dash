@@ -2066,7 +2066,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `3d20a59` | A layout suite that measures the band in a real browser |
 | `40f4d9a` | A dragged card leaves the pile it came from, on every pile |
 | `404cafd` | A desktop animates whatever the OS says; Dash everywhere on screen |
-| `PENDING` | The code says dash too: keys, types, CSS, tests |
+| `21aceac` | The code says dash too: keys, types, CSS, tests |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
