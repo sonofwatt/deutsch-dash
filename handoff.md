@@ -2082,7 +2082,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `40f4d9a` | A dragged card leaves the pile it came from, on every pile |
 | `404cafd` | A desktop animates whatever the OS says; Dash everywhere on screen |
 | `21aceac` | The code says dash too: keys, types, CSS, tests |
-| `PENDING` | The emulator project and the borrowed game name follow |
+| `aa4ec3e` | The emulator project and the borrowed game name follow |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
