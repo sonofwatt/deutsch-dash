@@ -6,10 +6,10 @@ const c = (v: number, suit: Suit, owner = 'them'): Card => ({ v, suit, owner });
 const board = (...tops: (Card | null)[]): CenterSpace[] =>
   tops.map(t => ({ stack: t ? [t] : [], history: [] }));
 const hand = (over: Partial<Tableau> = {}): Tableau =>
-  ({ blitz: [], post: [[], [], []], wood: [], woodIndex: 0, ...over });
+  ({ dash: [], post: [[], [], []], wood: [], woodIndex: 0, ...over });
 
 describe('openingsAfter', () => {
-  const mine = hand({ blitz: [c(6, 'red', 'me')] });   // a red 6, on top of my Blitz
+  const mine = hand({ dash: [c(6, 'red', 'me')] });   // a red 6, on top of my Dash
 
   it('lights the space somebody else just played to that my card fits', () => {
     const before = board(null, null);
@@ -32,7 +32,7 @@ describe('openingsAfter', () => {
 
   it('says nothing about my own play - I already know where I put it', () => {
     const after = board(c(5, 'red', 'me'));
-    expect(openingsAfter(board(null), after, hand({ blitz: [c(6, 'red', 'me')] }), 'me', 1)).toEqual({});
+    expect(openingsAfter(board(null), after, hand({ dash: [c(6, 'red', 'me')] }), 'me', 1)).toEqual({});
   });
 
   it('says nothing about a space that did not change', () => {
@@ -44,18 +44,18 @@ describe('openingsAfter', () => {
     const first = openingsAfter(board(c(4, 'red')), board(c(5, 'red')), mine, 'me', 1);
     expect(first).toEqual({ 0: { suit: 'red', at: 1 } });
     // ...and the nonce moves on, which is what remounts the element and replays it
-    const second = openingsAfter(board(c(5, 'red')), board(c(4, 'red')), hand({ blitz: [c(5, 'red', 'me')] }), 'me', 2);
+    const second = openingsAfter(board(c(5, 'red')), board(c(4, 'red')), hand({ dash: [c(5, 'red', 'me')] }), 'me', 2);
     expect(second).toEqual({ 0: { suit: 'red', at: 2 } });
   });
 
   it('ignores a space that was cleared rather than played to', () => {
     // A finished 1..10 pile empties its space. There is no card to take a colour
     // from, and it is open to every Ace on the table rather than to me.
-    expect(openingsAfter(board(c(10, 'red')), board(null), hand({ blitz: [c(1, 'blue', 'me')] }), 'me', 1))
+    expect(openingsAfter(board(c(10, 'red')), board(null), hand({ dash: [c(1, 'blue', 'me')] }), 'me', 1))
       .toEqual({});
   });
 
-  it('reads every face-up pile, not just the Blitz', () => {
+  it('reads every face-up pile, not just the Dash', () => {
     const t = hand({ wood: [c(6, 'red', 'me')], woodIndex: 1 });
     expect(openingsAfter(board(null), board(c(5, 'red')), t, 'me', 1)).toEqual({ 0: { suit: 'red', at: 1 } });
     const posts = hand({ post: [[], [c(6, 'red', 'me')], []] });
@@ -74,7 +74,7 @@ describe('useOpenings, as a host switch', () => {
   const gated = (from: CenterSpace[] | null, to: CenterSpace[], t: Tableau, on: boolean) =>
     (from && t && on ? openingsAfter(from, to, t, 'me', 1) : {});
 
-  const mine = hand({ blitz: [c(6, 'red', 'me')] });
+  const mine = hand({ dash: [c(6, 'red', 'me')] });
 
   it('shows nothing while the host has hints off', () => {
     expect(gated(board(null), board(c(5, 'red')), mine, false)).toEqual({});

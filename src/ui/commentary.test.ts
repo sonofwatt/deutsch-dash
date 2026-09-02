@@ -8,15 +8,15 @@ import type { CenterSpace, PlayerInfo, RoundScore, Suit } from '../game/types';
 const player = (name: string, score: number, extra: Partial<PlayerInfo> = {}): PlayerInfo => ({
   name, badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, awayAt: null, score, ...extra,
 });
-const sc = (centerCount: number, blitzLeft: number): RoundScore =>
-  ({ centerCount, blitzLeft, delta: centerCount - 2 * blitzLeft });
+const sc = (centerCount: number, dashLeft: number): RoundScore =>
+  ({ centerCount, dashLeft, delta: centerCount - 2 * dashLeft });
 const run = (upto: number, owner: string, suit: Suit = 'red'): CenterSpace['stack'] =>
   Array.from({ length: upto }, (_, i) => ({ v: i + 1, suit, owner }));
 
 const base = (over: Partial<CommentaryInput> = {}): CommentaryInput => ({
   players: { ann: player('Ann', 20), bo: player('Bo', 18) },
   scores: { ann: sc(6, 0), bo: sc(4, 1) },
-  spaces: [], duels: null, blitzedBy: 'ann', roundNumber: 3, targetScore: 75,
+  spaces: [], duels: null, dashedBy: 'ann', roundNumber: 3, targetScore: 75,
   durationMs: 120_000, stuckRounds: 0, stats: null, ...over,
 });
 const ids = (input: CommentaryInput) => commentary(input).map(r => r.id);
@@ -35,25 +35,25 @@ describe('commentary', () => {
     expect(commentary(base({ players: {}, scores: {} }))).toEqual([]);
   });
 
-  it('calls out a fast blitz, and stays quiet about an ordinary one', () => {
-    expect(ids(base({ durationMs: 38_000 }))).toContain('speed-blitz');
-    expect(textOf(base({ durationMs: 38_000 }), 'speed-blitz')).toContain('38');
+  it('calls out a fast dash, and stays quiet about an ordinary one', () => {
+    expect(ids(base({ durationMs: 38_000 }))).toContain('speed-dash');
+    expect(textOf(base({ durationMs: 38_000 }), 'speed-dash')).toContain('38');
     // Floored to agree with the keeper's clock, which cannot show 11.6 seconds.
-    expect(textOf(base({ durationMs: 11_600 }), 'speed-blitz')).toContain('11 seconds');
-    expect(ids(base({ durationMs: 120_000 }))).not.toContain('speed-blitz');
+    expect(textOf(base({ durationMs: 11_600 }), 'speed-dash')).toContain('11 seconds');
+    expect(ids(base({ durationMs: 120_000 }))).not.toContain('speed-dash');
   });
 
   it('counts in English', () => {
     // "1 seconds" and "0 apart" both turned up in a real round.
-    expect(textOf(base({ durationMs: 1_000 }), 'speed-blitz')).toContain('1 second.');
-    expect(textOf(base({ durationMs: 2_000 }), 'speed-blitz')).toContain('2 seconds');
+    expect(textOf(base({ durationMs: 1_000 }), 'speed-dash')).toContain('1 second.');
+    expect(textOf(base({ durationMs: 2_000 }), 'speed-dash')).toContain('2 seconds');
     const level = base({ players: { ann: player('Ann', 12), bo: player('Bo', 12) } });
     expect(textOf(level, 'photo-finish')).not.toContain('0 ');
     expect(textOf(level, 'photo-finish')).toMatch(/level|Not a point/);
   });
 
   it('knows a round nobody won', () => {
-    expect(ids(base({ blitzedBy: null }))).toContain('stalled');
+    expect(ids(base({ dashedBy: null }))).toContain('stalled');
   });
 
   it('spots a rivalry from the duel tally, counting both directions', () => {
@@ -152,8 +152,8 @@ describe('commentary', () => {
 
   it('leads with the most interesting thing that happened', () => {
     const remarks = commentary(base({ durationMs: 30_000, roundNumber: 1 }));
-    // A 30-second blitz outranks "it is round one".
-    expect(remarks[0].id).toBe('speed-blitz');
+    // A 30-second dash outranks "it is round one".
+    expect(remarks[0].id).toBe('speed-dash');
     expect(remarks.map(r => r.priority)).toEqual([...remarks.map(r => r.priority)].sort((a, b) => b - a));
   });
 
@@ -184,7 +184,7 @@ describe('commentary', () => {
     rounds: 4, players: {}, fastest: null, best: null, worst: null, allStuck: 0, races: 0, ...over,
   });
   const pStats = (over = {}) =>
-    ({ blitzes: 0, lastPlaces: 0, lastStreak: 0, racesWon: 0, racesLost: 0, ...over });
+    ({ dashes: 0, lastPlaces: 0, lastStreak: 0, racesWon: 0, racesLost: 0, ...over });
 
   it('notices a losing streak, which one round on its own cannot see', () => {
     const input = base({ stats: stats({ players: { bo: pStats({ lastStreak: 3 }) } }) });
@@ -208,16 +208,16 @@ describe('commentary', () => {
     expect(ids(base({ stats: stats({ players, races: 2 }) }))).not.toContain('unbeaten');
   });
 
-  it('keeps the standing fastest blitz, except in the round that set it', () => {
+  it('keeps the standing fastest dash, except in the round that set it', () => {
     const fastest = { uid: 'bo', ms: 31_000, round: 2 };
     expect(textOf(base({ roundNumber: 3, stats: stats({ fastest }) }), 'standing-record')).toContain('31');
     expect(ids(base({ roundNumber: 2, stats: stats({ fastest }) }))).not.toContain('standing-record');
   });
 
-  it('waits three rounds before mentioning that somebody has never blitzed', () => {
-    const players = { ann: pStats({ blitzes: 2 }), bo: pStats({ blitzes: 0 }) };
-    expect(ids(base({ stats: stats({ rounds: 2, players }) }))).not.toContain('never-blitzed');
-    expect(textOf(base({ stats: stats({ rounds: 4, players }) }), 'never-blitzed')).toContain('Bo');
+  it('waits three rounds before mentioning that somebody has never dashed', () => {
+    const players = { ann: pStats({ dashes: 2 }), bo: pStats({ dashes: 0 }) };
+    expect(ids(base({ stats: stats({ rounds: 2, players }) }))).not.toContain('never-dashed');
+    expect(textOf(base({ stats: stats({ rounds: 4, players }) }), 'never-dashed')).toContain('Bo');
   });
 
   it('counts the standstills across the whole game, in a round that had one', () => {
@@ -230,7 +230,7 @@ describe('commentary', () => {
   });
 
   it('says nothing game-long in the first round of a game', () => {
-    const long = ['last-streak', 'record-round', 'unbeaten', 'standing-record', 'blitz-hoarder', 'all-stuck'];
+    const long = ['last-streak', 'record-round', 'unbeaten', 'standing-record', 'dash-hoarder', 'all-stuck'];
     const first = ids(base({
       roundNumber: 1,
       stats: stats({ rounds: 1, allStuck: 5, players: { bo: pStats({ lastStreak: 1 }) } }),
@@ -257,10 +257,10 @@ describe('badge quips', () => {
     };
     // Cy was bottom before this round (30 - 12 = 18, well behind) and has just
     // taken 12 off it.
-    const good = base({ players, scores: { ann: sc(2, 1), bo: sc(1, 1), cy: sc(12, 0) }, blitzedBy: null });
+    const good = base({ players, scores: { ann: sc(2, 1), bo: sc(1, 1), cy: sc(12, 0) }, dashedBy: null });
     expect(ids(good)).toContain('quip-tulip');
     // The same player having a quiet round is not a late bloomer, just a tulip.
-    const quiet = base({ players, scores: { ann: sc(6, 0), bo: sc(5, 0), cy: sc(2, 1) }, blitzedBy: null });
+    const quiet = base({ players, scores: { ann: sc(6, 0), bo: sc(5, 0), cy: sc(2, 1) }, dashedBy: null });
     expect(ids(quiet)).not.toContain('quip-tulip');
   });
 
@@ -270,15 +270,15 @@ describe('badge quips', () => {
       cy: player('Cy', 20, { badgeId: 'bell' }),
     };
     // Ann was ahead of both and is now behind both: two overtakes against her.
-    const fell = base({ players, scores: { ann: sc(0, 5), bo: sc(9, 0), cy: sc(9, 0) }, blitzedBy: null });
+    const fell = base({ players, scores: { ann: sc(0, 5), bo: sc(9, 0), cy: sc(9, 0) }, dashedBy: null });
     expect(ids(fell)).toContain('quip-anchor');
     expect(textOf(fell, 'quip-anchor')).toMatch(/Ann/);
     const steady = base({ players: { ...players, ann: player('Ann', 40, { badgeId: 'anchor' }) },
-                          scores: { ann: sc(6, 0), bo: sc(5, 0), cy: sc(5, 0) }, blitzedBy: null });
+                          scores: { ann: sc(6, 0), bo: sc(5, 0), cy: sc(5, 0) }, dashedBy: null });
     expect(ids(steady)).not.toContain('quip-anchor');
   });
 
-  it('rings the bell for the badge that actually blitzed', () => {
+  it('rings the bell for the badge that actually dashed', () => {
     // Three players, spread totals and unremarkable deltas: the point is to leave
     // the bell holder room under MAX_PER_PLAYER, which two remarks about the same
     // person would otherwise use up before the quip is reached.
@@ -287,8 +287,8 @@ describe('badge quips', () => {
       cy: player('Cy', 27, { badgeId: 'clownfish' }),
     };
     const scores = { ann: sc(3, 0), bo: sc(5, 0), cy: sc(4, 0) };
-    expect(ids(base({ players, scores, blitzedBy: 'ann' }))).toContain('quip-bell');
-    expect(ids(base({ players, scores, blitzedBy: 'bo' }))).not.toContain('quip-bell');
+    expect(ids(base({ players, scores, dashedBy: 'ann' }))).toContain('quip-bell');
+    expect(ids(base({ players, scores, dashedBy: 'bo' }))).not.toContain('quip-bell');
   });
 
   it('has a quip for every badge that can be dealt', () => {

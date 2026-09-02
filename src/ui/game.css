@@ -401,13 +401,13 @@
    The numbers are deliberately small. Ten pixels is off the board, and the board
    is the half that is hard to aim at; it buys the clearance and nothing more. */
 
-/* iOS: an upward swipe from the bottom edge is "go home", and the Blitz and wood
+/* iOS: an upward swipe from the bottom edge is "go home", and the Dash and wood
    piles sit at the bottom of the screen, which is where a drag begins. Lifting
    the whole row clear of the home indicator's strip is the fix. */
 :root[data-platform="ios"] .game { --tableau-lift: 10px; }
 
 /* Android: an inward swipe from either side edge is "back", which from the board
-   is the lobby - and the wood and Blitz piles are the two ENDS of the row, so
+   is the lobby - and the wood and Dash piles are the two ENDS of the row, so
    whichever way round the player has them (see prefs.ts) one of them is against
    an edge. The guard is on both sides for that reason: swapping the sides must
    not move which gesture eats which pile.

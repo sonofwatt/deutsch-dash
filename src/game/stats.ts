@@ -1,7 +1,7 @@
 import type { RoundScore } from './types';
 
 export interface PlayerStats {
-  blitzes: number;
+  dashes: number;
   lastPlaces: number;
   /** Consecutive rounds finishing bottom, reset the moment they are not. */
   lastStreak: number;
@@ -9,7 +9,7 @@ export interface PlayerStats {
   racesLost: number;
 }
 
-export interface BlitzRecord { uid: string; ms: number; round: number }
+export interface DashRecord { uid: string; ms: number; round: number }
 export interface RoundRecord { uid: string; delta: number; round: number }
 
 /**
@@ -21,8 +21,8 @@ export interface RoundRecord { uid: string; delta: number; round: number }
 export interface GameStats {
   rounds: number;
   players: Record<string, PlayerStats>;
-  /** Fastest blitz of the game so far. */
-  fastest: BlitzRecord | null;
+  /** Fastest dash of the game so far. */
+  fastest: DashRecord | null;
   best: RoundRecord | null;   // biggest single-round gain
   worst: RoundRecord | null;  // biggest single-round loss
   /** Wood rotations forced by everybody being stuck at once, summed over rounds. */
@@ -31,7 +31,7 @@ export interface GameStats {
 }
 
 export const NO_PLAYER_STATS: PlayerStats =
-  { blitzes: 0, lastPlaces: 0, lastStreak: 0, racesWon: 0, racesLost: 0 };
+  { dashes: 0, lastPlaces: 0, lastStreak: 0, racesWon: 0, racesLost: 0 };
 
 export const statsFor = (stats: GameStats | null | undefined, uid: string): PlayerStats =>
   ({ ...NO_PLAYER_STATS, ...stats?.players?.[uid] });
@@ -54,7 +54,7 @@ export interface RoundOutcome {
   roundNumber: number;
   scores: Record<string, RoundScore>;
   duels: Record<string, Record<string, number>> | null;
-  blitzedBy: string | null;
+  dashedBy: string | null;
   /** How long the round took, or null when it cannot be trusted - see plays.ts. */
   durationMs: number | null;
   stuckRounds: number;
@@ -67,7 +67,7 @@ export function nextStats(prev: GameStats | null, round: RoundOutcome): GameStat
   const players: Record<string, PlayerStats> = {};
   for (const uid of Object.keys(round.totals)) players[uid] = statsFor(prev, uid);
 
-  if (round.blitzedBy && players[round.blitzedBy]) players[round.blitzedBy].blitzes += 1;
+  if (round.dashedBy && players[round.dashedBy]) players[round.dashedBy].dashes += 1;
 
   // Bottom of the table. Everybody level on the lowest total wears it, rather than
   // the sort order picking a scapegoat.
@@ -103,9 +103,9 @@ export function nextStats(prev: GameStats | null, round: RoundOutcome): GameStat
   }
 
   let fastest = prev?.fastest ?? null;
-  if (round.blitzedBy && round.durationMs != null
+  if (round.dashedBy && round.durationMs != null
       && (!fastest || round.durationMs < fastest.ms)) {
-    fastest = { uid: round.blitzedBy, ms: round.durationMs, round: round.roundNumber };
+    fastest = { uid: round.dashedBy, ms: round.durationMs, round: round.roundNumber };
   }
 
   return {

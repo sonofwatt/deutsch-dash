@@ -53,7 +53,7 @@ export type Rng = () => number;
 /** Every play the tableau can legally make right now, centre plays and post builds. */
 export function botMoves(t: Tableau, spaces: CenterSpace[]): BotAction[] {
   const sources: PlaySource[] = [
-    { kind: 'blitz' }, { kind: 'wood' },
+    { kind: 'dash' }, { kind: 'wood' },
     ...t.post.map((_, index) => ({ kind: 'post' as const, index })),
   ];
   const out: BotAction[] = [];
@@ -73,16 +73,16 @@ export function botMoves(t: Tableau, spaces: CenterSpace[]): BotAction[] {
 
 /**
  * How good a move is, in Dutch Blitz terms: the only way to win a round is to
- * empty the Blitz pile, so anything that takes a card off it - or empties a post
- * so the Blitz pile refills it - beats an otherwise identical wood play.
+ * empty the Dash pile, so anything that takes a card off it - or empties a post
+ * so the Dash pile refills it - beats an otherwise identical wood play.
  */
 export function rankMove(t: Tableau, a: BotAction): number {
   if (a.kind === 'flip') return 0;
-  const fromBlitz = a.source.kind === 'blitz';
-  // emptying a post pulls the next Blitz card down into it (see refillPosts)
-  const frees = a.source.kind === 'post' && t.post[a.source.index].length === 1 && t.blitz.length > 0;
+  const fromDash = a.source.kind === 'dash';
+  // emptying a post pulls the next Dash card down into it (see refillPosts)
+  const frees = a.source.kind === 'post' && t.post[a.source.index].length === 1 && t.dash.length > 0;
   const toCenter = a.kind === 'center';
-  if (fromBlitz) return toCenter ? 100 : 90;
+  if (fromDash) return toCenter ? 100 : 90;
   if (frees) return toCenter ? 80 : 45;
   if (a.source.kind === 'wood') return toCenter ? 70 : 40;
   return toCenter ? 60 : 20;

@@ -13,7 +13,7 @@ export interface CommentaryInput {
   scores: Record<string, RoundScore> | null;
   spaces: CenterSpace[];
   duels: Record<string, Record<string, number>> | null;
-  blitzedBy: string | null;
+  dashedBy: string | null;
   roundNumber: number;
   targetScore: number;
   /** endedAt - startedAt, when both are known. */
@@ -46,14 +46,14 @@ const MAX_REMARKS = 6;
 const MAX_PER_PLAYER = 2;
 
 export function commentary(input: CommentaryInput): Remark[] {
-  const { players, scores, spaces, duels, blitzedBy, roundNumber, targetScore } = input;
+  const { players, scores, spaces, duels, dashedBy, roundNumber, targetScore } = input;
   const ids = Object.keys(players);
   if (ids.length === 0) return [];
 
   const nameOf = (id: string) => players[id]?.name ?? 'Somebody';
   /**
    * Some facts are true for the rest of the game once they are true at all - a
-   * standing blitz record, a bot in front, a player who has not lost a race - and
+   * standing dash record, a bot in front, a player who has not lost a race - and
    * repeating one every round is how a carousel teaches people to ignore it.
    * These surface on alternating rounds, staggered per rule so they do not all
    * arrive and leave together.
@@ -106,7 +106,7 @@ export function commentary(input: CommentaryInput): Remark[] {
   const seconds = Math.floor((input.durationMs ?? 0) / 1000);
 
   // === the round itself ====================================================
-  if (!blitzedBy) {
+  if (!dashedBy) {
     add('stalled', 90, [
       'Nobody could move. That was less a round than a standoff.',
       'Round over by mutual exhaustion. No winner, only survivors.',
@@ -114,13 +114,13 @@ export function commentary(input: CommentaryInput): Remark[] {
       `Nobody could move. I call that a stand-off. Well - I call it that, nobody else does.`,
     ]);
   }
-  if (blitzedBy && input.durationMs != null && seconds > 0 && seconds <= 60) {
-    add('speed-blitz', 95, [
-      `${nameOf(blitzedBy)} dashed in ${plural(seconds, 'second')}. Everyone else was still reading their cards.`,
-      `${plural(seconds, 'second')}. ${nameOf(blitzedBy)} came to play; the rest came to watch.`,
+  if (dashedBy && input.durationMs != null && seconds > 0 && seconds <= 60) {
+    add('speed-dash', 95, [
+      `${nameOf(dashedBy)} dashed in ${plural(seconds, 'second')}. Everyone else was still reading their cards.`,
+      `${plural(seconds, 'second')}. ${nameOf(dashedBy)} came to play; the rest came to watch.`,
       `${plural(seconds, 'second')}. Some of you are still deciding which pile to look at.`,
       `${plural(seconds, 'second')}. Blink and you missed it, which several of you did.`,
-    ], [blitzedBy]);
+    ], [dashedBy]);
   }
   if (input.durationMs != null && input.durationMs >= 240_000) {
     add('slog', 40, [
@@ -156,13 +156,13 @@ export function commentary(input: CommentaryInput): Remark[] {
       `Everyone went backwards. A group effort, and the group should be ashamed.`,
     ]);
   }
-  if (blitzedBy && (scores?.[blitzedBy]?.centerCount ?? 0) >= 8) {
+  if (dashedBy && (scores?.[dashedBy]?.centerCount ?? 0) >= 8) {
     add('perfect', 84, [
-      `${nameOf(blitzedBy)} emptied the Dash pile AND left ${scores![blitzedBy].centerCount} cards in the middle. Show-off.`,
-      `${nameOf(blitzedBy)} did both jobs at once. Insufferable.`,
-      `${nameOf(blitzedBy)} won the round and the board. Leave something for the others.`,
-      `${nameOf(blitzedBy)} did the lot. Deal with it - because ${nameOf(blitzedBy)} certainly did.`,
-    ], [blitzedBy]);
+      `${nameOf(dashedBy)} emptied the Dash pile AND left ${scores![dashedBy].centerCount} cards in the middle. Show-off.`,
+      `${nameOf(dashedBy)} did both jobs at once. Insufferable.`,
+      `${nameOf(dashedBy)} won the round and the board. Leave something for the others.`,
+      `${nameOf(dashedBy)} did the lot. Deal with it - because ${nameOf(dashedBy)} certainly did.`,
+    ], [dashedBy]);
   }
   if (deltas.length > 1 && deltas[0] > 0 && deltas[0] >= 2 * Math.max(deltas[1], 1)) {
     const best = ids.find(id => delta(id) === deltas[0])!;
@@ -182,13 +182,13 @@ export function commentary(input: CommentaryInput): Remark[] {
       `${nameOf(passenger)} played nothing to the middle. Not a card. Card to believe.`,
     ], [passenger]);
   }
-  const hoarder = ids.find(id => id !== blitzedBy && (scores?.[id]?.blitzLeft ?? 0) >= 8);
+  const hoarder = ids.find(id => id !== dashedBy && (scores?.[id]?.dashLeft ?? 0) >= 8);
   if (hoarder) {
     add('barely-started', 46, [
-      `${nameOf(hoarder)} finished with ${scores![hoarder].blitzLeft} cards still in the Dash pile. Was it a nice nap?`,
+      `${nameOf(hoarder)} finished with ${scores![hoarder].dashLeft} cards still in the Dash pile. Was it a nice nap?`,
       `${nameOf(hoarder)}'s Dash pile is basically untouched. Bold strategy.`,
       `${nameOf(hoarder)} guarded that Dash pile like it was evidence.`,
-      `${nameOf(hoarder)} is still holding ${scores![hoarder].blitzLeft} Dash cards. Dash-edly disappointing.`,
+      `${nameOf(hoarder)} is still holding ${scores![hoarder].dashLeft} Dash cards. Dash-edly disappointing.`,
     ], [hoarder]);
   }
 
@@ -368,13 +368,13 @@ export function commentary(input: CommentaryInput): Remark[] {
       }
     }
   }
-  if (blitzedBy && players[blitzedBy]?.isBot) {
-    add('bot-blitz', 60, [
-      `${nameOf(blitzedBy)} dashed. It is a bot. It does not even want the points. That's embarrassing... For you.`,
-      `Beaten to it by ${nameOf(blitzedBy)}, who is made of arithmetic.`,
-      `${nameOf(blitzedBy)} dashed, felt nothing, and moved on. Be more like ${nameOf(blitzedBy)}.`,
-      `Beaten by ${nameOf(blitzedBy)}, who is a program. No hard feelings, because it has none.`,
-    ], [blitzedBy]);
+  if (dashedBy && players[dashedBy]?.isBot) {
+    add('bot-dash', 60, [
+      `${nameOf(dashedBy)} dashed. It is a bot. It does not even want the points. That's embarrassing... For you.`,
+      `Beaten to it by ${nameOf(dashedBy)}, who is made of arithmetic.`,
+      `${nameOf(dashedBy)} dashed, felt nothing, and moved on. Be more like ${nameOf(dashedBy)}.`,
+      `Beaten by ${nameOf(dashedBy)}, who is a program. No hard feelings, because it has none.`,
+    ], [dashedBy]);
   }
 
   // === the game so far, not just this round ================================
@@ -417,26 +417,26 @@ export function commentary(input: CommentaryInput): Remark[] {
         `Every race ${nameOf(unbeaten)} has been in, ${nameOf(unbeaten)} has won. Nobody likes that.`,
       ], [unbeaten]);
     }
-    // ...and only in a round where somebody blitzed and failed to beat it, which
+    // ...and only in a round where somebody dashed and failed to beat it, which
     // is when the record is actually the story.
     if (stats.fastest && stats.fastest.round !== roundNumber && players[stats.fastest.uid]
-        && blitzedBy && input.durationMs != null && standing('standing-record')) {
+        && dashedBy && input.durationMs != null && standing('standing-record')) {
       add('standing-record', 48, [
         `${nameOf(stats.fastest.uid)}'s ${Math.round(stats.fastest.ms / 1000)}-second dash is still the one to beat.`,
         `Nobody has got near ${nameOf(stats.fastest.uid)}'s ${Math.round(stats.fastest.ms / 1000)} seconds yet.`,
       ], [stats.fastest.uid]);
     }
-    const serial = ids.find(id => statsFor(stats, id).blitzes >= 3);
+    const serial = ids.find(id => statsFor(stats, id).dashes >= 3);
     if (serial) {
-      add('blitz-hoarder', 70, [
-        `${nameOf(serial)} has ended ${plural(statsFor(stats, serial).blitzes, 'of these rounds', 'of these rounds')}. Somebody stop them.`,
-        `${plural(statsFor(stats, serial).blitzes, 'round')} finished by ${nameOf(serial)}. This is becoming a pattern.`,
+      add('dash-hoarder', 70, [
+        `${nameOf(serial)} has ended ${plural(statsFor(stats, serial).dashes, 'of these rounds', 'of these rounds')}. Somebody stop them.`,
+        `${plural(statsFor(stats, serial).dashes, 'round')} finished by ${nameOf(serial)}. This is becoming a pattern.`,
       ], [serial]);
     }
     if (games >= 3) {
-      const quiet = ids.find(id => statsFor(stats, id).blitzes === 0);
+      const quiet = ids.find(id => statsFor(stats, id).dashes === 0);
       if (quiet) {
-        add('never-blitzed', 44, [
+        add('never-dashed', 44, [
           `${nameOf(quiet)} has yet to end a single round. There is still time. Probably.`,
           `${plural(games, 'round')} and ${nameOf(quiet)} has not called Dash once.`,
         ], [quiet]);
@@ -499,7 +499,7 @@ export function commentary(input: CommentaryInput): Remark[] {
     ], [star]);
   }
   const bell = holder('bell');
-  if (bell && blitzedBy === bell) {
+  if (bell && dashedBy === bell) {
     add('quip-bell', 66, [
       `${nameOf(bell)} calls it. Saved by the bell, and everyone else saved by nothing.`,
       `That is ${nameOf(bell)}'s bell. The rest of you were still ringing up.`,
@@ -538,7 +538,7 @@ export function commentary(input: CommentaryInput): Remark[] {
   // IS something - congratulating nobody for nothing is just noise. `overlords`
   // is addressed to the whole table and turns up on a hash of the round rather
   // than every time, so it reads as the game occasionally remembering itself.
-  const notable = blitzedBy && !players[blitzedBy]?.isBot ? blitzedBy
+  const notable = dashedBy && !players[dashedBy]?.isBot ? dashedBy
     : ids.find(id => !players[id].isBot && delta(id) >= 10);
   if (notable && standing('pointless')) {
     add('pointless', 46, [
@@ -629,7 +629,7 @@ export function remarksForRoom(room: Room, final = false): Remark[] {
     scores: round?.scores ?? null,
     spaces: round?.spaces ?? [],
     duels: round?.duels ?? null,
-    blitzedBy: round?.blitzedBy ?? null,
+    dashedBy: round?.dashedBy ?? null,
     roundNumber: room.meta.roundNumber,
     targetScore: room.meta.targetScore,
     // Both are server timestamps, so the difference is honest even though the two

@@ -6,7 +6,7 @@ import type { Card, PlayerInfo, Tableau } from '../../game/types';
 /**
  * One face-up slot of an opponent's tableau. Everything shown here is public in
  * the physical game too - post tops, the turned-over wood card and the top of the
- * Blitz pile all sit face up on the table.
+ * Dash pile all sit face up on the table.
  */
 function Slot({ card, badgeId, count }: { card: Card; badgeId: BadgeId; count?: number }) {
   return (
@@ -17,8 +17,8 @@ function Slot({ card, badgeId, count }: { card: Card; badgeId: BadgeId; count?: 
   );
 }
 
-const blitzSlot = (card: Card | null, t: Tableau, p: PlayerInfo) =>
-  card ? <Slot key="blitz" card={card} badgeId={p.badgeId} count={t.blitz.length} /> : null;
+const dashSlot = (card: Card | null, t: Tableau, p: PlayerInfo) =>
+  card ? <Slot key="dash" card={card} badgeId={p.badgeId} count={t.dash.length} /> : null;
 const woodSlot = (card: Card | null, p: PlayerInfo) =>
   card ? <Slot key="wood" card={card} badgeId={p.badgeId} /> : null;
 const postSlots = (t: Tableau, p: PlayerInfo) => t.post.map((stack, i) => {
@@ -40,7 +40,7 @@ export function OpponentStrip(props: {
         const b = BADGES[p.badgeId];
         const t = props.tableaus[uid];
         const woodTop = t && t.woodIndex > 0 ? t.wood[t.woodIndex - 1] ?? null : null;
-        const blitzTop = t ? t.blitz[t.blitz.length - 1] ?? null : null;
+        const dashTop = t ? t.dash[t.dash.length - 1] ?? null : null;
         // Dimmed for either kind of absence - a dropped socket and a phone lying
         // face-up on the table both mean "do not wait for them", and at this size
         // two shades of grey would be indistinguishable anyway. The class is
@@ -53,7 +53,7 @@ export function OpponentStrip(props: {
               <span>{b.glyph}</span>
               <span>{p.name}</span>
               {p.isBot && <span className="opp-ai">AI</span>}
-              {/* The Blitz count is NOT repeated here. It is on the pile it
+              {/* The Dash count is NOT repeated here. It is on the pile it
                   counts, in the bubble at its corner (see Slot) - having it in
                   both places had players reading two numbers off one player and
                   looking for the difference between them. The bubble wins because
@@ -70,15 +70,15 @@ export function OpponentStrip(props: {
                   )}
             </div>
             {/* Same left-to-right order as your own tableau, so a glance across
-                the table reads the same way: Blitz, posts, wood. */}
+                the table reads the same way: Dash, posts, wood. */}
             {/* Only the slots holding something. An empty slot said "this player
                 has no wood turned over" at the cost of a whole card of width in a
                 strip that has to fit seven other players. */}
             {t && (
               <div className="opp-cards">
                 {(props.woodSide === 'left'
-                  ? [woodSlot(woodTop, p), ...postSlots(t, p), blitzSlot(blitzTop, t, p)]
-                  : [blitzSlot(blitzTop, t, p), ...postSlots(t, p), woodSlot(woodTop, p)]
+                  ? [woodSlot(woodTop, p), ...postSlots(t, p), dashSlot(dashTop, t, p)]
+                  : [dashSlot(dashTop, t, p), ...postSlots(t, p), woodSlot(woodTop, p)]
                 )}
               </div>
             )}

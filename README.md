@@ -1,7 +1,7 @@
 # Deutsch Dash
 
 A mobile-first multiplayer Dutch Blitz card game for 2-8 players. Create a room,
-text the invite link, race to empty your Blitz pile. React + Firebase Realtime
+text the invite link, race to empty your Dash pile. React + Firebase Realtime
 Database, hosted on GitHub Pages.
 
 ## Local development (no Firebase account needed)
@@ -126,7 +126,7 @@ you were out you have no hand to return to, so you come back in the next one -
 the button says which case you are in.
 
 A round you sat out moves your score not at all, in either direction: no penalty
-for the Blitz pile you left, no credit for what you had already played. Cards you
+for the Dash pile you left, no credit for what you had already played. Cards you
 had played to the middle stay there - other people are building on them.
 
 ## Host options
@@ -188,8 +188,8 @@ of them. Effective rate works out at roughly one action every 4.9s / 2.3s / 1.1s
 All three were tuned down after the first game against them - a bot punches above
 its settings because it never plays illegally and never loses track of the board,
 so speed and attention are the only honest handicaps. Move quality is ranked
-the way the game actually rewards - anything that takes a card off the Blitz pile,
-or empties a post so the Blitz pile refills it, beats an equivalent wood play.
+the way the game actually rewards - anything that takes a card off the Dash pile,
+or empties a post so the Dash pile refills it, beats an equivalent wood play.
 
 Bots have no client and no auth identity of their own: **the host plays their
 hands**, and if the host changes mid-game the new host picks them up. They are
@@ -240,7 +240,7 @@ rotation.
 the nearest space it can legally reach - for an Ace, simply the closest free one,
 so you never have to aim at a particular slot mid-race.
 
-**Tableau layout** is Blitz on the left, post piles in the middle, wood on the
+**Tableau layout** is Dash on the left, post piles in the middle, wood on the
 right. Wood is the pile a player touches most - every flip of three is another
 tap - so it sits under the right thumb. The opponent strip mirrors the same order
 so a glance across the table reads the same way.

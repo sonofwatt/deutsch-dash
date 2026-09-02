@@ -477,7 +477,7 @@ emu('app writes under real security rules (regular client SDK, correct namespace
     let rejected = false;
     try {
       await set(ref(p2.db, `rooms/${code}/round/tableaus/${hostUid}`), {
-        blitz: [], post: [[], [], []], wood: [], woodIndex: 0,
+        dash: [], post: [[], [], []], wood: [], woodIndex: 0,
       });
     } catch {
       rejected = true;

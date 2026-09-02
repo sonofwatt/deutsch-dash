@@ -5,7 +5,7 @@ import type { Card, CenterSpace, Suit, Tableau } from './types';
 
 const c = (v: number, suit: Suit, owner = 'bot'): Card => ({ v, suit, owner });
 const tab = (p: Partial<Tableau> = {}): Tableau =>
-  ({ blitz: [], post: [[], [], []], wood: [], woodIndex: 0, ...p });
+  ({ dash: [], post: [[], [], []], wood: [], woodIndex: 0, ...p });
 const spaces = (n = 2, stacks: Record<number, Card[]> = {}): CenterSpace[] =>
   Array.from({ length: n }, (_, i) => ({ stack: stacks[i] ?? [], history: [] }));
 /** rng that walks a fixed script, so "random" choices are assertable */
@@ -13,28 +13,28 @@ const scripted = (...values: number[]) => { let i = 0; return () => values[Math.
 
 describe('botMoves', () => {
   it('finds centre plays and post builds, never a post onto itself', () => {
-    const t = tab({ blitz: [c(1, 'red')], post: [[c(8, 'red')], [c(7, 'green')], []] });
+    const t = tab({ dash: [c(1, 'red')], post: [[c(8, 'red')], [c(7, 'green')], []] });
     const moves = botMoves(t, spaces(2));
-    expect(moves).toContainEqual({ kind: 'center', source: { kind: 'blitz' }, space: 0 });
+    expect(moves).toContainEqual({ kind: 'center', source: { kind: 'dash' }, space: 0 });
     expect(moves).toContainEqual({ kind: 'post', source: { kind: 'post', index: 1 }, post: 0 });
     expect(moves.some(m => m.kind === 'post' && m.source.kind === 'post' && m.source.index === m.post)).toBe(false);
   });
   it('reuses a space whose pile was cleared away', () => {
     const cleared: CenterSpace = { stack: [], history: [Array.from({ length: 10 }, (_, i) => c(i + 1, 'blue'))] };
-    expect(botMoves(tab({ blitz: [c(1, 'red')] }), [cleared]))
-      .toEqual([{ kind: 'center', source: { kind: 'blitz' }, space: 0 }]);
+    expect(botMoves(tab({ dash: [c(1, 'red')] }), [cleared]))
+      .toEqual([{ kind: 'center', source: { kind: 'dash' }, space: 0 }]);
   });
 });
 
 describe('rankMove', () => {
-  it('rates emptying the Blitz pile above everything else', () => {
-    const t = tab({ blitz: [c(1, 'red')], post: [[c(2, 'blue')], [], []], wood: [c(1, 'green')], woodIndex: 1 });
-    const fromBlitz = rankMove(t, { kind: 'center', source: { kind: 'blitz' }, space: 0 });
+  it('rates emptying the Dash pile above everything else', () => {
+    const t = tab({ dash: [c(1, 'red')], post: [[c(2, 'blue')], [], []], wood: [c(1, 'green')], woodIndex: 1 });
+    const fromDash = rankMove(t, { kind: 'center', source: { kind: 'dash' }, space: 0 });
     const fromWood = rankMove(t, { kind: 'center', source: { kind: 'wood' }, space: 0 });
-    expect(fromBlitz).toBeGreaterThan(fromWood);
+    expect(fromDash).toBeGreaterThan(fromWood);
   });
-  it('rates emptying a post above a deeper one, because the Blitz pile refills it', () => {
-    const t = tab({ blitz: [c(9, 'red')], post: [[c(1, 'blue')], [c(1, 'green'), c(2, 'green')], []] });
+  it('rates emptying a post above a deeper one, because the Dash pile refills it', () => {
+    const t = tab({ dash: [c(9, 'red')], post: [[c(1, 'blue')], [c(1, 'green'), c(2, 'green')], []] });
     const frees = rankMove(t, { kind: 'center', source: { kind: 'post', index: 0 }, space: 0 });
     const deep = rankMove(t, { kind: 'center', source: { kind: 'post', index: 1 }, space: 0 });
     expect(frees).toBeGreaterThan(deep);
@@ -42,11 +42,11 @@ describe('rankMove', () => {
 });
 
 describe('chooseBotAction', () => {
-  const t = tab({ blitz: [c(1, 'red')], post: [[c(1, 'blue')], [], []], wood: [c(1, 'green')], woodIndex: 1 });
+  const t = tab({ dash: [c(1, 'red')], post: [[c(1, 'blue')], [], []], wood: [c(1, 'green')], woodIndex: 1 });
 
   it('a hard bot takes the best move on the board', () => {
     const a = chooseBotAction(t, spaces(2), 'hard', scripted(0.99));
-    expect(a).toEqual({ kind: 'center', source: { kind: 'blitz' }, space: 0 });
+    expect(a).toEqual({ kind: 'center', source: { kind: 'dash' }, space: 0 });
   });
   it('a sloppy roll still only ever returns a legal move', () => {
     const legal = botMoves(t, spaces(2));
@@ -62,10 +62,10 @@ describe('chooseBotAction', () => {
   });
   it('turns wood over when nothing is playable, and gives up when there is none', () => {
     // explicit rng: every level can dither now, so Math.random would make this flaky
-    const stuck = tab({ blitz: [c(9, 'red')], wood: [c(9, 'blue')], woodIndex: 1 });
+    const stuck = tab({ dash: [c(9, 'red')], wood: [c(9, 'blue')], woodIndex: 1 });
     expect(chooseBotAction(stuck, spaces(1, { 0: [c(1, 'red')] }), 'hard', scripted(0.99)))
       .toEqual({ kind: 'flip' });
-    const bare = tab({ blitz: [c(9, 'red')] });
+    const bare = tab({ dash: [c(9, 'red')] });
     expect(chooseBotAction(bare, spaces(1, { 0: [c(1, 'red')] }), 'hard', scripted(0.99))).toBeNull();
   });
 });
@@ -141,10 +141,10 @@ describe('the difficulty ladder', () => {
   });
 
   it('never dithers or wanders as Genius - it simply takes the best move', () => {
-    const t = tab({ blitz: [c(1, 'red')] });
+    const t = tab({ dash: [c(1, 'red')] });
     const spaces = [{ stack: [], history: [] }];
     // rng at its most unhelpful: any sloppiness or dither would show here.
     const action = chooseBotAction(t, spaces, 'genius', () => 0.5);
-    expect(action).toEqual({ kind: 'center', source: { kind: 'blitz' }, space: 0 });
+    expect(action).toEqual({ kind: 'center', source: { kind: 'dash' }, space: 0 });
   });
 });

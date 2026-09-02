@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import {
-  blitzerOf, emptyGame, roundScore, statsOf, totals, winnerOf, type KeeperGame,
+  dasherOf, emptyGame, roundScore, statsOf, totals, winnerOf, type KeeperGame,
 } from './model';
 import { loadGame, saveGame } from './storage';
 import { statsFor } from '../game/stats';
@@ -16,8 +16,8 @@ const game = (over: Partial<KeeperGame> = {}): KeeperGame => ({
 
 describe('keeper model', () => {
   it('turns the two numbers a player counts into a round score', () => {
-    expect(roundScore(9, 0)).toEqual({ centerCount: 9, blitzLeft: 0, delta: 9 });
-    expect(roundScore(3, 4)).toEqual({ centerCount: 3, blitzLeft: 4, delta: -5 });
+    expect(roundScore(9, 0)).toEqual({ centerCount: 9, dashLeft: 0, delta: 9 });
+    expect(roundScore(3, 4)).toEqual({ centerCount: 3, dashLeft: 4, delta: -5 });
   });
 
   it('adds the rounds up, and ignores a player who has since been removed', () => {
@@ -32,11 +32,11 @@ describe('keeper model', () => {
     expect(totals(game())).toEqual({ tulip: 0, star: 0 });
   });
 
-  it('reads the blitzer off the numbers rather than asking who won', () => {
-    expect(blitzerOf({ tulip: roundScore(9, 0), star: roundScore(2, 5) })).toBe('tulip');
-    expect(blitzerOf({ tulip: roundScore(4, 2), star: roundScore(2, 5) })).toBeNull();
+  it('reads the dasher off the numbers rather than asking who won', () => {
+    expect(dasherOf({ tulip: roundScore(9, 0), star: roundScore(2, 5) })).toBe('tulip');
+    expect(dasherOf({ tulip: roundScore(4, 2), star: roundScore(2, 5) })).toBeNull();
     // Two empty piles cannot both be right, so credit neither rather than guess.
-    expect(blitzerOf({ tulip: roundScore(9, 0), star: roundScore(7, 0) })).toBeNull();
+    expect(dasherOf({ tulip: roundScore(9, 0), star: roundScore(7, 0) })).toBeNull();
   });
 
   it('declares a winner only when somebody stands alone at the target', () => {
@@ -56,7 +56,7 @@ describe('keeper model', () => {
     ] });
     const stats = statsOf(g)!;
     expect(stats.rounds).toBe(2);
-    expect(statsFor(stats, 'tulip').blitzes).toBe(1);      // only round one was emptied
+    expect(statsFor(stats, 'tulip').dashes).toBe(1);      // only round one was emptied
     expect(statsFor(stats, 'star').lastStreak).toBe(2);
     expect(stats.races).toBe(0);                           // nothing to race across a table
     // Timed rounds do count, when somebody used the clock.
@@ -122,12 +122,33 @@ describe('keeper storage', () => {
     const store = shim();
     store.set('bz.keeper', JSON.stringify({
       players: [{ id: 'tulip', name: 'Ann', badgeId: 'tulip' }], targetScore: 25,
-      rounds: [{ tulip: { centerCount: 9, blitzLeft: 0, delta: 9 } }],
+      rounds: [{ tulip: { centerCount: 9, dashLeft: 0, delta: 9 } }],
     }));
     const loaded = loadGame()!;
     expect(loaded.rounds[0].ms).toBeNull();
     expect(loaded.rounds[0].scores.tulip.delta).toBe(9);
     expect(totals(loaded)).toEqual({ tulip: 9 });
+  });
+
+  it('reads a game saved while the Dash pile was still called blitz', () => {
+    // A phone holding a game from before the field names caught up with the
+    // screen. The old key is read, the new one is written back, and the
+    // arithmetic is untouched - including who is credited with the dash, which
+    // is worked out from the pile rather than stored.
+    const store = shim();
+    store.set('bz.keeper', JSON.stringify({
+      players: [{ id: 'tulip', name: 'Ann', badgeId: 'tulip' },
+                { id: 'star', name: 'Bo', badgeId: 'star' }], targetScore: 25,
+      rounds: [{ ms: null, scores: { tulip: { centerCount: 9, blitzLeft: 0, delta: 9 },
+                                     star: { centerCount: 2, blitzLeft: 5, delta: -8 } } }],
+    }));
+    const loaded = loadGame()!;
+    expect(loaded.rounds[0].scores).toEqual({
+      tulip: { centerCount: 9, dashLeft: 0, delta: 9 },
+      star: { centerCount: 2, dashLeft: 5, delta: -8 },
+    });
+    expect(dasherOf(loaded.rounds[0].scores)).toBe('tulip');
+    expect(totals(loaded)).toEqual({ tulip: 9, star: -8 });
   });
 
   it('keeps playing when the browser refuses to store anything', () => {

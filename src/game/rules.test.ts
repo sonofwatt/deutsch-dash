@@ -10,7 +10,7 @@ import type { Card, Suit, Tableau, CenterSpace } from './types';
 const c = (v: number, suit: Suit, owner = 'me'): Card => ({ v, suit, owner });
 const space = (stack: Card[] = []): CenterSpace => ({ stack, history: [] });
 const tab = (p: Partial<Tableau> = {}): Tableau =>
-  ({ blitz: [], post: [[], [], []], wood: [], woodIndex: 0, ...p });
+  ({ dash: [], post: [[], [], []], wood: [], woodIndex: 0, ...p });
 
 describe('faceGroup', () => {
   it('red+blue are boy, yellow+green are girl', () => {
@@ -112,16 +112,16 @@ describe('the orderly grid', () => {
 describe('isStuck', () => {
   const blocked = [space([c(5, 'red')])]; // only a red 6 could land
   it('is false while a legal move exists, however much wood is left', () => {
-    expect(isStuck(tab({ blitz: [c(6, 'red')], wood: [c(9, 'blue')] }), blocked, 99)).toBe(false);
+    expect(isStuck(tab({ dash: [c(6, 'red')], wood: [c(9, 'blue')] }), blocked, 99)).toBe(false);
   });
   it('is false with wood still unturned - flip first, that is not stuck', () => {
     // 9 wood cards is three flips to see the pile; one flip proves nothing
-    const t = tab({ blitz: [c(9, 'blue')], wood: Array.from({ length: 9 }, () => c(9, 'blue')) });
+    const t = tab({ dash: [c(9, 'blue')], wood: Array.from({ length: 9 }, () => c(9, 'blue')) });
     expect(isStuck(t, blocked, 1)).toBe(false);
     expect(isStuck(t, blocked, 3)).toBe(true); // been all the way round
   });
   it('is true immediately with no wood at all - nothing left to turn over', () => {
-    expect(isStuck(tab({ blitz: [c(9, 'blue')], wood: [] }), blocked, 0)).toBe(true);
+    expect(isStuck(tab({ dash: [c(9, 'blue')], wood: [] }), blocked, 0)).toBe(true);
   });
 });
 
@@ -174,52 +174,52 @@ describe('canBuildOnPost', () => {
   });
   it('checks the TOP of a stack, and rejects empty stacks', () => {
     expect(canBuildOnPost(c(6, 'red'), [c(8, 'red'), c(7, 'green')])).toBe(true);
-    expect(canBuildOnPost(c(7, 'yellow'), [])).toBe(false); // empty slots refill from blitz only
+    expect(canBuildOnPost(c(7, 'yellow'), [])).toBe(false); // empty slots refill from dash only
   });
 });
 
 describe('refillPosts', () => {
-  it('moves blitz top into each empty post slot', () => {
-    const t = tab({ blitz: [c(4, 'red'), c(9, 'blue')], post: [[], [c(5, 'green')], []] });
+  it('moves dash top into each empty post slot', () => {
+    const t = tab({ dash: [c(4, 'red'), c(9, 'blue')], post: [[], [c(5, 'green')], []] });
     const out = refillPosts(t);
-    expect(out.post[0]).toEqual([c(9, 'blue')]); // blitz TOP (last element) fills first
+    expect(out.post[0]).toEqual([c(9, 'blue')]); // dash TOP (last element) fills first
     expect(out.post[1]).toEqual([c(5, 'green')]);
     expect(out.post[2]).toEqual([c(4, 'red')]);
-    expect(out.blitz).toEqual([]);
+    expect(out.dash).toEqual([]);
   });
-  it('leaves slots empty when blitz is exhausted, and is a no-op otherwise', () => {
-    const t = tab({ blitz: [], post: [[], [c(5, 'green')], []] });
+  it('leaves slots empty when dash is exhausted, and is a no-op otherwise', () => {
+    const t = tab({ dash: [], post: [[], [c(5, 'green')], []] });
     expect(refillPosts(t)).toEqual(t);
   });
-  it('fills slots in order until blitz runs out, leaving the rest empty', () => {
-    const t = tab({ blitz: [c(9, 'blue')], post: [[], [c(5, 'green')], []] });
+  it('fills slots in order until dash runs out, leaving the rest empty', () => {
+    const t = tab({ dash: [c(9, 'blue')], post: [[], [c(5, 'green')], []] });
     const out = refillPosts(t);
     expect(out.post[0]).toEqual([c(9, 'blue')]);
     expect(out.post[1]).toEqual([c(5, 'green')]);
     expect(out.post[2]).toEqual([]);
-    expect(out.blitz).toEqual([]);
+    expect(out.dash).toEqual([]);
   });
 });
 
 describe('sourceTop / takeCard', () => {
   const t = tab({
-    blitz: [c(4, 'red'), c(9, 'blue')],
+    dash: [c(4, 'red'), c(9, 'blue')],
     post: [[c(8, 'red'), c(7, 'green')], [c(2, 'blue')], [c(3, 'green')]],
     wood: [c(1, 'red'), c(2, 'red'), c(3, 'red'), c(4, 'blue')],
     woodIndex: 3,
   });
   it('reads tops without mutating', () => {
-    expect(sourceTop(t, { kind: 'blitz' })).toEqual(c(9, 'blue'));
+    expect(sourceTop(t, { kind: 'dash' })).toEqual(c(9, 'blue'));
     expect(sourceTop(t, { kind: 'post', index: 0 })).toEqual(c(7, 'green'));
     expect(sourceTop(t, { kind: 'wood' })).toEqual(c(3, 'red')); // wood[woodIndex-1]
-    expect(sourceTop(tab(), { kind: 'blitz' })).toBeNull();
+    expect(sourceTop(tab(), { kind: 'dash' })).toBeNull();
     expect(sourceTop(tab({ wood: [c(1, 'red')] }), { kind: 'wood' })).toBeNull(); // nothing flipped
   });
-  it('takeCard removes blitz top and refills empty posts from new blitz top', () => {
-    const r = takeCard({ ...t, post: [[], [c(2, 'blue')], [c(3, 'green')]] }, { kind: 'blitz' })!;
+  it('takeCard removes dash top and refills empty posts from new dash top', () => {
+    const r = takeCard({ ...t, post: [[], [c(2, 'blue')], [c(3, 'green')]] }, { kind: 'dash' })!;
     expect(r.card).toEqual(c(9, 'blue'));
-    expect(r.next.post[0]).toEqual([c(4, 'red')]); // refilled from remaining blitz
-    expect(r.next.blitz).toEqual([]);
+    expect(r.next.post[0]).toEqual([c(4, 'red')]); // refilled from remaining dash
+    expect(r.next.dash).toEqual([]);
   });
   it('takeCard from wood decrements woodIndex', () => {
     const r = takeCard(t, { kind: 'wood' })!;
@@ -227,14 +227,14 @@ describe('sourceTop / takeCard', () => {
     expect(r.next.wood).toEqual([c(1, 'red'), c(2, 'red'), c(4, 'blue')]);
     expect(r.next.woodIndex).toBe(2);
   });
-  it('takeCard from a post refills the emptied slot from blitz', () => {
+  it('takeCard from a post refills the emptied slot from dash', () => {
     const r = takeCard(t, { kind: 'post', index: 1 })!;
     expect(r.card).toEqual(c(2, 'blue'));
     expect(r.next.post[1]).toEqual([c(9, 'blue')]);
-    expect(r.next.blitz).toEqual([c(4, 'red')]);
+    expect(r.next.dash).toEqual([c(4, 'red')]);
   });
   it('returns null for empty sources', () => {
-    expect(takeCard(tab(), { kind: 'blitz' })).toBeNull();
+    expect(takeCard(tab(), { kind: 'dash' })).toBeNull();
     expect(takeCard(tab(), { kind: 'post', index: 0 })).toBeNull();
     expect(takeCard(tab(), { kind: 'wood' })).toBeNull();
   });
@@ -242,7 +242,7 @@ describe('sourceTop / takeCard', () => {
 
 describe('placeOnPost', () => {
   const t = tab({
-    blitz: [c(9, 'blue')],
+    dash: [c(9, 'blue')],
     post: [[c(8, 'red')], [c(2, 'blue')], [c(5, 'yellow')]],
     wood: [c(7, 'green'), c(4, 'blue')],
     woodIndex: 1,
@@ -253,38 +253,38 @@ describe('placeOnPost', () => {
     expect(out.wood).toEqual([c(4, 'blue')]);
     expect(out.woodIndex).toBe(0);
   });
-  it('moves post top to another post; source slot refills from blitz', () => {
-    const t2 = tab({ blitz: [c(9, 'blue')], post: [[c(8, 'red')], [c(7, 'green')], [c(2, 'blue')]] });
+  it('moves post top to another post; source slot refills from dash', () => {
+    const t2 = tab({ dash: [c(9, 'blue')], post: [[c(8, 'red')], [c(7, 'green')], [c(2, 'blue')]] });
     const out = placeOnPost(t2, { kind: 'post', index: 1 }, 0)!;
     expect(out.post[0]).toEqual([c(8, 'red'), c(7, 'green')]);
     expect(out.post[1]).toEqual([c(9, 'blue')]);
-    expect(out.blitz).toEqual([]);
+    expect(out.dash).toEqual([]);
   });
   it('rejects illegal builds, empty targets, and self-moves', () => {
     expect(placeOnPost(t, { kind: 'wood' }, 1)).toBeNull();          // 7 on 2
     expect(placeOnPost(t, { kind: 'post', index: 0 }, 0)).toBeNull(); // self
-    expect(placeOnPost(tab({ blitz: [c(7, 'green')], post: [[c(8, 'red')], []] }), { kind: 'blitz' }, 1)).toBeNull(); // empty target
+    expect(placeOnPost(tab({ dash: [c(7, 'green')], post: [[c(8, 'red')], []] }), { kind: 'dash' }, 1)).toBeNull(); // empty target
   });
 });
 
 describe('hasLegalMove', () => {
   it('true when a source can reach the center', () => {
-    const t = tab({ blitz: [c(1, 'red')] });
+    const t = tab({ dash: [c(1, 'red')] });
     expect(hasLegalMove(t, [space()])).toBe(true);
   });
   it('true when only a post build exists', () => {
-    const t = tab({ blitz: [c(9, 'blue')], post: [[c(8, 'red')], [c(7, 'green')], [c(3, 'blue')]] });
+    const t = tab({ dash: [c(9, 'blue')], post: [[c(8, 'red')], [c(7, 'green')], [c(3, 'blue')]] });
     // post[1] green 7 fits on post[0] red 8; nothing fits center (no 1s, center empty needs 1)
     expect(hasLegalMove(t, [space()])).toBe(true);
   });
   it('counts a cleared space as somewhere to play again', () => {
-    const t = tab({ blitz: [c(1, 'red')] });
+    const t = tab({ dash: [c(1, 'red')] });
     const cleared: CenterSpace = { stack: [], history: [Array.from({ length: 10 }, (_, i) => c(i + 1, 'blue'))] };
     expect(hasLegalMove(t, [cleared])).toBe(true);  // the finished pile moved to the rail
     expect(hasLegalMove(t, [space([c(5, 'red')])])).toBe(false); // an occupied one does not
   });
   it('false when nothing fits anywhere', () => {
-    const t = tab({ blitz: [c(9, 'blue')], post: [[c(8, 'blue')], [c(4, 'yellow')], [c(3, 'green')]],
+    const t = tab({ dash: [c(9, 'blue')], post: [[c(8, 'blue')], [c(4, 'yellow')], [c(3, 'green')]],
                     wood: [c(10, 'green')], woodIndex: 1 });
     expect(hasLegalMove(t, [space([c(1, 'red')])])).toBe(false);
   });
@@ -296,7 +296,7 @@ describe('hasReachableMove and being stuck', () => {
   // Nothing face up can go anywhere: no Ace on top of anything, and the posts are
   // empty so nothing can be built on them either.
   const hand = (wood: Card[]): Tableau =>
-    ({ blitz: [card(7)], post: [[], [], []], wood, woodIndex: 0 });
+    ({ dash: [card(7)], post: [[], [], []], wood, woodIndex: 0 });
 
   it('sees a move that is only reachable by turning the wood over', () => {
     // The Ace is first in the pile, so at three a turn it is NEVER the top card:
@@ -350,15 +350,15 @@ describe('post piles build DOWN and only down', () => {
     expect(canBuildOnPost(card(8, 'green'), eight)).toBe(false);  // level
   });
 
-  it('refuses everything on an empty post - the Blitz pile refills those', () => {
-    // This is the likeliest thing behind the report: refillPosts drops the Blitz
+  it('refuses everything on an empty post - the Dash pile refills those', () => {
+    // This is the likeliest thing behind the report: refillPosts drops the Dash
     // top into an empty post, so a card of any value can APPEAR on a post pile
     // without anybody having built it there.
     expect(canBuildOnPost(card(5, 'red'), [])).toBe(false);
   });
 
   it('placeOnPost enforces it too, not just the highlighting', () => {
-    const t: Tableau = { blitz: [card(3, 'red')], post: [[card(8, 'red')], [card(9, 'green')], []],
+    const t: Tableau = { dash: [card(3, 'red')], post: [[card(8, 'red')], [card(9, 'green')], []],
                          wood: [], woodIndex: 0 };
     // The 9 of green cannot go up onto the 8 of red...
     expect(placeOnPost(t, { kind: 'post', index: 1 }, 0)).toBeNull();

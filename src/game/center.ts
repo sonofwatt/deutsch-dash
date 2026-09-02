@@ -35,10 +35,10 @@ export function orderlySpaces(count: number): CenterSpace[] {
 }
 
 export function normalizeTableau(raw: unknown, postCount: number): Tableau {
-  const r = (raw ?? {}) as { blitz?: unknown; post?: unknown; wood?: unknown; woodIndex?: number };
+  const r = (raw ?? {}) as { dash?: unknown; post?: unknown; wood?: unknown; woodIndex?: number };
   const rawPost = (r.post ?? {}) as Record<number, unknown>;
   return {
-    blitz: asCards(r.blitz),
+    dash: asCards(r.dash),
     post: Array.from({ length: postCount }, (_, i) => asCards(rawPost[i])),
     wood: asCards(r.wood),
     woodIndex: r.woodIndex ?? 0,
@@ -83,7 +83,7 @@ export function reconcileTableau(t: Tableau, spaces: CenterSpace[]): Tableau {
   const removedFlipped = t.wood.slice(0, t.woodIndex).filter(c => !keep(c)).length;
   return {
     ...t,
-    blitz: t.blitz.filter(keep),
+    dash: t.dash.filter(keep),
     post: t.post.map(s => s.filter(keep)),
     wood: t.wood.filter(keep),
     woodIndex: t.woodIndex - removedFlipped,

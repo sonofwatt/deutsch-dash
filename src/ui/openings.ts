@@ -6,14 +6,14 @@ import { cardId, type CenterSpace, type Suit, type Tableau } from '../game/types
 export interface Opening { suit: Suit; at: number }
 
 /**
- * The cards a player could actually play right now: the top of the Blitz pile,
+ * The cards a player could actually play right now: the top of the Dash pile,
  * the turned-over wood card, and the top of each post. Everything face up, which
  * is the same set the player can see - a glow for a card buried in the wood pile
  * would be pointing at something they cannot reach.
  */
 function visibleTops(t: Tableau) {
   return [
-    sourceTop(t, { kind: 'blitz' }),
+    sourceTop(t, { kind: 'dash' }),
     sourceTop(t, { kind: 'wood' }),
     ...t.post.map((_, i) => sourceTop(t, { kind: 'post', index: i })),
   ].filter(c => c != null);

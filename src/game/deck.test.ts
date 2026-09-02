@@ -34,14 +34,14 @@ describe('shuffle', () => {
 });
 
 describe('deal', () => {
-  it('splits 10 blitz / N single-card posts / rest wood, woodIndex 0', () => {
+  it('splits 10 dash / N single-card posts / rest wood, woodIndex 0', () => {
     const deck = buildDeck('u1');
     const t = deal(deck, 3);
-    expect(t.blitz).toHaveLength(10);
+    expect(t.dash).toHaveLength(10);
     expect(t.post).toEqual([[deck[10]], [deck[11]], [deck[12]]]);
     expect(t.wood).toHaveLength(27);
     expect(t.woodIndex).toBe(0);
-    const all = [...t.blitz, ...t.post.flat(), ...t.wood];
+    const all = [...t.dash, ...t.post.flat(), ...t.wood];
     expect(new Set(all.map(cardId)).size).toBe(40);
   });
   it('supports 5 posts for 2-player games', () => {

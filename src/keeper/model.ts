@@ -32,8 +32,8 @@ export interface KeeperGame {
 }
 
 export const MAX_KEEPER_PLAYERS = 8;
-/** A Blitz pile is ten cards, and forty is a whole deck in the middle. */
-export const MAX_BLITZ_LEFT = 10;
+/** A Dash pile is ten cards, and forty is a whole deck in the middle. */
+export const MAX_DASH_LEFT = 10;
 export const MAX_CENTER = 40;
 
 export const emptyGame = (targetScore = 75): KeeperGame =>
@@ -50,8 +50,8 @@ export const TIMED_MAX_MS = 60 * 60_000;
 export const believableMs = (ms: number): number | null =>
   (ms >= TIMED_MIN_MS && ms <= TIMED_MAX_MS ? ms : null);
 
-export const roundScore = (centerCount: number, blitzLeft: number): RoundScore =>
-  ({ centerCount, blitzLeft, delta: centerCount - 2 * blitzLeft });
+export const roundScore = (centerCount: number, dashLeft: number): RoundScore =>
+  ({ centerCount, dashLeft, delta: centerCount - 2 * dashLeft });
 
 /** Running totals after every round entered so far. Zero for a player with none. */
 export function totals(game: KeeperGame): Record<string, number> {
@@ -66,12 +66,12 @@ export function totals(game: KeeperGame): Record<string, number> {
 }
 
 /**
- * Who called Blitz, read off the numbers rather than asked for: the player who
- * finished with an empty Blitz pile. If two people are entered with none left,
+ * Who called Dash, read off the numbers rather than asked for: the player who
+ * finished with an empty Dash pile. If two people are entered with none left,
  * nobody is credited - the round is unreadable rather than a guess.
  */
-export function blitzerOf(round: Record<string, RoundScore>): string | null {
-  const empty = Object.entries(round).filter(([, s]) => s.blitzLeft === 0);
+export function dasherOf(round: Record<string, RoundScore>): string | null {
+  const empty = Object.entries(round).filter(([, s]) => s.dashLeft === 0);
   return empty.length === 1 ? empty[0][0] : null;
 }
 
@@ -95,7 +95,7 @@ export function statsOf(game: KeeperGame): GameStats | null {
       roundNumber: i + 1,
       scores: round.scores,
       duels: null,                 // no races to see across a real table
-      blitzedBy: blitzerOf(round.scores),
+      dashedBy: dasherOf(round.scores),
       durationMs: round.ms,
       stuckRounds: 0,
       totals: { ...running },

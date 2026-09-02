@@ -40,8 +40,8 @@ describe('normalize', () => {
     expect(new Set(seeded.map(sp => sp.suit)).size).toBe(4);
   });
   it('restores tableau shape with fixed post count', () => {
-    const t = normalizeTableau({ blitz: [c(2, 'red')], woodIndex: 0 }, 3);
-    expect(t).toEqual({ blitz: [c(2, 'red')], post: [[], [], []], wood: [], woodIndex: 0 });
+    const t = normalizeTableau({ dash: [c(2, 'red')], woodIndex: 0 }, 3);
+    expect(t).toEqual({ dash: [c(2, 'red')], post: [[], [], []], wood: [], woodIndex: 0 });
     const t5 = normalizeTableau({ post: { 1: [c(4, 'blue')] } }, 5);
     expect(t5.post).toEqual([[], [c(4, 'blue')], [], [], []]);
   });
@@ -101,17 +101,17 @@ describe('centerPlayTxn', () => {
 describe('reconcileTableau', () => {
   it('drops my cards that already made it to the center', () => {
     const dupe = c(3, 'red', 'me');
-    const t = { blitz: [dupe, c(9, 'blue', 'me')], post: [[c(3, 'red', 'other')]],
+    const t = { dash: [dupe, c(9, 'blue', 'me')], post: [[c(3, 'red', 'other')]],
                 wood: [c(5, 'green', 'me')], woodIndex: 0 };
     const spaces = normalizeSpaces({ 0: { stack: [c(3, 'red', 'me')] } }, 16);
     const out = reconcileTableau(t, spaces);
-    expect(out.blitz).toEqual([c(9, 'blue', 'me')]);
+    expect(out.dash).toEqual([c(9, 'blue', 'me')]);
     expect(out.post).toEqual([[c(3, 'red', 'other')]]); // other players' ids never match mine
     expect(out.wood).toEqual([c(5, 'green', 'me')]);
   });
   it('repositions the wood pointer when a flipped card was reclaimed by the center', () => {
     const t = {
-      blitz: [], post: [[]],
+      dash: [], post: [[]],
       wood: [c(1, 'red'), c(2, 'red'), c(3, 'red'), c(4, 'blue'), c(5, 'blue')],
       woodIndex: 3, // flipped top is red 3
     };

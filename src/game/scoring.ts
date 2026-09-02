@@ -12,8 +12,8 @@ export function scoreRound(
   const out: Record<string, RoundScore> = {};
   for (const [uid, t] of Object.entries(tableaus)) {
     const centerCount = centerCounts[uid] ?? 0;
-    const blitzLeft = t.blitz.length;
-    out[uid] = { centerCount, blitzLeft, delta: centerCount - 2 * blitzLeft };
+    const dashLeft = t.dash.length;
+    out[uid] = { centerCount, dashLeft, delta: centerCount - 2 * dashLeft };
   }
   return out;
 }

@@ -16,7 +16,7 @@ export function RoundEndOverlay() {
   const actionError = useGameStore(s => s.actionError);
   const scores = room.round?.scores;
   if (!scores) return null;
-  const blitzer = room.round?.blitzedBy ? room.players[room.round.blitzedBy]?.name : null;
+  const dasher = room.round?.dashedBy ? room.players[room.round.dashedBy]?.name : null;
 
   const me = uid ? room.players[uid] : null;
   const iAmReady = me?.ready === true;
@@ -35,8 +35,8 @@ export function RoundEndOverlay() {
   return (
     <div className="overlay">
       <div className="sheet">
-        <h2 style={{ margin: 0 }}>{blitzer ? `${blitzer} dashed!` : 'Round over (all stuck)'}</h2>
-        <ScoreList players={room.players} scores={scores} blitzedBy={room.round?.blitzedBy} showReady />
+        <h2 style={{ margin: 0 }}>{dasher ? `${dasher} dashed!` : 'Round over (all stuck)'}</h2>
+        <ScoreList players={room.players} scores={scores} dashedBy={room.round?.dashedBy} showReady />
         <Commentary remarks={remarksForRoom(room)} />
         {actionError && <p className="error" style={{ margin: 0 }}>{actionError}</p>}
         {me && !me.sittingOut && (

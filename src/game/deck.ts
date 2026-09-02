@@ -21,7 +21,7 @@ export function shuffle<T>(items: T[], rng: Rng = Math.random): T[] {
 
 export function deal(deck: Card[], postCount: number): Tableau {
   return {
-    blitz: deck.slice(0, 10),
+    dash: deck.slice(0, 10),
     post: Array.from({ length: postCount }, (_, i) => [deck[10 + i]]),
     wood: deck.slice(10 + postCount),
     woodIndex: 0,

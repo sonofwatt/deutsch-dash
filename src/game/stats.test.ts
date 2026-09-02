@@ -2,20 +2,20 @@ import { describe, it, expect } from 'vitest';
 import { nextStats, normalizeStats, statsFor, type GameStats, type RoundOutcome } from './stats';
 import type { RoundScore } from './types';
 
-const sc = (delta: number): RoundScore => ({ centerCount: 0, blitzLeft: 0, delta });
+const sc = (delta: number): RoundScore => ({ centerCount: 0, dashLeft: 0, delta });
 
 const round = (over: Partial<RoundOutcome> = {}): RoundOutcome => ({
   roundNumber: 1,
   scores: { ann: sc(9), bo: sc(-4) },
-  duels: null, blitzedBy: 'ann', durationMs: 60_000, stuckRounds: 0,
+  duels: null, dashedBy: 'ann', durationMs: 60_000, stuckRounds: 0,
   totals: { ann: 9, bo: -4 },
   ...over,
 });
 
 describe('nextStats', () => {
-  it('counts a blitz and a bottom finish', () => {
+  it('counts a dash and a bottom finish', () => {
     const s = nextStats(null, round());
-    expect(statsFor(s, 'ann').blitzes).toBe(1);
+    expect(statsFor(s, 'ann').dashes).toBe(1);
     expect(statsFor(s, 'bo').lastPlaces).toBe(1);
     expect(statsFor(s, 'bo').lastStreak).toBe(1);
     expect(statsFor(s, 'ann').lastStreak).toBe(0);
@@ -78,7 +78,7 @@ describe('nextStats', () => {
     expect(two.worst).toEqual({ uid: 'bo', delta: -11, round: 2 });   // beaten
   });
 
-  it('keeps only the fastest blitz, and ignores a round with no usable clock', () => {
+  it('keeps only the fastest dash, and ignores a round with no usable clock', () => {
     const one = nextStats(null, round({ roundNumber: 1, durationMs: 60_000 }));
     const two = nextStats(one, round({ roundNumber: 2, durationMs: 90_000 }));
     expect(two.fastest).toEqual({ uid: 'ann', ms: 60_000, round: 1 });
@@ -96,14 +96,14 @@ describe('nextStats', () => {
   it('never mutates what it was given', () => {
     const one = nextStats(null, round());
     const snapshot = JSON.parse(JSON.stringify(one)) as GameStats;
-    nextStats(one, round({ roundNumber: 2, blitzedBy: 'bo', totals: { ann: 1, bo: 30 } }));
+    nextStats(one, round({ roundNumber: 2, dashedBy: 'bo', totals: { ann: 1, bo: 30 } }));
     expect(one).toEqual(snapshot);
   });
 
   it('reads a room that has never had stats written to it', () => {
     expect(normalizeStats(undefined)).toBeNull();
     expect(statsFor(null, 'ann')).toEqual(
-      { blitzes: 0, lastPlaces: 0, lastStreak: 0, racesWon: 0, racesLost: 0 });
+      { dashes: 0, lastPlaces: 0, lastStreak: 0, racesWon: 0, racesLost: 0 });
     // RTDB gives back only what was written, so partial objects have to be safe.
     expect(normalizeStats({ rounds: 4 })!.players).toEqual({});
     expect(normalizeStats({ rounds: 4 })!.races).toBe(0);

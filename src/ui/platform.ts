@@ -7,7 +7,7 @@
  * an upward swipe from the bottom edge as "go home", and Android takes an
  * inward swipe from either side edge as "back" - which, from the board, is the
  * lobby. Both were reported from real tables: a thumb starting a drag on the
- * wood or Blitz pile is a thumb near an edge.
+ * wood or Dash pile is a thumb near an edge.
  */
 export type Platform = 'ios' | 'android' | 'other';
 

@@ -8,7 +8,7 @@ describe('a round holds the size it was dealt with', () => {
   // the board under everybody's hands, which is the exact thing sizing on the
   // whole room was chosen to avoid.
   const round = (spaceCount?: number) => ({
-    tableaus: {}, blitzedBy: null, scores: null, races: null, duels: null,
+    tableaus: {}, dashedBy: null, scores: null, races: null, duels: null,
     endedAt: null, stuckRounds: 0, startedAt: 1, ...(spaceCount ? { spaceCount } : {}),
   });
   const raw = (players: number, r: unknown) => ({

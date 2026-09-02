@@ -66,7 +66,7 @@ export interface Deps {
   clearStuck(code: string, uid: string): Promise<void>;
   markAway(code: string, uid: string): Promise<void>;
   clearAway(code: string, uid: string): Promise<void>;
-  announceBlitz(code: string, uid: string): Promise<void>;
+  announceDash(code: string, uid: string): Promise<void>;
   endRoundStalled(code: string): Promise<void>;
   incrementStuckRounds(code: string): Promise<number>;
   commitScores(code: string, room: Room): Promise<void>;
@@ -450,7 +450,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         void deps.persistTableau(code, id, next);
         flips.set(id, 0);
         if (p.stuckAt != null) void deps.clearStuck(code, id);
-        if (next.blitz.length === 0) void deps.announceBlitz(code, id);
+        if (next.dash.length === 0) void deps.announceDash(code, id);
       };
 
       if (action.kind === 'flip') {
@@ -738,7 +738,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
 
       async playTo(target) {
         if (!get().online) return; // spec §8: no plays while disconnected
-        // The board stays on screen under the blitz splash for over a second after
+        // The board stays on screen under the dash splash for over a second after
         // the round ends, and the splash does not take pointer events.
         if (get().room?.meta.phase !== 'playing') return;
         // Sitting out keeps the hand so it can be rejoined, so the hand alone is
@@ -758,7 +758,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
           flips.set(uid, 0); // progress: the wood cycle counts from here again
           void deps.clearStuck(code, uid);
           endRescue();
-          if (next.blitz.length === 0) void deps.announceBlitz(code, uid);
+          if (next.dash.length === 0) void deps.announceDash(code, uid);
           return;
         }
 
@@ -795,7 +795,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         flips.set(uid, 0);
         void deps.clearStuck(code, uid);
         endRescue();
-        if (taken.next.blitz.length === 0) void deps.announceBlitz(code, uid);
+        if (taken.next.dash.length === 0) void deps.announceDash(code, uid);
       },
 
       /**
@@ -1001,7 +1001,7 @@ const realDeps: Deps = {
   clearStuck: netPlays.clearStuck,
   markAway: netPlays.markAway,
   clearAway: netPlays.clearAway,
-  announceBlitz: netPlays.announceBlitz,
+  announceDash: netPlays.announceDash,
   endRoundStalled: netPlays.endRoundStalled,
   incrementStuckRounds: netPlays.incrementStuckRounds,
   commitScores: netPlays.commitScores,

@@ -35,7 +35,7 @@ import type { Card, Suit, Tableau } from '../../game/types';
 const c = (v: number, suit: Suit, owner = 'me'): Card => ({ v, suit, owner });
 const noop = () => {};
 const TABLEAU: Tableau = {
-  blitz: [c(9, 'red'), c(4, 'blue')],
+  dash: [c(9, 'red'), c(4, 'blue')],
   post: [[c(8, 'red'), c(7, 'green')], [c(3, 'blue')], []],
   wood: Array.from({ length: 12 }, (_, i) => c((i % 10) + 1, 'blue')),
   woodIndex: 3,

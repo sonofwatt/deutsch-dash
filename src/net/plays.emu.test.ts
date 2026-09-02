@@ -72,9 +72,9 @@ emu('game-over threshold against emulator', () => {
     const players = { [uid]: { name: 'Host', badgeId: 'tulip' as const, joinedAt: 1,
                                connected: true, stuckAt: null, awayAt: null, score: 0, ready: true } };
     await startRound(code, { meta: { ...meta, phase: 'lobby' }, players, round: null });
-    await update(ref(db, `rooms/${code}/meta`), { phase: 'roundEnd' }); // the blitz landed
+    await update(ref(db, `rooms/${code}/meta`), { phase: 'roundEnd' }); // the dash landed
 
-    // n cards of mine sitting in the centre, nothing left in my Blitz pile:
+    // n cards of mine sitting in the centre, nothing left in my Dash pile:
     // delta is exactly n (+1 each, no -2 penalty).
     const suits: Suit[] = ['red', 'blue', 'green', 'yellow'];
     const mine: Card[] = Array.from({ length: centerCards }, (_, i) =>
@@ -83,8 +83,8 @@ emu('game-over threshold against emulator', () => {
       ({ stack: i === 0 ? mine : [], history: [] }));
     const room: Room = {
       meta, players,
-      round: { spaces, tableaus: { [uid]: { blitz: [], post: [[], [], []], wood: [], woodIndex: 0 } },
-               blitzedBy: uid, scores: null, races: null, duels: null, endedAt: null, stuckRounds: 0, startedAt: 1 },
+      round: { spaces, tableaus: { [uid]: { dash: [], post: [[], [], []], wood: [], woodIndex: 0 } },
+               dashedBy: uid, scores: null, races: null, duels: null, endedAt: null, stuckRounds: 0, startedAt: 1 },
     };
     await commitScores(code, room);
     const snap = await get(ref(db, `rooms/${code}`));
@@ -101,8 +101,8 @@ emu('game-over threshold against emulator', () => {
 });
 
 emu('the round shown in the 2026-08-25 playtest screenshot', () => {
-  // Replays that exact board: Dave blitzes for +24, the other player is left
-  // holding all ten Blitz cards for -20, and the target is 25. The report was
+  // Replays that exact board: Dave dashes for +24, the other player is left
+  // holding all ten Dash cards for -20, and the target is 25. The report was
   // "the game ended at 24" - so this asserts both halves: the game must NOT end
   // one short of the target, and "Next round" must actually deal the next round.
   it('scores 24/-12, keeps playing, and deals round 2', async () => {
@@ -135,10 +135,10 @@ emu('the round shown in the 2026-08-25 playtest screenshot', () => {
       round: {
         spaces,
         tableaus: {
-          [dave]: { blitz: [], post: [[], [], [], [], []], wood: [], woodIndex: 0 },
-          [other]: { blitz: owned(other, 10, 8), post: [[], [], [], [], []], wood: [], woodIndex: 0 },
+          [dave]: { dash: [], post: [[], [], [], [], []], wood: [], woodIndex: 0 },
+          [other]: { dash: owned(other, 10, 8), post: [[], [], [], [], []], wood: [], woodIndex: 0 },
         },
-        blitzedBy: dave, scores: null, races: null, duels: null, endedAt: null, stuckRounds: 0, startedAt: 1,
+        dashedBy: dave, scores: null, races: null, duels: null, endedAt: null, stuckRounds: 0, startedAt: 1,
       },
     };
 
@@ -160,13 +160,13 @@ emu('the round shown in the 2026-08-25 playtest screenshot', () => {
     const afterNext = normalizeRoom((await get(ref(db, `rooms/${code}`))).val())!;
     expect(afterNext.meta.phase).toBe('playing');
     expect(afterNext.meta.roundNumber).toBe(afterScoring.meta.roundNumber + 1);
-    expect(afterNext.round!.blitzedBy).toBeNull();
+    expect(afterNext.round!.dashedBy).toBeNull();
     expect(afterNext.round!.scores).toBeNull();
     expect(afterNext.round!.spaces.every(sp => sp.stack.length === 0)).toBe(true);
-    // both players dealt a fresh 2-player tableau: 10 blitz, 5 posts, 25 wood
+    // both players dealt a fresh 2-player tableau: 10 dash, 5 posts, 25 wood
     for (const uid of [dave, other]) {
       const t = afterNext.round!.tableaus[uid];
-      expect(t.blitz).toHaveLength(10);
+      expect(t.dash).toHaveLength(10);
       expect(t.post).toHaveLength(5);
       expect(t.wood).toHaveLength(25);
     }
@@ -205,8 +205,8 @@ emu('the score commit does not ride on the stats write', () => {
     const room: Room = {
       meta, players,
       round: { spaces: Array.from({ length: 16 }, () => ({ stack: [] as Card[], history: [] as Card[][] })),
-               tableaus: { [uid]: { blitz: [], post: [[], [], []], wood: [], woodIndex: 0 } },
-               blitzedBy: uid, scores: null, races: null, duels: null, endedAt: null,
+               tableaus: { [uid]: { dash: [], post: [[], [], []], wood: [], woodIndex: 0 } },
+               dashedBy: uid, scores: null, races: null, duels: null, endedAt: null,
                stuckRounds: 0, startedAt: 1 },
     };
     await commitScores(code, room);
@@ -264,8 +264,8 @@ emu('sitting out leaves the round in progress', () => {
       .toEqual(mid.round!.tableaus[dave]);
     await setSittingOut(code, dave, true);   // out again for the scoring below
 
-    // Sam blitzes; the round is scored.
-    await update(ref(db, `rooms/${code}`), { 'round/blitzedBy': other, 'meta/phase': 'roundEnd' });
+    // Sam dashes; the round is scored.
+    await update(ref(db, `rooms/${code}`), { 'round/dashedBy': other, 'meta/phase': 'roundEnd' });
     const atEnd = normalizeRoom((await get(ref(db, `rooms/${code}`))).val())!;
     await commitScores(code, atEnd);
     const after = normalizeRoom((await get(ref(db, `rooms/${code}`))).val())!;

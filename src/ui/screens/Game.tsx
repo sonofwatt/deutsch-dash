@@ -157,7 +157,7 @@ export function Game() {
 
   // The store drops our hand the moment the phase leaves 'playing' (store.ts, the
   // clear that makes the next round adopt a fresh one). The round is still on
-  // screen underneath the blitz splash and the score sheet though, so fall back
+  // screen underneath the dash splash and the score sheet though, so fall back
   // to the hand RTDB last recorded: the board the round ended on, rather than the
   // word "dealing…" flashing up behind the moment someone won. Nothing can be
   // played from it - playTo refuses outside 'playing'.

@@ -5,14 +5,14 @@ import type { Card, CenterSpace, Suit, Tableau } from './types';
 const c = (v: number, suit: Suit, owner = 'me'): Card => ({ v, suit, owner });
 const space = (...stack: Card[]): CenterSpace => ({ stack, history: [] });
 const hand = (over: Partial<Tableau> = {}): Tableau =>
-  ({ blitz: [], post: [[], [], []], wood: [], woodIndex: 0, ...over });
+  ({ dash: [], post: [[], [], []], wood: [], woodIndex: 0, ...over });
 
 describe('hintSpace', () => {
   it('points at where the best move LANDS, not at the card that makes it', () => {
-    // Blitz -> centre outranks post -> centre in the bot's own ranking, so the
-    // answer is the blitz card's destination even though the post move is
+    // Dash -> centre outranks post -> centre in the bot's own ranking, so the
+    // answer is the dash card's destination even though the post move is
     // generated against a lower-numbered space.
-    const t = hand({ blitz: [c(5, 'red')], post: [[c(3, 'blue')], [], []] });
+    const t = hand({ dash: [c(5, 'red')], post: [[c(3, 'blue')], [], []] });
     const spaces = [space(c(2, 'blue')), space(), space(c(4, 'red'))];
     expect(hintSpace(t, spaces)).toBe(2);
   });
@@ -20,7 +20,7 @@ describe('hintSpace', () => {
   it('settles ties on the first space rather than the last, so it cannot wander', () => {
     // An Ace fits every empty space at exactly the same rank. Re-running it must
     // give the same answer every time: the hint re-renders on a timer.
-    const t = hand({ blitz: [c(1, 'green')] });
+    const t = hand({ dash: [c(1, 'green')] });
     const spaces = [space(c(7, 'yellow')), space(), space(), space()];
     expect(hintSpace(t, spaces)).toBe(1);
     expect(hintSpace(t, spaces)).toBe(1);
@@ -34,7 +34,7 @@ describe('hintSpace', () => {
   });
 
   it('stays silent for a player with nothing at all', () => {
-    const t = hand({ blitz: [c(9, 'blue')] });
+    const t = hand({ dash: [c(9, 'blue')] });
     expect(hintSpace(t, [space(c(1, 'red'))])).toBeNull();
   });
 });

@@ -78,7 +78,7 @@ export async function startRound(code: string, room: Room, rng?: Rng): Promise<v
   const spaces = orderly ? orderlySpaces(spaceCountForPlayers(uids.length, true)) : null;
   const patch: Record<string, unknown> = {
     round: {
-      tableaus, stuckRounds: 0, blitzedBy: null, scores: null, startedAt: serverTimestamp(),
+      tableaus, stuckRounds: 0, dashedBy: null, scores: null, startedAt: serverTimestamp(),
       // Fixed here rather than derived per client, because the player count can
       // change mid-round now that a game in progress admits spectators - and a
       // board that changes shape under a hand somebody is holding costs the round.
@@ -168,13 +168,13 @@ export function clearAway(code: string, uid: string): Promise<void> {
   return set(r(code, `players/${uid}/awayAt`), null);
 }
 
-export function announceBlitz(code: string, uid: string): Promise<void> {
-  return update(r(code), { 'round/blitzedBy': uid, 'meta/phase': 'roundEnd' });
+export function announceDash(code: string, uid: string): Promise<void> {
+  return update(r(code), { 'round/dashedBy': uid, 'meta/phase': 'roundEnd' });
 }
 
 // Called by the host client by convention; not security-enforced (casual trust model, see database.rules.json).
 export function endRoundStalled(code: string): Promise<void> {
-  return update(r(code), { 'round/blitzedBy': null, 'meta/phase': 'roundEnd' });
+  return update(r(code), { 'round/dashedBy': null, 'meta/phase': 'roundEnd' });
 }
 
 // Called by the host client by convention; not security-enforced (casual trust model, see database.rules.json).
@@ -212,12 +212,12 @@ export async function commitScores(code: string, room: Room): Promise<void> {
   // The duration is the host's own clock against a server timestamp, because
   // round/endedAt is a sentinel until this write lands - so it is thrown away
   // unless it is plausible. Only the game-record lines use it; the per-round
-  // "blitzed in Ns" reads endedAt - startedAt, which is server time on both ends.
+  // "dashed in Ns" reads endedAt - startedAt, which is server time on both ends.
   const elapsed = round.startedAt > 0 ? Date.now() - round.startedAt : 0;
   const durationMs = elapsed >= 3_000 && elapsed <= 20 * 60_000 ? elapsed : null;
   const stats = nextStats(room.stats ?? null, {
     roundNumber: room.meta.roundNumber,
-    scores, duels: round.duels, blitzedBy: round.blitzedBy,
+    scores, duels: round.duels, dashedBy: round.dashedBy,
     durationMs, stuckRounds: round.stuckRounds, totals,
   });
   // Ties at/above target play another round (spec: game ends only when someone stands alone on top)

@@ -30,7 +30,7 @@
         },
         "round": {
           "spaces": { ".write": "auth != null" },
-          "blitzedBy": { ".write": "auth != null" },
+          "dashedBy": { ".write": "auth != null" },
           "scores": { ".write": "auth != null" },
           "races": { ".write": "auth != null" },
           "duels": { ".write": "auth != null" },

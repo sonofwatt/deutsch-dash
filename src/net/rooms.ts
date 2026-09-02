@@ -62,7 +62,7 @@ export function normalizeRoom(raw: unknown): Room | null {
       tableaus: Object.fromEntries(
         Object.entries(rr.tableaus ?? {}).map(([uid, t]) => [uid, normalizeTableau(t, postCount)]),
       ),
-      blitzedBy: rr.blitzedBy ?? null,
+      dashedBy: rr.dashedBy ?? null,
       scores: rr.scores ?? null,
       races: rr.races ?? null,
       duels: rr.duels ?? null,

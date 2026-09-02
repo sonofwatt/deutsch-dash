@@ -30,7 +30,7 @@ const SHELLS = [
 ];
 const SHELL_SPARKS = 46;
 
-/** What falls on somebody who did not blitz. The trophy falls with it. */
+/** What falls on somebody who did not dash. The trophy falls with it. */
 const GLYPHS: Record<Exclude<SplashBase, 'glitter'>, string> = {
   poo: '💩', crying: '😢', relief: '🥹', toilet: '🚽',
 };
@@ -108,20 +108,20 @@ function Rain({ glyphs }: { glyphs: string[] }) {
   );
 }
 
-export function BlitzSplash({ name, splash }: { name: string; splash: Splash }) {
+export function DashSplash({ name, splash }: { name: string; splash: Splash }) {
   const glyphs = splash.base === 'glitter' ? [] : [GLYPHS[splash.base]];
   if (splash.trophy) glyphs.push('🏆');
   return (
-    <div className="blitz-splash">
+    <div className="dash-splash">
       {splash.base === 'glitter' ? <><Fireworks /><Glitter /></> : <Rain glyphs={glyphs} />}
       {/* Above the weather, not in it. The name is the one piece of information
           the splash carries and it was being rained on. */}
-      <motion.div className="blitz-say"
+      <motion.div className="dash-say"
         initial={{ scale: 0.3, opacity: 0, rotate: -6 }}
         animate={{ scale: 1, opacity: 1, rotate: 0 }}
         transition={{ type: 'spring', stiffness: 300, damping: 18 }}>
-        <div className="blitz-word">DASH!</div>
-        <p className="blitz-name">{name}</p>
+        <div className="dash-word">DASH!</div>
+        <p className="dash-name">{name}</p>
       </motion.div>
     </div>
   );

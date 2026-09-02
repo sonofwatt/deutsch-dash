@@ -32,7 +32,7 @@ export function TableauView(props: {
 }) {
   const { t, badgeId } = props;
   const woodTop = t.woodIndex > 0 ? t.wood[t.woodIndex - 1] : null;
-  const blitzTop = t.blitz[t.blitz.length - 1] ?? null;
+  const dashTop = t.dash[t.dash.length - 1] ?? null;
   const sel = JSON.stringify(props.selection);
   const isSel = (s: PlaySource) => sel === JSON.stringify(s);
 
@@ -46,7 +46,7 @@ export function TableauView(props: {
   // player is holding taken off it.
   const beneath = dealt.slice(0, -1);
   const draggingWood = props.dragging?.kind === 'wood';
-  const draggingBlitz = props.dragging?.kind === 'blitz';
+  const draggingDash = props.dragging?.kind === 'dash';
   // What is under the card in the air, for a pile that shows only its top card.
   // Null when it was the last one, and then the slot is simply empty.
   const under = (stack: Card[]) => stack[stack.length - 2] ?? null;
@@ -61,26 +61,26 @@ export function TableauView(props: {
   // so it sits under a thumb, and which thumb is a preference (see prefs.ts).
   // Only the two ends trade places: the posts stay in the middle, because moving
   // them would shuffle four positions to fix one.
-  const blitzGroup = (
-      <div key="blitz">
-        <PileStack layers={depthLayers(t.blitz.length)}>
+  const dashGroup = (
+      <div key="dash">
+        <PileStack layers={depthLayers(t.dash.length)}>
           {/* Nothing to grab while one is already in the air, and no layoutId: the
               card revealed underneath is not moving anywhere. */}
-          {draggingBlitz
-            ? (under(t.blitz)
-                ? <CardView key={cardId(under(t.blitz)!)} card={under(t.blitz)!} badgeId={badgeId} />
+          {draggingDash
+            ? (under(t.dash)
+                ? <CardView key={cardId(under(t.dash)!)} card={under(t.dash)!} badgeId={badgeId} />
                 : <div className="pile-space" />)
-            : blitzTop ? (
-            <div onClick={() => props.onSelect({ kind: 'blitz' })}
-              onPointerDown={e => props.startDrag(e, blitzTop, { kind: 'blitz' })}>
-              <CardView key={cardId(blitzTop)} card={blitzTop} badgeId={badgeId} selected={isSel({ kind: 'blitz' })} layoutId={cardId(blitzTop)} />
+            : dashTop ? (
+            <div onClick={() => props.onSelect({ kind: 'dash' })}
+              onPointerDown={e => props.startDrag(e, dashTop, { kind: 'dash' })}>
+              <CardView key={cardId(dashTop)} card={dashTop} badgeId={badgeId} selected={isSel({ kind: 'dash' })} layoutId={cardId(dashTop)} />
             </div>
           ) : <div className="pile-space" />}
         </PileStack>
         {/* The count used to be a bubble pinned to the card's corner, over the
             card art. Every pile now says how many cards it holds in the same
             place, in the same way: on the label underneath. */}
-        <div className="pile-label">dash {t.blitz.length}</div>
+        <div className="pile-label">dash {t.dash.length}</div>
       </div>
   );
 
@@ -165,8 +165,8 @@ export function TableauView(props: {
   );
 
   const ends = props.woodSide === 'left'
-    ? [woodGroup, ...postGroups, blitzGroup]
-    : [blitzGroup, ...postGroups, woodGroup];
+    ? [woodGroup, ...postGroups, dashGroup]
+    : [dashGroup, ...postGroups, woodGroup];
   // The pile count and its gap are set on .game (Game.tsx), because --hand-card
   // is defined there - the drag ghost is a sibling of this and needs the same one.
   // data-hand marks where the player's own cards start. useDrag reads it to
@@ -196,7 +196,7 @@ export function TableauView(props: {
           : <span className="wood-note quiet">No moves left</span>
       ) : (
         /* With nothing to say, the band is a target instead. It is the nearest
-           empty space to a thumb coming off the wood or the Blitz pile, so a
+           empty space to a thumb coming off the wood or the Dash pile, so a
            throw that barely leaves the hand lands in it - and data-drop is all
            that takes, because parseDrop walks up from whatever is under the
            finger. Invisible, and it covers no card (see .wood-note's geometry). */

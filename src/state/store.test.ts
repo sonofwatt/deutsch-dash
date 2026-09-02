@@ -30,7 +30,7 @@ function fakeDeps(over: Partial<Deps> = {}): Deps {
     clearStuck: vi.fn(async () => {}),
     markAway: vi.fn(async () => {}),
     clearAway: vi.fn(async () => {}),
-    announceBlitz: vi.fn(async () => {}),
+    announceDash: vi.fn(async () => {}),
     endRoundStalled: vi.fn(async () => {}),
     incrementStuckRounds: vi.fn(async () => 1),
     commitScores: vi.fn(async () => {}),
@@ -51,18 +51,18 @@ function playingRoom(tableau: Tableau): Room {
     meta: { createdAt: 1, hostId: 'me', creatorId: 'me', targetScore: 75, phase: 'playing', roundNumber: 1 },
     players: { me: { name: 'D', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, awayAt: null, score: 0 } },
     round: { spaces: Array.from({ length: 16 }, () => ({ stack: [], history: [] })),
-             tableaus: { me: tableau }, blitzedBy: null, scores: null, races: null, duels: null, endedAt: null, stuckRounds: 0, startedAt: 1 },
+             tableaus: { me: tableau }, dashedBy: null, scores: null, races: null, duels: null, endedAt: null, stuckRounds: 0, startedAt: 1 },
   };
 }
 
 describe('legalTargets', () => {
   it('lists center spaces and post stacks the source card fits', () => {
-    const t: Tableau = { blitz: [c(1, 'red')], post: [[c(8, 'red')], [c(2, 'blue')], [c(7, 'green')]],
+    const t: Tableau = { dash: [c(1, 'red')], post: [[c(8, 'red')], [c(2, 'blue')], [c(7, 'green')]],
                          wood: [], woodIndex: 0 };
     const spaces = Array.from({ length: 16 }, () => ({ stack: [] as Card[], history: [] as Card[][] }));
-    const fromBlitz = legalTargets(t, { kind: 'blitz' }, spaces);
-    expect(fromBlitz.spaces).toHaveLength(16); // a 1 starts any empty space
-    expect(fromBlitz.posts).toEqual([]);
+    const fromDash = legalTargets(t, { kind: 'dash' }, spaces);
+    expect(fromDash.spaces).toHaveLength(16); // a 1 starts any empty space
+    expect(fromDash.posts).toEqual([]);
     const fromPost2 = legalTargets(t, { kind: 'post', index: 2 }, spaces); // green 7 -> red 8
     expect(fromPost2.spaces).toEqual([]);
     expect(fromPost2.posts).toEqual([0]);
@@ -76,22 +76,22 @@ describe('optimistic play', () => {
     const t = seededTableau();
     store.setState({ uid: 'me', code: 'ABCDEF', room: playingRoom(t), tableau: t });
 
-    store.getState().select({ kind: 'blitz' });
-    const top = t.blitz[t.blitz.length - 1];
+    store.getState().select({ kind: 'dash' });
+    const top = t.dash[t.dash.length - 1];
     // force the top card to be a red 1 so space 0 is legal
-    const rigged: Tableau = { ...t, blitz: [...t.blitz.slice(0, -1), c(1, 'red')] };
+    const rigged: Tableau = { ...t, dash: [...t.dash.slice(0, -1), c(1, 'red')] };
     store.setState({ tableau: rigged });
     await store.getState().playTo({ space: 0 });
 
     expect(deps.playToCenter).toHaveBeenCalledWith('ABCDEF', 0, c(1, 'red'));
     expect(deps.persistTableau).toHaveBeenCalled();
-    expect(store.getState().tableau!.blitz).toHaveLength(9);
+    expect(store.getState().tableau!.dash).toHaveLength(9);
     expect(store.getState().selection).toBeNull();
     expect(top).toBeDefined(); // silence unused warning
   });
 
   it('refuses a play once the round is over', async () => {
-    // The board is still on screen under the blitz splash, which takes no pointer
+    // The board is still on screen under the dash splash, which takes no pointer
     // events, so a tap in that window would otherwise land on a scored round.
     const deps = fakeDeps();
     const store = createGameStore(deps);
@@ -101,7 +101,7 @@ describe('optimistic play', () => {
       uid: 'me', code: 'ABCDEF', tableau: t,
       room: { ...room, meta: { ...room.meta, phase: 'roundEnd' } },
     });
-    store.getState().select({ kind: 'blitz' });
+    store.getState().select({ kind: 'dash' });
     await store.getState().playTo({ space: 0 });
     expect(deps.playToCenter).not.toHaveBeenCalled();
   });
@@ -110,10 +110,10 @@ describe('optimistic play', () => {
     const deps = fakeDeps({ playToCenter: vi.fn(async () => ({ committed: false, winner: 'ann' })) });
     const store = createGameStore(deps);
     const t = seededTableau();
-    const rigged: Tableau = { ...t, blitz: [...t.blitz.slice(0, -1), c(1, 'red')] };
+    const rigged: Tableau = { ...t, dash: [...t.dash.slice(0, -1), c(1, 'red')] };
     store.setState({ uid: 'me', code: 'ABCDEF', room: playingRoom(rigged), tableau: rigged });
 
-    store.getState().select({ kind: 'blitz' });
+    store.getState().select({ kind: 'dash' });
     await store.getState().playTo({ space: 0 });
 
     expect(store.getState().tableau).toEqual(rigged); // rolled back
@@ -125,31 +125,31 @@ describe('optimistic play', () => {
     expect(deps.reportRace).toHaveBeenCalledWith('ABCDEF', 0, 'me', 'ann');
   });
 
-  it('announces blitz when the last blitz card is played', async () => {
+  it('announces dash when the last dash card is played', async () => {
     const deps = fakeDeps();
     const store = createGameStore(deps);
     const t = seededTableau();
-    const oneLeft: Tableau = { ...t, blitz: [c(1, 'red')] };
+    const oneLeft: Tableau = { ...t, dash: [c(1, 'red')] };
     store.setState({ uid: 'me', code: 'ABCDEF', room: playingRoom(oneLeft), tableau: oneLeft });
 
-    store.getState().select({ kind: 'blitz' });
+    store.getState().select({ kind: 'dash' });
     await store.getState().playTo({ space: 0 });
 
-    expect(deps.announceBlitz).toHaveBeenCalledWith('ABCDEF', 'me');
+    expect(deps.announceDash).toHaveBeenCalledWith('ABCDEF', 'me');
   });
 
-  it('announces blitz when the last blitz card builds onto a post', async () => {
+  it('announces dash when the last dash card builds onto a post', async () => {
     const deps = fakeDeps();
     const store = createGameStore(deps);
-    const t: Tableau = { blitz: [c(7, 'green')],
+    const t: Tableau = { dash: [c(7, 'green')],
                          post: [[c(8, 'red')], [c(2, 'blue')], [c(5, 'yellow')]], wood: [], woodIndex: 0 };
     store.setState({ uid: 'me', code: 'ABCDEF', room: playingRoom(t), tableau: t });
 
-    store.getState().select({ kind: 'blitz' });
+    store.getState().select({ kind: 'dash' });
     await store.getState().playTo({ post: 0 }); // green 7 builds on red 8
 
-    expect(store.getState().tableau!.blitz).toHaveLength(0);
-    expect(deps.announceBlitz).toHaveBeenCalledWith('ABCDEF', 'me');
+    expect(store.getState().tableau!.dash).toHaveLength(0);
+    expect(deps.announceDash).toHaveBeenCalledWith('ABCDEF', 'me');
     expect(deps.clearStuck).toHaveBeenCalledWith('ABCDEF', 'me');
   });
 
@@ -157,9 +157,9 @@ describe('optimistic play', () => {
     const deps = fakeDeps();
     const store = createGameStore(deps);
     const t = seededTableau();
-    const rigged: Tableau = { ...t, blitz: [...t.blitz.slice(0, -1), c(5, 'red')] };
+    const rigged: Tableau = { ...t, dash: [...t.dash.slice(0, -1), c(5, 'red')] };
     store.setState({ uid: 'me', code: 'ABCDEF', room: playingRoom(rigged), tableau: rigged });
-    store.getState().select({ kind: 'blitz' });
+    store.getState().select({ kind: 'dash' });
     await store.getState().playTo({ space: 0 }); // 5 on empty space: illegal
     expect(deps.playToCenter).not.toHaveBeenCalled();
     expect(store.getState().tableau).toEqual(rigged);
@@ -170,9 +170,9 @@ describe('selection', () => {
   it('toggles off when the same source is selected twice', () => {
     const deps = fakeDeps();
     const store = createGameStore(deps);
-    store.getState().select({ kind: 'blitz' });
-    expect(store.getState().selection).toEqual({ kind: 'blitz' });
-    store.getState().select({ kind: 'blitz' });
+    store.getState().select({ kind: 'dash' });
+    expect(store.getState().selection).toEqual({ kind: 'dash' });
+    store.getState().select({ kind: 'dash' });
     expect(store.getState().selection).toBeNull();
   });
 });
@@ -182,10 +182,10 @@ describe('offline guard', () => {
     const deps = fakeDeps();
     const store = createGameStore(deps);
     const t = seededTableau();
-    const rigged: Tableau = { ...t, blitz: [...t.blitz.slice(0, -1), c(1, 'red')] };
+    const rigged: Tableau = { ...t, dash: [...t.dash.slice(0, -1), c(1, 'red')] };
     store.setState({ uid: 'me', code: 'ABCDEF', room: playingRoom(rigged), tableau: rigged, online: false });
 
-    store.getState().select({ kind: 'blitz' });
+    store.getState().select({ kind: 'dash' });
     await store.getState().playTo({ space: 0 }); // would be legal if online
     expect(deps.playToCenter).not.toHaveBeenCalled();
     expect(deps.persistTableau).not.toHaveBeenCalled();
@@ -205,7 +205,7 @@ describe('offline guard', () => {
 describe('all-stuck rotation re-entrancy', () => {
   it('a snapshot raised synchronously by clearStuck/persist rotates wood exactly once', async () => {
     let cb!: (room: Room | null) => void;
-    const woodTab: Tableau = { blitz: [c(9, 'red')], post: [[], [], []],
+    const woodTab: Tableau = { dash: [c(9, 'red')], post: [[], [], []],
                                wood: [c(1, 'red'), c(2, 'blue'), c(3, 'green')], woodIndex: 0 };
     const room = playingRoom(woodTab);
     room.players.me.stuckAt = 123; // every connected player is stuck
@@ -372,14 +372,14 @@ describe('the lobby ready gate', () => {
       players: { me: human({ ready: true }), you: human({ ready: true }) },
       round: { spaces: Array.from({ length: 16 }, () => ({ stack: [], history: [] })),
                tableaus: { me: t, you: deal(buildDeck('you'), 3) },
-               blitzedBy: null, scores: null, races: null, duels: null,
+               dashedBy: null, scores: null, races: null, duels: null,
                endedAt: null, stuckRounds: 0, startedAt: 1 },
     });
     cb(playing(1));
     // Lose a race for a space: the scowl is the point of this state existing.
-    const ace = t.post.flat().concat(t.blitz[t.blitz.length - 1]).find(c => c.v === 1)!;
-    const src = t.blitz[t.blitz.length - 1] === ace
-      ? { kind: 'blitz' as const }
+    const ace = t.post.flat().concat(t.dash[t.dash.length - 1]).find(c => c.v === 1)!;
+    const src = t.dash[t.dash.length - 1] === ace
+      ? { kind: 'dash' as const }
       : { kind: 'post' as const, index: t.post.findIndex(p => p.includes(ace)) };
     store.getState().select(src);
     await store.getState().playTo({ space: 4 });
@@ -544,7 +544,7 @@ describe('the host committing scores', () => {
   const roundEnd = (): Room => {
     const r = playingRoom(seededTableau());
     r.meta.phase = 'roundEnd';
-    r.round!.blitzedBy = 'me';
+    r.round!.dashedBy = 'me';
     return r;
   };
 
@@ -613,14 +613,14 @@ describe('stale-session guards', () => {
     });
     const store = createGameStore(deps);
     const t = seededTableau();
-    const oneLeft: Tableau = { ...t, blitz: [c(1, 'red')] };
+    const oneLeft: Tableau = { ...t, dash: [c(1, 'red')] };
     store.setState({ uid: 'me', code: 'ABCDEF', room: playingRoom(oneLeft), tableau: oneLeft });
-    store.getState().select({ kind: 'blitz' });
+    store.getState().select({ kind: 'dash' });
     const inFlight = store.getState().playTo({ space: 0 });
     store.getState().leave();
     resolvePlay({ committed: true, winner: null });
     await inFlight;
-    expect(deps.announceBlitz).not.toHaveBeenCalled();
+    expect(deps.announceDash).not.toHaveBeenCalled();
     expect(deps.persistTableau).not.toHaveBeenCalled();
     expect(store.getState().tableau).toBeNull();
   });
@@ -772,7 +772,7 @@ describe('AI players', () => {
       round: {
         spaces: Array.from({ length: 16 }, () => ({ stack: [], history: [] })),
         tableaus: { me: deal(buildDeck('me'), 3), bot_star: deal(buildDeck('bot_star'), 3) },
-        blitzedBy: null, scores: null, races: null, duels: null, endedAt: null, stuckRounds: 0, startedAt: 1,
+        dashedBy: null, scores: null, races: null, duels: null, endedAt: null, stuckRounds: 0, startedAt: 1,
       },
     };
   }
@@ -815,16 +815,16 @@ describe('AI players', () => {
 });
 
 describe('automatic stuck detection', () => {
-  // Only a red 6 could land here, so a blue 9 on top of the Blitz pile is dead
+  // Only a red 6 could land here, so a blue 9 on top of the Dash pile is dead
   const blocked = (): CenterSpace[] => [{ stack: [c(5, 'red')], history: [] }];
   const noMoves = (over: Partial<Tableau> = {}): Tableau =>
-    ({ blitz: [c(9, 'blue')], post: [[], [], []], wood: [], woodIndex: 0, ...over });
+    ({ dash: [c(9, 'blue')], post: [[], [], []], wood: [], woodIndex: 0, ...over });
 
   function room(t: Tableau, stuckAt: number | null = null): Room {
     return {
       meta: { createdAt: 1, hostId: 'me', creatorId: 'me', targetScore: 75, phase: 'playing', roundNumber: 1 },
       players: { me: { name: 'D', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt, awayAt: null, score: 0 } },
-      round: { spaces: blocked(), tableaus: { me: t }, blitzedBy: null, scores: null, races: null, duels: null, endedAt: null,
+      round: { spaces: blocked(), tableaus: { me: t }, dashedBy: null, scores: null, races: null, duels: null, endedAt: null,
                stuckRounds: 0, startedAt: 1 },
     };
   }
@@ -860,7 +860,7 @@ describe('automatic stuck detection', () => {
 
   it('withdraws the claim as soon as the board frees the player', async () => {
     // already flagged stuck, and now holding a card that fits the centre
-    const { deps } = await feed(noMoves({ blitz: [c(6, 'red')] }), 12345);
+    const { deps } = await feed(noMoves({ dash: [c(6, 'red')] }), 12345);
     expect(deps.clearStuck).toHaveBeenCalledWith('ABCDEF', 'me');
     expect(deps.declareStuck).not.toHaveBeenCalled();
   });
@@ -916,7 +916,7 @@ describe('away players', () => {
     // present they are one more player the table waits on forever.
     round: { spaces: Array.from({ length: 16 }, () => ({ stack: [], history: [] })),
              tableaus: { me: deal(buildDeck('me'), 3), idle: deal(buildDeck('idle'), 3) },
-             blitzedBy: null, scores: null, races: null, duels: null,
+             dashedBy: null, scores: null, races: null, duels: null,
              endedAt: null, stuckRounds: 0, startedAt: 1 },
   });
 
@@ -925,7 +925,7 @@ describe('away players', () => {
     players: { me: { name: 'D', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, awayAt, score: 0 } },
     round: { spaces: Array.from({ length: 16 }, () => ({ stack: [], history: [] })),
              tableaus: { me: deal(buildDeck('me'), 3) },
-             blitzedBy: null, scores: null, races: null, duels: null,
+             dashedBy: null, scores: null, races: null, duels: null,
              endedAt: null, stuckRounds: 0, startedAt: 1 },
   });
 

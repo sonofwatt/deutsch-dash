@@ -135,14 +135,14 @@
   place-items: center; z-index: 100; padding: 16px; }
 .sheet { background: var(--bg); border-radius: 16px; padding: 20px; width: min(440px, 100%);
   max-height: 85dvh; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
-/* badge · name · -blitz · +center · = · round · total. The name track must be
+/* badge · name · -dash · +center · = · round · total. The name track must be
    minmax(0, 1fr), not 1fr: a 14-character name against six other columns on a
    360px phone otherwise overflows the sheet into a horizontal scrollbar instead
    of ellipsing. */
 .score-row { display: grid; gap: 6px; align-items: center;
-  /* badge | name | penalty | played | = | round | TOTAL | blitz bolt. The last
+  /* badge | name | penalty | played | = | round | TOTAL | dash bolt. The last
      column is reserved whether or not a bolt is in it, so the totals stay in a
-     line down the sheet instead of the blitzer's row shunting left. */
+     line down the sheet instead of the dasher's row shunting left. */
   grid-template-columns: 28px minmax(0, 1fr) 10px repeat(2, minmax(3ch, auto)) auto
                          repeat(2, minmax(3ch, auto)) 16px;
   padding: 8px 10px; border-radius: var(--radius);
@@ -163,7 +163,7 @@
 .score-total { font-weight: 800; padding-left: 10px; margin-left: 4px;
   border-left: 2px solid color-mix(in srgb, var(--ink) 28%, transparent);
   align-self: stretch; display: flex; align-items: center; justify-content: flex-end; }
-.score-blitz { font-size: 13px; line-height: 1; text-align: right; }
+.score-dash { font-size: 13px; line-height: 1; text-align: right; }
 /* Who the table is waiting on, in the lobby's three colours at dot size. The
    column is reserved whether or not a dot is in it, so the arithmetic stays in a
    line down the sheet on the game-over sheet too. */
@@ -209,13 +209,13 @@
 .keep-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-weight: 600; }
 .keep-delta { font-weight: 800; font-variant-numeric: tabular-nums; }
-/* One field per row. Side by side left the Blitz stepper about 160px on a
+/* One field per row. Side by side left the Dash stepper about 160px on a
    360px phone, which is not enough for four 44px buttons around a value - and
    shrinking the buttons to fit would put the most-tapped control on this screen
    under the touch-target floor. */
 .keep-fields { display: grid; gap: 10px; }
 .keep-field { display: grid; gap: 4px; font-size: 12px; }
-/* Steppers, not a keyboard: the Blitz pile is ten cards, so this is at most ten
+/* Steppers, not a keyboard: the Dash pile is ten cards, so this is at most ten
    taps and never a wrong number. The middle count can be forty, which is why
    that one is a real numeric field. */
 .keep-step { display: grid; grid-template-columns: 44px 44px 1fr 44px 44px;
@@ -252,11 +252,11 @@
 .commentary-dots span { width: 4px; height: 4px; border-radius: 999px; background: var(--line); }
 .commentary-dots span.on { background: var(--ink-soft); }
 
-.blitz-splash { position: fixed; inset: 0; display: grid; place-items: center; z-index: 110;
+.dash-splash { position: fixed; inset: 0; display: grid; place-items: center; z-index: 110;
   pointer-events: none; }
 /* Above the weather. The name is the one piece of information the splash carries
    and it was being rained on: .splash-fx is absolute and was painting over it. */
-.blitz-say { position: relative; z-index: 3; }
+.dash-say { position: relative; z-index: 3; }
 .splash-fx { z-index: 2; }
 .fireworks { position: absolute; inset: 0; z-index: 1; }
 /* One shell: a point the sparks are flung from. The sparks are its children, so
@@ -301,20 +301,20 @@
    page's: a hard black outline, drawn with -webkit-text-stroke where it is
    supported and with four offset shadows everywhere else. Without it the white
    sat on pale confetti and vanished. */
-.blitz-word { font-size: clamp(56px, 21vw, 140px); font-weight: 800; letter-spacing: .02em;
+.dash-word { font-size: clamp(56px, 21vw, 140px); font-weight: 800; letter-spacing: .02em;
   color: #ffffff; text-align: center;
   -webkit-text-stroke: 3px #000000; paint-order: stroke fill;
   text-shadow: 0 0 2px #000, 2px 2px 0 #000, -2px 2px 0 #000, 2px -2px 0 #000,
                -2px -2px 0 #000, 0 6px 28px rgb(0 0 0 / .45); }
 /* Twice the size it was: it is the name of whoever just won the round, and it
    was set at body weight under a 120px word. */
-.blitz-name { margin: 6px 0 0; text-align: center; font-weight: 800;
+.dash-name { margin: 6px 0 0; text-align: center; font-weight: 800;
   font-size: clamp(28px, 9vw, 56px); color: #ffffff;
   -webkit-text-stroke: 2px #000000; paint-order: stroke fill;
   text-shadow: 0 0 2px #000, 1.5px 1.5px 0 #000, -1.5px 1.5px 0 #000,
                1.5px -1.5px 0 #000, -1.5px -1.5px 0 #000, 0 4px 18px rgb(0 0 0 / .45); }
 
-/* Blitz splash particles. The whole splash is on screen for SPLASH_MS (3.6s, in
+/* Dash splash particles. The whole splash is on screen for SPLASH_MS (3.6s, in
    RoomScreen), so every animation here has to finish inside that. */
 .splash-fx { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
 .spark { position: absolute; left: 50%; top: 50%;

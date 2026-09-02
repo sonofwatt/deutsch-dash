@@ -5,7 +5,7 @@ import type { PlayerInfo, RoundScore } from '../game/types';
 const p = (name: string, score: number): PlayerInfo => ({
   name, badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, awayAt: null, score,
 });
-const d = (delta: number): RoundScore => ({ centerCount: delta, blitzLeft: 0, delta });
+const d = (delta: number): RoundScore => ({ centerCount: delta, dashLeft: 0, delta });
 
 describe('signed', () => {
   it('marks a gain and leaves a loss and a zero alone', () => {

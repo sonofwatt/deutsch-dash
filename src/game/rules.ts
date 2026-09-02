@@ -100,17 +100,17 @@ export function canBuildOnPost(card: Card, stack: Card[]): boolean {
 }
 
 export function refillPosts(t: Tableau): Tableau {
-  if (!t.post.some(s => s.length === 0) || t.blitz.length === 0) return t;
-  const blitz = [...t.blitz];
+  if (!t.post.some(s => s.length === 0) || t.dash.length === 0) return t;
+  const dash = [...t.dash];
   const post = t.post.map(s => {
-    if (s.length > 0 || blitz.length === 0) return s;
-    return [blitz.pop() as Card];
+    if (s.length > 0 || dash.length === 0) return s;
+    return [dash.pop() as Card];
   });
-  return { ...t, blitz, post };
+  return { ...t, dash, post };
 }
 
 export function sourceTop(t: Tableau, source: PlaySource): Card | null {
-  if (source.kind === 'blitz') return t.blitz[t.blitz.length - 1] ?? null;
+  if (source.kind === 'dash') return t.dash[t.dash.length - 1] ?? null;
   if (source.kind === 'wood') return t.woodIndex > 0 ? t.wood[t.woodIndex - 1] ?? null : null;
   const stack = t.post[source.index];
   return stack ? stack[stack.length - 1] ?? null : null;
@@ -120,8 +120,8 @@ export function takeCard(t: Tableau, source: PlaySource): { next: Tableau; card:
   const card = sourceTop(t, source);
   if (!card) return null;
   let next: Tableau;
-  if (source.kind === 'blitz') {
-    next = { ...t, blitz: t.blitz.slice(0, -1) };
+  if (source.kind === 'dash') {
+    next = { ...t, dash: t.dash.slice(0, -1) };
   } else if (source.kind === 'wood') {
     const wood = [...t.wood];
     wood.splice(t.woodIndex - 1, 1);
@@ -193,7 +193,7 @@ export function hasReachableMove(
 
 export function hasLegalMove(t: Tableau, spaces: CenterSpace[]): boolean {
   const sources: PlaySource[] = [
-    { kind: 'blitz' }, { kind: 'wood' },
+    { kind: 'dash' }, { kind: 'wood' },
     ...t.post.map((_, index) => ({ kind: 'post' as const, index })),
   ];
   for (const source of sources) {

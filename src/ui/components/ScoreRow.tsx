@@ -16,11 +16,11 @@ import type { PlayerInfo, RoundScore } from '../../game/types';
  * `move` tints it for the trip. Both are inert until something actually reorders.
  */
 export function ScoreRow(
-  // `blitzed` is optional like everything else here: render.test.ts builds these
+  // `dashed` is optional like everything else here: render.test.ts builds these
   // props as complete literals and tsc -b typechecks it, so a REQUIRED prop
   // breaks the build rather than just the tests.
-  { player, score, move, blitzed, showReady }:
-  { player: PlayerInfo; score?: RoundScore; move?: Move; blitzed?: boolean;
+  { player, score, move, dashed, showReady }:
+  { player: PlayerInfo; score?: RoundScore; move?: Move; dashed?: boolean;
     // The round-end sheet is a gate, so it says who the table is waiting on.
     // Game over is not, and passes nothing.
     showReady?: boolean },
@@ -44,9 +44,9 @@ export function ScoreRow(
         )}
       </span>
       {/* A zero is quiet in both columns: red is for an actual penalty, and a
-          blitzer's "0" in danger red reads as a loss rather than a clean sweep. */}
-      <span className={`score-math ${score?.blitzLeft ? 'score-neg' : 'muted'}`}>
-        {score ? signed(-2 * score.blitzLeft) : ''}
+          dasher's "0" in danger red reads as a loss rather than a clean sweep. */}
+      <span className={`score-math ${score?.dashLeft ? 'score-neg' : 'muted'}`}>
+        {score ? signed(-2 * score.dashLeft) : ''}
       </span>
       <span className={`score-math ${score?.centerCount ? '' : 'muted'}`}>
         {score ? signed(score.centerCount) : ''}
@@ -54,10 +54,10 @@ export function ScoreRow(
       <span className="score-math muted">{score ? '=' : ''}</span>
       <span className="score-math score-delta">{score ? signed(score.delta) : ''}</span>
       <span className="score-total">{player.score}</span>
-      {/* Who emptied their Blitz pile, said once, on the row it belongs to. The
+      {/* Who emptied their Dash pile, said once, on the row it belongs to. The
           column is always there so the totals stay in line down the sheet. */}
-      <span className="score-blitz" aria-label={blitzed ? 'Dashed this round' : undefined}>
-        {blitzed ? '\u26a1' + EMOJI : ''}
+      <span className="score-dash" aria-label={dashed ? 'Dashed this round' : undefined}>
+        {dashed ? '\u26a1' + EMOJI : ''}
       </span>
     </motion.div>
   );

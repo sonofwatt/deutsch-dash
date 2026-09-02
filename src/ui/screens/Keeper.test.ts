@@ -30,8 +30,8 @@ describe('Keeper', () => {
       targetScore: 25, snark: true,
       players: [{ id: 'tulip', name: 'Ada', badgeId: 'tulip' },
                 { id: 'star', name: 'Bo', badgeId: 'star' }],
-      rounds: [{ ms: 61_000, scores: { tulip: { centerCount: 9, blitzLeft: 0, delta: 9 },
-                                       star: { centerCount: 2, blitzLeft: 5, delta: -8 } } }],
+      rounds: [{ ms: 61_000, scores: { tulip: { centerCount: 9, dashLeft: 0, delta: 9 },
+                                       star: { centerCount: 2, dashLeft: 5, delta: -8 } } }],
     });
     expect(html).toContain('After round 1');
     expect(html).toContain('Ada');

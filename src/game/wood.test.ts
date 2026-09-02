@@ -4,7 +4,7 @@ import type { Card, Suit, Tableau } from './types';
 
 const c = (v: number, suit: Suit): Card => ({ v, suit, owner: 'me' });
 const woodTab = (wood: Card[], woodIndex = 0): Tableau =>
-  ({ blitz: [], post: [[], [], []], wood, woodIndex });
+  ({ dash: [], post: [[], [], []], wood, woodIndex });
 const cards = (n: number) => Array.from({ length: n }, (_, i) => c((i % 10) + 1, 'red'));
 
 describe('flipWood', () => {

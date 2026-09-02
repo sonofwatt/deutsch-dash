@@ -6,12 +6,12 @@ export interface Card { v: number; suit: Suit; owner: string }
 export function cardId(c: Card): string { return `${c.owner}:${c.suit}:${c.v}`; }
 
 export type PlaySource =
-  | { kind: 'blitz' }
+  | { kind: 'dash' }
   | { kind: 'wood' }
   | { kind: 'post'; index: number };
 
 /** Last array element = top, everywhere. */
-export interface Tableau { blitz: Card[]; post: Card[][]; wood: Card[]; woodIndex: number }
+export interface Tableau { dash: Card[]; post: Card[][]; wood: Card[]; woodIndex: number }
 
 /**
  * `suit` is the orderly-grid constraint: only that colour may ever start or build
@@ -120,7 +120,7 @@ export interface PlayerInfo {
   isBot?: boolean; botLevel?: BotLevel;
 }
 
-export interface RoundScore { centerCount: number; blitzLeft: number; delta: number }
+export interface RoundScore { centerCount: number; dashLeft: number; delta: number }
 
 /**
  * "I lost the race for this space." Written by the LOSER, keyed by space index,
@@ -132,7 +132,7 @@ export interface RaceRecord { by: string; at: number }
 
 export interface RoundState {
   spaces: CenterSpace[]; tableaus: Record<string, Tableau>;
-  blitzedBy: string | null; scores: Record<string, RoundScore> | null;
+  dashedBy: string | null; scores: Record<string, RoundScore> | null;
   races: Record<string, RaceRecord> | null;
   // How often each player lost a space to each other player this round, loser
   // first: duels[loser][winner]. Only the commentary reads it.

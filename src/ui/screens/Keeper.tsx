@@ -5,15 +5,15 @@ import { Commentary } from '../components/Commentary';
 import { commentary } from '../commentary';
 import { signed } from '../scoreRanks';
 import {
-  believableMs, blitzerOf, emptyGame, roundScore, statsOf, totals, winnerOf,
-  MAX_BLITZ_LEFT, MAX_CENTER, MAX_KEEPER_PLAYERS, TIMED_MIN_MS, type KeeperGame,
+  believableMs, dasherOf, emptyGame, roundScore, statsOf, totals, winnerOf,
+  MAX_DASH_LEFT, MAX_CENTER, MAX_KEEPER_PLAYERS, TIMED_MIN_MS, type KeeperGame,
 } from '../../keeper/model';
 import { loadGame, saveGame } from '../../keeper/storage';
 import type { PlayerInfo, RoundScore } from '../../game/types';
 
 /** What the entry form holds while it is being typed into. */
-interface Entry { center: string; blitz: number }
-const blankEntry = (): Entry => ({ center: '', blitz: MAX_BLITZ_LEFT });
+interface Entry { center: string; dash: number }
+const blankEntry = (): Entry => ({ center: '', dash: MAX_DASH_LEFT });
 
 /**
  * The scoreboard's components want a room's worth of players. A scorepad has
@@ -86,7 +86,7 @@ export function Keeper() {
     setPhase('playing');
   }
 
-  /** Somebody called Blitz: stop the clock and go and count. */
+  /** Somebody called Dash: stop the clock and go and count. */
   function stopRound() {
     setGame(g => ({
       ...g,
@@ -98,7 +98,7 @@ export function Keeper() {
 
   function startEntry(prefill?: Record<string, RoundScore>) {
     setEntries(Object.fromEntries(game.players.map(p => [p.id, prefill?.[p.id]
-      ? { center: String(prefill[p.id].centerCount), blitz: prefill[p.id].blitzLeft }
+      ? { center: String(prefill[p.id].centerCount), dash: prefill[p.id].dashLeft }
       : blankEntry()])));
     setPhase('entry');
   }
@@ -107,7 +107,7 @@ export function Keeper() {
     const round: Record<string, RoundScore> = {};
     for (const p of game.players) {
       const e = entries[p.id] ?? blankEntry();
-      round[p.id] = roundScore(clamp(e.center, MAX_CENTER), e.blitz);
+      round[p.id] = roundScore(clamp(e.center, MAX_CENTER), e.dash);
     }
     setGame(g => ({
       ...g,
@@ -195,13 +195,13 @@ export function Keeper() {
         </p>
         {game.players.map(p => {
           const e = entries[p.id] ?? blankEntry();
-          const delta = clamp(e.center, MAX_CENTER) - 2 * e.blitz;
+          const delta = clamp(e.center, MAX_CENTER) - 2 * e.dash;
           const step = (by: number, label: string) => (
             <button className="btn btn-slim" aria-label={label} key={by}
-              disabled={e.blitz === (by < 0 ? 0 : MAX_BLITZ_LEFT)}
+              disabled={e.dash === (by < 0 ? 0 : MAX_DASH_LEFT)}
               onClick={() => setEntries(s => ({
                 ...s,
-                [p.id]: { ...e, blitz: Math.min(MAX_BLITZ_LEFT, Math.max(0, e.blitz + by)) },
+                [p.id]: { ...e, dash: Math.min(MAX_DASH_LEFT, Math.max(0, e.dash + by)) },
               }))}>
               {by > 0 ? `+${by === 1 ? '' : by}` : `−${by === -1 ? '' : -by}`}
             </button>
@@ -235,7 +235,7 @@ export function Keeper() {
                   <div className="keep-step">
                     {step(-3, `Three fewer left for ${p.name}`)}
                     {step(-1, `One fewer left for ${p.name}`)}
-                    <span className="keep-step-value">{e.blitz}</span>
+                    <span className="keep-step-value">{e.dash}</span>
                     {step(1, `One more left for ${p.name}`)}
                     {step(3, `Three more left for ${p.name}`)}
                   </div>
@@ -258,7 +258,7 @@ export function Keeper() {
   const last = game.rounds[game.rounds.length - 1];
   const remarks = game.snark && last ? commentary({
     players, scores: last.scores, spaces: [], duels: null,
-    blitzedBy: blitzerOf(last.scores), roundNumber: game.rounds.length,
+    dashedBy: dasherOf(last.scores), roundNumber: game.rounds.length,
     targetScore: game.targetScore, durationMs: last.ms, stuckRounds: 0,
     stats: statsOf(game), final: winner != null,
   }) : [];

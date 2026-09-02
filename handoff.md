@@ -5,12 +5,12 @@ should cost a flag and not a rebuild.
 
 # Project Handoff - Deutsch Dash
 
-_Last updated: 2026-08-28. Working tree clean, CI green including the emulator
+_Last updated: 2026-09-02. Working tree clean, CI green including the emulator
 suite. A commit sitting unpushed has already invalidated one playtest - what
 people are playing is whatever last reached Pages - so check `git status -sb`
 before trusting what a table reports._
 
-_**366 tests green** (342 unit + 24 emulator). This is the only place in the repo
+_**385 tests green** (361 unit + 24 emulator). This is the only place in the repo
 that quotes a count - it drifted three separate ways when it lived in four
 places, so keep it here and nowhere else._
 
@@ -201,7 +201,7 @@ Locally, `npm test` skipping the rules tests is fine and intended - but run
 ### Trust model
 
 **Knowing the room code is the credential.** Room `.read` and the writes to
-`round/spaces`, `blitzedBy`, `scores` and `stuckRounds` are gated only on
+`round/spaces`, `dashedBy`, `scores` and `stuckRounds` are gated only on
 `auth != null`, and anonymous tokens can be minted straight from the Firebase
 REST API. Only `players/$uid` and `round/tableaus/$uid` are genuinely bound to a
 uid. `endRoundStalled` and `incrementStuckRounds` are host-by-convention and
@@ -239,7 +239,7 @@ Two different absences, and every table-wide rule has to skip both.
 
 **Away** is how the idle-table hang was fixed (`034e313`). One human, two bots,
 the human doing nothing: an idle player is never marked stuck - correctly, their
-wood is untouched and their Blitz top will land somewhere - so `allConnectedStuck`
+wood is untouched and their Dash top will land somewhere - so `allConnectedStuck`
 never came true, the rotation never fired, and the three-fruitless-rotations round
 end was unreachable. A player with legal moves who is not playing is not stuck,
 and the game waiting for them is right up until they have *gone*; so what is
@@ -282,7 +282,7 @@ to every player who is not sitting out.
 
 **Sitting out** is `players/$uid/sittingOut`, owner-written like `ready` and
 `awayAt`, so no rules change. It ejects the player from the round **in progress**,
-forfeiting that round's arithmetic in both directions: no penalty for the Blitz
+forfeiting that round's arithmetic in both directions: no penalty for the Dash
 pile they abandoned, no credit for what they had already played. Cards already in
 the centre stay there - other people are building on them.
 
@@ -400,7 +400,7 @@ render, and it sets state.
   **The step is 1 while the host's rescue is on**, so that bar moves with it.
 - That flip counter is a closure-scoped `Map` in `createGameStore`, never
   persisted - **it resets to zero on any page reload**.
-- Tableau order is Blitz | posts | wood. Wood sits under the right thumb because
+- Tableau order is Dash | posts | wood. Wood sits under the right thumb because
   it's the pile touched most, and `src/ui/prefs.ts` lets a device flip the two
   ends (see below). `render.test.ts` pins this order in both the tableau and the
   opponent strip.
@@ -470,22 +470,40 @@ painted, re-measuring on `visualViewport` events. On a browser that was already
 right the correction is zero. The `translate(-50%, -55%)` lift is intentional -
 it keeps the card out from under the thumb.
 
-### Dash on screen, blitz in the code
+### Dash on screen and in the code
 
-**Every string a player reads says Dash.** The splash, the pile label, the score
-screen's "X dashed!", the scorepad's "Stop the clock when somebody calls Dash",
-the ⚡ row's screen-reader label, the thumb-swap button's tooltip, and eight
-commentary lines including the pun, which is now "Dash-edly disappointing".
+**The pile is called Dash everywhere.** The strings a player reads went first -
+the splash, the pile label, the score screen's "X dashed!", the scorepad's "Stop
+the clock when somebody calls Dash", the ⚡ row's screen-reader label, the
+thumb-swap tooltip, and eight commentary lines including the pun, which is now
+"Dash-edly disappointing". The identifiers followed, once the table confirmed
+there were no rooms in flight to migrate: `round/dashedBy` (in
+`database.rules.json` too), `Tableau.dash`, `RoundScore.dashLeft`, `PlaySource`'s
+`dash` kind, `announceDash`, `dasherOf`, `PlayerStats.dashes`, `DashRecord`,
+`MAX_DASH_LEFT`, `DashSplash` and the `.dash-*` CSS. Test names and comments say
+Dash pile now as well - a reader should meet one word, not two.
 
-**Every identifier still says blitz, deliberately.** `round/blitzedBy` is a live
-key in the database and in `database.rules.json`, `PlaySource` has a `blitz` kind,
-`Tableau.blitz` is the pile, and `RoundScore.blitzLeft` is what the scoring reads.
-Renaming those is a data migration on rooms that are mid-round, for a word nobody
-can see. Around 500 mentions of blitz survive in the source; the sweep was for the
-ones on screen, and `grep` for a quoted or JSX-text blitz comes back empty.
+**A rename of a database key is only free while nothing is playing.** All four of
+the renamed keys live under `rooms/<code>/round`, and nothing reads the old
+spelling: a room written by an older build would come back with `dashedBy` null
+and every tableau empty. That was acceptable exactly once. Anything similar in
+future either waits for an empty table or reads both spellings for a while.
 
-Test names and code comments still say Blitz pile where they mean the mechanic.
-That is the game's own vocabulary talking to whoever reads the code next.
+**The scorepad is the exception, because its data is on somebody's phone.**
+`loadGame` maps a saved `blitzLeft` onto `dashLeft` (`asScores` in
+`src/keeper/storage.ts`) and the next save drops the old key. Without it a game
+in progress reloads with a NaN in the penalty column and nobody credited with the
+dash - and a scorepad that loses forty minutes of scores is a scorepad nobody
+uses twice.
+
+**Two things still say blitz on purpose.** The physical game is called Dutch
+Blitz and is named as such where the lineage is the point - the README's first
+line, the scorepad's doc comment, `rankMove`'s reasoning. And the emulator's
+project id is `demo-blitz`, which is infrastructure rather than vocabulary: it is
+load-bearing in four places that have to agree (see the namespace trap above),
+and the forensic comments in `rooms.emu.test.ts` narrate a real bug by quoting
+the old URL. Renaming it would buy nothing and could silently turn the rules off
+in the tests.
 
 ### The card in the air leaves the pile it came from
 
@@ -550,10 +568,10 @@ prefix from one rule and watching them go red.
 Two gestures the page never sees, both reported from real tables, and both cost
 the player the round they were in.
 
-- **iOS** takes an upward swipe from the bottom edge as "go home" - and the Blitz
+- **iOS** takes an upward swipe from the bottom edge as "go home" - and the Dash
   and wood piles sit at the bottom of the screen, which is where a drag begins.
 - **Android** takes an inward swipe from either side edge as "back", which from
-  the board is the lobby. Wood and Blitz are the two ENDS of the tableau row, so
+  the board is the lobby. Wood and Dash are the two ENDS of the tableau row, so
   whichever way round the player has them (`prefs.ts`), one is against an edge.
 
 **A system edge gesture is not the page's to cancel**, so there is nothing to
@@ -626,11 +644,11 @@ Firebase config at all.
 
 It reuses the online game rather than copying it. A round is the same
 `RoundScore`, which is what lets `ScoreList`, the ranking animation, `nextStats`
-and the commentary all work without a card being dealt. The blitzer is inferred
-rather than asked for: whoever is entered with an empty Blitz pile, or nobody if
+and the commentary all work without a card being dealt. The dasher is inferred
+rather than asked for: whoever is entered with an empty Dash pile, or nobody if
 two people are.
 
-**Rounds are timed.** Dealing starts a clock and "Blitz! Count the cards" stops
+**Rounds are timed.** Dealing starts a clock and "Dash! Count the cards" stops
 it, which is what makes the speed remarks work at a table with real cards. A
 length under ten seconds or over an hour is discarded rather than recorded
 (`believableMs`) - it was a mis-tap or somebody went to lunch. The clock lives in
@@ -676,8 +694,8 @@ Three things about it that are not obvious:
 **`rooms/$code/stats` is the game-long half of it** (`src/game/stats.ts`).
 `nextStats` is pure and the host calls it inside `commitScores`, in the same
 idempotent write as the scores, so no round can be counted into it twice. It
-carries blitz counts, last-place tallies and streaks, race wins and losses, the
-fastest blitz and the best and worst round of the game, and the number of full
+carries dash counts, last-place tallies and streaks, race wins and losses, the
+fastest dash and the best and worst round of the game, and the number of full
 standstills. `rematch` clears it, because it describes one game.
 
 Two traps that were caught only by playing it:
@@ -690,7 +708,7 @@ Two traps that were caught only by playing it:
 - **The round's length is the host's own clock** against a server timestamp: at
   commit time `round/endedAt` is still a sentinel, so the host cannot read it back.
   It is thrown away unless it lands between 3 seconds and 20 minutes, and only the
-  game-record lines use it. The per-round "blitzed in Ns" reads
+  game-record lines use it. The per-round "dashed in Ns" reads
   `endedAt - startedAt`, which is server time at both ends.
 
 ---
@@ -985,8 +1003,8 @@ space it can follow rigged into place:
 The head reads `Dayvigo 0 pts to 75` - one space throughout, no separators. It
 went via a doubled gap after the name, written with non-breaking spaces because
 HTML collapses a run of plain ones to a single; that read as an extra space and
-came back out. The word on the splash is **DASH!**, not BLITZ! - the round-end
-sheet still says "blitzed", which is the verb rather than the name.
+came back out. The word on the splash is **DASH!**, the name of the pile; the
+round-end sheet says "dashed", which is the verb for having emptied it.
 
 **The washroom sign is a solid plate in the GENDER's colour** (`--sign-boy`
 `#0f6ad4`, `--sign-girl` `#e0489b`) with the figure knocked out in white. It used
@@ -1081,7 +1099,7 @@ in `wood.test.ts` with the worked numbers.
   what it was for.
 - **With nothing to say, that band becomes a drop target** (`data-drop="nearest"`,
   same geometry, invisible). It is the nearest empty space to a thumb coming off
-  the wood or the Blitz pile, so a throw that barely leaves the hand lands in it
+  the wood or the Dash pile, so a throw that barely leaves the hand lands in it
   instead of nowhere. `parseDrop` walks up from whatever is under the finger, so
   the attribute is all it takes.
 
@@ -1111,7 +1129,7 @@ in this order:
 | 🏆 | falls **with** whichever of those, if they lead the table after this round |
 
 **The standings are PROJECTED, and they have to be.** The splash fires the moment
-blitz is announced, before the host has committed anything, so `player.score` is
+dash is announced, before the host has committed anything, so `player.score` is
 still last round's total - and "dropped into last" is a question about this round.
 `scoreRound` is the same pure function the host is about to run on the same board,
 so this is the host's arithmetic done early rather than a guess. It can differ
@@ -1121,7 +1139,7 @@ only where a play is still being reconciled.
 anywhere, and handing every tied player a toilet would be a lie about a change
 that did not happen. Same reasoning as `basement` in the commentary.
 
-### The blitzer gets fireworks _(#58)_
+### The dasher gets fireworks _(#58)_
 
 **Fifteen shells at forty-six sparks each**, about 690 elements - ten times the
 first cut. It is affordable because it exists for 3.6 seconds and every spark
@@ -1141,7 +1159,7 @@ take a little gravity at the end, which is the whole difference between a firewo
 and a starburst.
 
 **Three layers, and the order is the point.** Fireworks at `z-index: 1`, the emoji
-at 2, and `.blitz-say` at 3 - the name is the one piece of information the splash
+at 2, and `.dash-say` at 3 - the name is the one piece of information the splash
 carries and `.splash-fx` was painting straight over it.
 
 ### The wood flip stopped being watchable _(#59)_
@@ -1198,7 +1216,7 @@ a single repeated emoji reads as a pattern, a handful reads as a celebration -
 each with its own size, delay and tumble, thrown out over two turns of the circle
 so the arms interleave instead of arriving as one rank of spokes.
 
-**"BLITZ!" and the name carry their own contrast.** They are read against whatever
+**"DASH!" and the name carry their own contrast.** They are read against whatever
 the splash is raining past them, in either theme, so white on the page's accent
 was hopeless: both now have a hard black outline, `-webkit-text-stroke` with
 `paint-order: stroke fill` plus four offset shadows for anything that lacks it.
@@ -1353,14 +1371,14 @@ it now carries an `aria-label` with the board's own wording.
 lower of the other gender and nothing else. Reported as allowing both directions;
 it does not, and `rules.test.ts` now pins every rejected case so the claim can be
 settled by running the tests. **The likeliest thing behind the report is
-`refillPosts`**: when a post empties, the Blitz top drops into it automatically, so
+`refillPosts`**: when a post empties, the Dash top drops into it automatically, so
 a card of any value can APPEAR on a post pile without anybody having built it
 there. That is the rule, not a bug.
 
 Terminology, since it has caused confusion: the **wood pile** is the face-down
 draw pile turned over in threes, and the **post piles** are the three (or five, at
-two players) build piles between Blitz and wood. The code has always used those
-names.
+two players) build piles between Dash and wood. The code has always used those
+two names.
 
 ### The round-end sheet _(#29-#34)_
 
@@ -1379,9 +1397,9 @@ was carrying the whole message on its own.
 
 **The rule between the total and the round's arithmetic existed and could not be
 seen** - a 1px hairline in `--line`, lost against the row's own border. It is full
-height, in ink rather than furniture, with room on both sides. The **blitz bolt**
+height, in ink rather than furniture, with room on both sides. The **dash bolt**
 sits right of the total in a column that is reserved whether or not it holds one,
-so the totals stay in a line down the sheet instead of the blitzer's row shunting
+so the totals stay in a line down the sheet instead of the dasher's row shunting
 left.
 
 **The carousel** dwelt 4.2s at 13px, which read as a slideshow being rushed past
@@ -1591,11 +1609,11 @@ when the host has pocketed their phone and the overlay covers the screen.
 `App.tsx`'s route effect calls `s.leave()` on the way home, so these are plain
 `href="#/"` links needing no handler.
 
-**The wood/Blitz side can be pre-set in the lobby.** `useWoodSide` is device-local
+**The wood/Dash side can be pre-set in the lobby.** `useWoodSide` is device-local
 `localStorage`, so the lobby reads it as easily as the game does. Deliberately not
 disabled for non-hosts and not a room option: it is about the phone in your hand.
 
-### Which side wood and Blitz sit on _(#2)_
+### Which side wood and Dash sit on _(#2)_
 
 `src/ui/prefs.ts` holds it, local to the device and not to the room, because two
 players at one table can want opposite answers. The `⇄` in the game head flips it
@@ -1653,9 +1671,9 @@ the round's delta, then the running total set off by a rule.
   with a prior score. No header row: labels wide enough to read cost more width
   than the numbers they label and squeeze the name below an ellipsis at 360px.
 - **The sum is `RoundScore.delta` verbatim**, never recomputed from
-  `centerCount`/`blitzLeft`, so it cannot disagree with the total beside it.
+  `centerCount`/`dashLeft`, so it cannot disagree with the total beside it.
   `render.test.ts` feeds a contradicting fixture to pin exactly that.
-- **Zero is unsigned and muted** - a blitzer reads `0 +9 = +9`, not `-0`, and the
+- **Zero is unsigned and muted** - a dasher reads `0 +9 = +9`, not `-0`, and the
   danger red is reserved for a real penalty.
 - The row lives in `ScoreRow`, shared by both overlays, and takes `score` as
   optional: game over can render from a snapshot with no `round/scores`.
@@ -1688,7 +1706,7 @@ the whole row. The scorepad entry sits below the code field and Join, spaced by
 `calc(48px - var(--stack-gap))` so the visible gap is exactly one field height.
 
 In the keeper, "In the middle" is "Dutch piles count" (their actual name) and the
-Blitz stepper has a coarse `±3` pair outside the fine one - value in the middle,
+Dash stepper has a coarse `±3` pair outside the fine one - value in the middle,
 bigger jump the further the thumb travels, both clamping so `±3` near an end lands
 on the end. `.keep-fields` went to ONE column to pay for it: side by side left the
 stepper ~160px on a 360px phone, and four 44px buttons around a value do not fit
@@ -1706,7 +1724,7 @@ the thumb arrives from.
 substring including the closing quote, so adding any second class to that button
 breaks it.
 
-Also retired: the Blitz count that appeared twice per opponent, beside the name
+Also retired: the Dash count that appeared twice per opponent, beside the name
 and again in the bubble on the pile. The bubble stays - it is attached to the pile
 it counts.
 
@@ -1737,7 +1755,7 @@ Questions to settle **before any code**:
 - **What does "tap which cards to move" mean?** Taking the card at depth k plus
   everything above it (a contiguous suffix) is the only reading that leaves both
   piles legal runs, and the only one under which the given example works.
-- **May the whole pile move**, emptying the post so the Blitz top drops into it
+- **May the whole pile move**, emptying the post so the Dash top drops into it
   via `refillPosts`? That is the strongest move in the game.
 - Trigger at 3+ cards as proposed, or 2+? A 2-card pile is equally movable.
 
@@ -1829,7 +1847,7 @@ curl -X PUT -H 'authorization: Bearer owner' -d '"roundEnd"' \
 ```
 
 Write `round/scores` and `players/$uid/score` yourself and the score sheet shows
-exactly the movement you want to look at; set `round/blitzedBy` and flip the phase
+exactly the movement you want to look at; set `round/dashedBy` and flip the phase
 and the splash fires; write `round/races/$i` and the halo appears. The client
 takes it as real data, because it is.
 
@@ -1875,16 +1893,16 @@ assuming a code fault.
 
 ### Never actually played
 
-- A full round to completion on the new board - blitz call, scoring overlay, next
+- A full round to completion on the new board - dash call, scoring overlay, next
   round, rematch.
 - **AI players end to end.** The bot loop has only run against fake deps and fake
-  timers. Whether a bot's blitz announces correctly and whether host transfer
+  timers. Whether a bot's dash announces correctly and whether host transfer
   hands bots over cleanly are both unknown. Difficulty was retuned on 2026-08-25
   after Easy beat a casual human; whether Easy is now beatable *without being
   inert* is unverified.
 - The all-stuck path **with bots in the room**. It has been driven for real with
-  two human clients (stuck player, away player, three rotations, `blitzedBy: null`
-  round end), but a two-bot table now reaches a normal blitz rather than the stall
+  two human clients (stuck player, away player, three rotations, `dashedBy: null`
+  round end), but a two-bot table now reaches a normal dash rather than the stall
   path, so that repro stopped reaching it.
 - The drop zone by touch drag, and by tap.
 - **The stall overlay and the single-card rescue on a real table** (#40, #41). The
@@ -2048,6 +2066,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `3d20a59` | A layout suite that measures the band in a real browser |
 | `40f4d9a` | A dragged card leaves the pile it came from, on every pile |
 | `404cafd` | A desktop animates whatever the OS says; Dash everywhere on screen |
+| `PENDING` | The code says dash too: keys, types, CSS, tests |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.

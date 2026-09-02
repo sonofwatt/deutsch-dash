@@ -5,7 +5,7 @@ import { TableauView } from './TableauView';
 import { CenterGrid, gridColumns } from './CenterGrid';
 import { OpponentStrip } from './OpponentStrip';
 import { ScoreRow } from './ScoreRow';
-import { BlitzSplash } from './BlitzSplash';
+import { DashSplash } from './DashSplash';
 import { ScoreList } from './ScoreList';
 import { rankRows } from '../scoreRanks';
 import { raceFlashes } from '../raceFlash';
@@ -19,7 +19,7 @@ const run = (suit: Suit) => Array.from({ length: 10 }, (_, i) => c(i + 1, suit))
 const noop = () => {};
 
 const tableau = (p: Partial<Tableau> = {}): Tableau => ({
-  blitz: [c(9, 'red'), c(4, 'blue')],
+  dash: [c(9, 'red'), c(4, 'blue')],
   post: [[c(8, 'red'), c(7, 'green')], [c(3, 'blue')], []],
   wood: Array.from({ length: 12 }, (_, i) => c((i % 10) + 1, 'blue')),
   woodIndex: 3,
@@ -39,7 +39,7 @@ describe('TableauView', () => {
   });
   it('labels every pile with the cards it holds, the whole pile not the remainder', () => {
     const html = renderTableau(tableau());
-    expect(html).toContain('>dash 2<');   // 2 in the Blitz pile
+    expect(html).toContain('>dash 2<');   // 2 in the Dash pile
     expect(html).toContain('>2<');         // a 2-card post says 2, not "+1"
     expect(html).toContain('>1<');         // and a single card says so rather than nothing
     expect(html).toContain('>wood 12<');
@@ -50,7 +50,7 @@ describe('TableauView', () => {
     const one = renderTableau(tableau({ post: [[c(8, 'red')]] }));
     expect(two.split('pile-layer').length).toBeGreaterThan(one.split('pile-layer').length);
   });
-  it('lays out Blitz on the left and wood on the right', () => {
+  it('lays out Dash on the left and wood on the right', () => {
     // Wood is the pile touched most - every flip of three is another tap - so it
     // sits under the right thumb. Order is a deliberate choice, so pin it.
     const html = renderTableau(tableau());
@@ -85,20 +85,20 @@ describe('TableauView', () => {
     // every assertion below reads ONE pile's own markup rather than the whole
     // tableau. `values` is what that pile is showing, in order.
     const values = (html: string, drop: string) => {
-      const from = drop === 'blitz' ? 0 : html.indexOf(`data-drop="${drop}"`);
+      const from = drop === 'dash' ? 0 : html.indexOf(`data-drop="${drop}"`);
       const slice = html.slice(from, html.indexOf('pile-label', from));
       return [...slice.matchAll(/class="card-v">(\d+)</g)].map(m => m[1]);
     };
     // These stacks read bottom-first, so the LAST entry is the one on top. Dash is
     // 9 red under 4 blue: lift the 4 and the 9 is what is left showing.
-    expect(values(held({ kind: 'blitz' }), 'blitz')).toEqual(['9']);
+    expect(values(held({ kind: 'dash' }), 'dash')).toEqual(['9']);
     // Post 0 is 8 red under 7 green, so lifting the 7 reveals the 8. Post 1 holds
     // one card, so lifting it leaves the empty slot and nothing to look at.
     const post0 = held({ kind: 'post', index: 0 });
     expect(values(post0, 'post:0')).toEqual(['8']);
     expect(values(held({ kind: 'post', index: 1 }), 'post:1')).toEqual([]);
     // ...and lifting off one post leaves every other pile exactly as it was.
-    expect(values(post0, 'blitz')).toEqual(['4']);      // Dash still shows its top
+    expect(values(post0, 'dash')).toEqual(['4']);      // Dash still shows its top
     expect(values(post0, 'post:1')).toEqual(['3']);     // and so does post 1
   });
 
@@ -108,7 +108,7 @@ describe('TableauView', () => {
     const dash = renderToStaticMarkup(createElement(TableauView, {
       t: tableau(), badgeId: 'tulip' as const, selection: null, postHighlight: [],
       onSelect: noop, onFlip: noop, onTapPost: noop, startDrag: noop,
-      dragging: { kind: 'blitz' } as PlaySource,
+      dragging: { kind: 'dash' } as PlaySource,
     }));
     // The count is untouched: the play commits on the drop, not on the lift.
     expect(dash).toContain('>dash 2<');
@@ -266,7 +266,7 @@ describe('the way out of being stuck', () => {
   // It sits in the band the wood column's two-card height leaves empty above the
   // posts, absolutely positioned so it costs no layout - not under the grid,
   // which is a long way from the pile it is talking about.
-  const hand: Tableau = { blitz: [c(5, 'red')], post: [[], [], []],
+  const hand: Tableau = { dash: [c(5, 'red')], post: [[], [], []],
                           wood: [c(1, 'red'), c(2, 'blue')], woodIndex: 1 };
   const view = (over: Record<string, unknown>) => renderToStaticMarkup(createElement(
     TableauView, { t: hand, badgeId: 'tulip' as const, selection: null, postHighlight: [],
@@ -309,7 +309,7 @@ describe('dragging off the wood', () => {
   // holds the card. What it must not do is show a second copy of the one already
   // following the finger.
   const hand = (woodIndex: number): Tableau =>
-    ({ blitz: [c(5, 'red')], post: [[], [], []],
+    ({ dash: [c(5, 'red')], post: [[], [], []],
        wood: [c(1, 'red'), c(2, 'blue'), c(3, 'green'), c(4, 'yellow')], woodIndex });
   const view = (t: Tableau, dragging: PlaySource | null) => renderToStaticMarkup(createElement(
     TableauView, { t, badgeId: 'tulip' as const, selection: null, postHighlight: [],
@@ -330,7 +330,7 @@ describe('dragging off the wood', () => {
   });
 
   it('is unmoved by a drag from anywhere else', () => {
-    expect(view(hand(3), { kind: 'blitz' })).toContain('>3<');
+    expect(view(hand(3), { kind: 'dash' })).toContain('>3<');
     expect(view(hand(3), { kind: 'post', index: 0 })).toContain('>3<');
   });
 });
@@ -347,11 +347,11 @@ describe('OpponentStrip', () => {
     }));
     expect(html).not.toContain('>Me<');
     expect(html).toContain('>You<');
-    // Only slots holding a card: blitz top + 2 non-empty posts + wood top. The
+    // Only slots holding a card: dash top + 2 non-empty posts + wood top. The
     // third post is empty and takes no width at all - see OpponentStrip.
     expect(html.split('opp-slot').length - 1).toBe(4);
     expect(html).not.toContain('pile-space');
-    // and in the same order as your own tableau: the Blitz slot, the one carrying
+    // and in the same order as your own tableau: the Dash slot, the one carrying
     // the count bubble, is the first of them
     const slotsBeforeCount = html.slice(0, html.indexOf('opp-count')).split('opp-slot').length - 1;
     expect(slotsBeforeCount).toBe(1);
@@ -368,20 +368,20 @@ describe('ScoreRow', () => {
       .replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 
   it('spells the round out as arithmetic, then the running total', () => {
-    const text = renderRow(player(), { centerCount: 6, blitzLeft: 2, delta: 2 });
+    const text = renderRow(player(), { centerCount: 6, dashLeft: 2, delta: 2 });
     expect(text).toContain('Dave -4 +6 = +2 47');
   });
   it('takes the sum from the committed delta instead of recomputing it', () => {
     // delta is the exact number commitScores added to player.score. Recomputing
     // from the components here would let the row show a sum that disagrees with
     // the total beside it; this fixture disagrees on purpose to pin that.
-    const text = renderRow(player(), { centerCount: 6, blitzLeft: 2, delta: 9 });
+    const text = renderRow(player(), { centerCount: 6, dashLeft: 2, delta: 9 });
     expect(text).toContain('= +9 47');
   });
   it('leaves zero unsigned and signs a losing round', () => {
-    const blitzer = renderRow(player({ name: 'Ann', score: 56 }), { centerCount: 9, blitzLeft: 0, delta: 9 });
-    expect(blitzer).toContain('Ann 0 +9 = +9 56'); // not "-0", which reads as a typo
-    const loser = renderRow(player(), { centerCount: 3, blitzLeft: 4, delta: -5 });
+    const dasher = renderRow(player({ name: 'Ann', score: 56 }), { centerCount: 9, dashLeft: 0, delta: 9 });
+    expect(dasher).toContain('Ann 0 +9 = +9 56'); // not "-0", which reads as a typo
+    const loser = renderRow(player(), { centerCount: 3, dashLeft: 4, delta: -5 });
     expect(loser).toContain('Dave -8 +3 = -5 47');
   });
   it('degrades to a name and a total when there is no round breakdown', () => {
@@ -390,7 +390,7 @@ describe('ScoreRow', () => {
   });
 });
 
-describe('BlitzSplash', () => {
+describe('DashSplash', () => {
   const player = (score: number): PlayerInfo => ({
     name: 'P', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, awayAt: null, score,
   });
@@ -399,10 +399,10 @@ describe('BlitzSplash', () => {
 
   // No `round` passed means no projected deltas, so before and after are the same
   // standings - which is the right reading of "the board tells us nothing yet".
-  const base = (t: Record<string, PlayerInfo>, blitzer: string, uid: string | null) =>
-    splashVariant(t, blitzer, uid).base;
+  const base = (t: Record<string, PlayerInfo>, dasher: string, uid: string | null) =>
+    splashVariant(t, dasher, uid).base;
 
-  it('gives the blitzer glitter and never a trophy - they have the glitter', () => {
+  it('gives the dasher glitter and never a trophy - they have the glitter', () => {
     expect(splashVariant(table(10, 20, 30), 'p1', 'p1')).toEqual({ base: 'glitter', trophy: false });
   });
   it('never poos on a two-player game', () => {
@@ -419,7 +419,7 @@ describe('BlitzSplash', () => {
     expect(base(t, 'p0', 'p1')).toBe('poo');
     expect(base(t, 'p0', 'p2')).toBe('poo');
   });
-  it('spares the table when the blitzer is the one propping it up', () => {
+  it('spares the table when the dasher is the one propping it up', () => {
     // The winner gets glitter, so nobody gets the poo that round.
     const t = table(2, 30, 20);
     expect(base(t, 'p0', 'p0')).toBe('glitter');
@@ -434,7 +434,7 @@ describe('BlitzSplash', () => {
   // let scoreRound project it - the same arithmetic the host is about to run.
   // scoreRound walks the TABLEAUS and counts each owner's cards out of the
   // spaces, so every player needs a hand for the projection to see them at all.
-  const empty = (): Tableau => ({ blitz: [], post: [], wood: [], woodIndex: 0 });
+  const empty = (): Tableau => ({ dash: [], post: [], wood: [], woodIndex: 0 });
   const board = (owner: string, cards: number, who = ['p0', 'p1', 'p2']) => ({
     spaces: [{ stack: Array.from({ length: cards }, (_, i) => c(i + 1, 'red', owner)), history: [] }],
     tableaus: Object.fromEntries(who.map(id => [id, empty()])) as Record<string, Tableau>,
@@ -451,7 +451,7 @@ describe('BlitzSplash', () => {
     expect(splashVariant(t, 'p0', 'p2', board('p2', 9)).base).toBe('relief');
   });
   it('sends the trophy down with whatever else is falling', () => {
-    // p1 leads after the round and did not blitz: tears and a trophy.
+    // p1 leads after the round and did not dash: tears and a trophy.
     const t = table(10, 30, 12);
     expect(splashVariant(t, 'p0', 'p1', board('p0', 3))).toEqual({ base: 'crying', trophy: true });
   });
@@ -460,7 +460,7 @@ describe('BlitzSplash', () => {
   });
 
   const render = (splash: Splash) =>
-    renderToStaticMarkup(createElement(BlitzSplash, { name: 'Dave', splash }));
+    renderToStaticMarkup(createElement(DashSplash, { name: 'Dave', splash }));
   it('throws exactly one kind of thing at a viewer', () => {
     const glitter = render({ base: 'glitter', trophy: false });
     expect(glitter).toContain('🥳');
@@ -480,7 +480,7 @@ describe('rankRows', () => {
   const p = (score: number): PlayerInfo => ({
     name: 'P', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, awayAt: null, score,
   });
-  const sc = (delta: number): RoundScore => ({ centerCount: 0, blitzLeft: 0, delta });
+  const sc = (delta: number): RoundScore => ({ centerCount: 0, dashLeft: 0, delta });
 
   it('derives the old standing by undoing this round', () => {
     // ann 30 (+12 this round), bo 25 (-2): ann was 18 and last, and is now first.
@@ -519,8 +519,8 @@ describe('ScoreList', () => {
     // previous standing, before the swap it is about to play out.
     const html = renderToStaticMarkup(createElement(ScoreList, {
       players: { ann: p('Ann', 20), bo: p('Bo', 25) },
-      scores: { ann: { centerCount: 0, blitzLeft: 0, delta: 12 },
-                bo: { centerCount: 0, blitzLeft: 0, delta: -2 } },
+      scores: { ann: { centerCount: 0, dashLeft: 0, delta: 12 },
+                bo: { centerCount: 0, dashLeft: 0, delta: -2 } },
     }));
     expect(html.indexOf('Bo')).toBeLessThan(html.indexOf('Ann'));
     expect(html).not.toContain('moved-');

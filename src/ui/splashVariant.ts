@@ -6,7 +6,7 @@ export type SplashBase = 'glitter' | 'poo' | 'crying' | 'relief' | 'toilet';
 export interface Splash { base: SplashBase; trophy: boolean }
 
 /**
- * The blitzer gets the celebration. Everyone else gets told what the round just
+ * The dasher gets the celebration. Everyone else gets told what the round just
  * did to them, which is a more interesting question than "did you win".
  *
  * The four losing faces, in the order they are tested:
@@ -20,10 +20,10 @@ export interface Splash { base: SplashBase; trophy: boolean }
  * - **😢 crying** - everybody else.
  *
  * **🏆 falls WITH whichever of those you got** if you lead the table after this
- * round, because leading and not blitzing is a real thing to feel two ways about.
- * The blitzer never needs it: they already have the glitter.
+ * round, because leading and not dashing is a real thing to feel two ways about.
+ * The dasher never needs it: they already have the glitter.
  *
- * The standings are PROJECTED. The splash fires the moment blitz is announced,
+ * The standings are PROJECTED. The splash fires the moment dash is announced,
  * which is before the host has committed anything, so `player.score` is still
  * last round's total - and "dropped into last" is a question about this round.
  * `scoreRound` is the same pure function the host is about to run on the same
@@ -31,10 +31,10 @@ export interface Splash { base: SplashBase; trophy: boolean }
  * guess. It can differ only where a play is still being reconciled.
  */
 export function splashVariant(
-  players: Record<string, PlayerInfo>, blitzedBy: string, uid: string | null,
+  players: Record<string, PlayerInfo>, dashedBy: string, uid: string | null,
   round?: { spaces: CenterSpace[]; tableaus: Record<string, Tableau> } | null,
 ): Splash {
-  if (uid === blitzedBy) return { base: 'glitter', trophy: false };
+  if (uid === dashedBy) return { base: 'glitter', trophy: false };
   const me = uid ? players[uid] : undefined;
   if (!me) return { base: 'crying', trophy: false };
 
