@@ -514,9 +514,11 @@ reasoning; each now says what it meant without the borrowed name. The one
 survivor is the FAQ link under the deferred post-pile move, where the URL is the
 citation and changing it would break the evidence.
 
-**Three rows in the History table below still say Blitz.** They are the record of
-commits that shipped under that name. Rewriting them would make the table
-disagree with the log it indexes.
+**The History table says Dash throughout as well**, including the three rows for
+commits that shipped under the old name. The table is an index of what the work
+was, not a transcript of what it was called at the time, and one word meaning one
+thing is worth more to a reader than a preserved spelling. The commit messages
+those rows point at are the transcript, and they are unedited.
 
 ### The card in the air leaves the pile it came from
 
@@ -2022,18 +2024,18 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `17d766a` | All three bot levels slowed; fixed a 16%-flaky test |
 | `3f030ea` | Reconnect-after-backgrounding fixes; washroom-sign redraw |
 | `6a0836f` | Larger figures on the gender plates; bot-cannot-be-host test |
-| `d1c85b4` | Swapped wood and Blitz - wood to the right thumb |
+| `d1c85b4` | Swapped wood and Dash - wood to the right thumb |
 | `26ff306` | This handoff, rewritten around pending work and the landmines |
 | `6abe8bd` | CI runs the rules tests; guard so that cannot silently regress |
 | `7803a44` | Race flashes - who won a contested space, told by the loser |
 | `18d57d1` | The score sheet plays the change in standings out |
-| `4fdd258` | Blitz splash: glitter for the winner, worse for the worst round |
+| `4fdd258` | Dash splash: glitter for the winner, worse for the worst round |
 | `58ebb3f` | How to drive the real app, and what doing it proved |
 | `77bafc1` | The board rendered at last; most of the never-rendered list closed |
 | `05516a8` → `cdd986e` | The score sheets talk: commentary, per-game stats, no repeats |
 | `b38da9b` | Round arithmetic on the score rows; `--danger-ink` for dark mode |
 | `5d7039d` | `#/keeper` - a scorepad for a game played with a real deck |
-| `92f57d0` | The keeper's round timer; the wood/Blitz side picker |
+| `92f57d0` | The keeper's round timer; the wood/Dash side picker |
 | `034e313` | The idle-table hang, fixed as presence: `awayAt` |
 | `db81ee0` | Stuck alert into the drop band; orderly grid; helper hint |
 | `8bdc017` | Away in the opponent strip; 32 spaces; the hint stops nagging |
