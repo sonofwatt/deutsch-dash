@@ -2151,7 +2151,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `404cafd` | A desktop animates whatever the OS says; Dash everywhere on screen |
 | `21aceac` | The code says dash too: keys, types, CSS, tests |
 | `aa4ec3e` | The emulator project and the borrowed game name follow |
-| `dc78867` → `368f718` | Security and performance audit: the ghost off the render path, memoised cards, defensive reads, one-field wood writes, self-hosted fonts, least-privilege CI |
+| `dc78867` → `e3c6676` | Security and performance audit: the ghost off the render path, memoised cards, defensive reads, one-field wood writes, self-hosted fonts, least-privilege CI |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
