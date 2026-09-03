@@ -78,6 +78,8 @@ export interface Deps {
   addBot(code: string, badgeId: BadgeId, level: BotLevel, name: string): Promise<string>;
   removeBot(code: string, id: string, badgeId: BadgeId): Promise<void>;
   stopPresence: () => void;
+  /** Re-arm the presence writer for a room; the last call wins (see rooms.ts). */
+  startPresence(code: string, uid: string): () => void;
 }
 
 export interface GameStore {
@@ -732,7 +734,15 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         try {
           const uid = await deps.ensureSignedIn();
           const res = await deps.joinRoom(code, name, badgeId);
-          if (stale(attempt)) { if (res.ok) deps.stopPresence(); return res; }
+          if (stale(attempt)) {
+            // joinRoom armed presence for THIS room on its way out, and presence is
+            // last-writer-wins. If a newer join has already landed, put its room's
+            // writer back; otherwise there is nothing to be present in.
+            const cur = get();
+            if (cur.joinPhase === 'in-room' && cur.code && cur.uid) deps.startPresence(cur.code, cur.uid);
+            else if (res.ok) deps.stopPresence();
+            return res;
+          }
           if (res.ok) watch(code, uid);
           else set({ joinPhase: 'idle', joinError: res.reason });
           return res;
@@ -1046,6 +1056,7 @@ const realDeps: Deps = {
   addBot: netRooms.addBot,
   removeBot: netRooms.removeBot,
   stopPresence: netRooms.stopPresenceNow,
+  startPresence: netRooms.startPresence,
 };
 
 export const gameStore = createGameStore(realDeps);

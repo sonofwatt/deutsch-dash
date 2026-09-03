@@ -42,6 +42,7 @@ function fakeDeps(over: Partial<Deps> = {}): Deps {
     addBot: vi.fn(async () => 'bot_star'),
     removeBot: vi.fn(async () => {}),
     stopPresence: vi.fn(),
+    startPresence: vi.fn(() => () => {}),
     ...over,
   };
 }
@@ -1202,5 +1203,10 @@ describe('leaving while a join is in flight', () => {
     expect(store.getState().code).toBe('BBBBBB');
     expect(deps.watchRoom).toHaveBeenCalledTimes(1);
     expect(deps.watchRoom).toHaveBeenCalledWith('BBBBBB', expect.any(Function));
+    // The late join armed presence for AAAAAA on its way out (rooms.ts does that
+    // inside joinRoom, last writer wins), so the room the player is actually in
+    // gets its writer back.
+    expect(deps.startPresence).toHaveBeenCalledWith('BBBBBB', 'me');
+    expect(deps.stopPresence).not.toHaveBeenCalled();
   });
 });
