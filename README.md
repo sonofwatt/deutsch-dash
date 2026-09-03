@@ -68,6 +68,14 @@ What that means in practice:
   server resolves it atomically and concurrent joins can't both slip through.
   (`numChildren()` would be the obvious way to count players, but the RTDB
   emulator's rules engine rejects it at parse time, so it can't be tested locally.)
+  One honest limit: the cap holds for the app's own join path. A client that
+  writes its own `players/$uid` record directly bypasses the counter; the rule
+  that would close that is in `docs/database.rules.proposed.json`, waiting on a
+  production probe.
+- **Bounded server-side.** Since the audit the rules also say what may be
+  stored: a badge id must be a badge, the phase a phase, every number a number
+  in range, a card a card owned by the hand it sits in, and the host alone
+  writes the scores. Like every rules change it takes effect once deployed.
 - **Deliberately open.** Reading a room and writing the shared center piles
   require only `auth != null`. Someone who has a room code can watch or interfere
   with that game. Codes are 6 characters from a 32-letter alphabet (~1 billion
@@ -94,9 +102,9 @@ database rather than generating a charge. That changes if you upgrade to Blaze.
 client, so the app reads a room defensively: a badge it does not know is drawn
 grey rather than taking the screen down, a stack entry that is not a card is not
 in the pile, and the board and post counts are held to what a real deal can
-produce before anything allocates on them. The rules bound WHO may write each
-path but not WHAT; validation rules that would bound the what are proposed in
-`docs/audit-2026-09-03.md` and wait on being deployed.
+produce before anything allocates on them. The rules bound the same things at
+the door (see above), so a hostile write is refused and, for the ones already
+stored, drawn harmlessly.
 
 **No third parties.** The page talks to Firebase and nothing else. The Outfit
 font is served from this site (`public/fonts`, SIL Open Font License) rather than
