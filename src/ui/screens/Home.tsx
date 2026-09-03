@@ -3,6 +3,7 @@ import { useGameStore } from '../../state/store';
 import { BadgePicker } from '../components/BadgePicker';
 import { JOIN_REASONS } from '../joinReasons';
 import { APP_VERSION } from '../../version';
+import { readSavedBadge } from '../prefs';
 import type { BadgeId } from '../../game/badges';
 
 export function Home() {
@@ -11,7 +12,7 @@ export function Home() {
   const joinPhase = useGameStore(s => s.joinPhase);
   const joinError = useGameStore(s => s.joinError);
   const [name, setName] = useState(localStorage.getItem('bz.name') ?? '');
-  const [badge, setBadge] = useState<BadgeId | null>(localStorage.getItem('bz.badge') as BadgeId | null);
+  const [badge, setBadge] = useState<BadgeId | null>(readSavedBadge);
   const [code, setCode] = useState('');
   const ready = name.trim().length > 0 && badge != null;
 

@@ -1,4 +1,4 @@
-import { BADGES, EMOJI, type BadgeId } from '../../game/badges';
+import { badgeFor, EMOJI, type BadgeId } from '../../game/badges';
 import { CardView } from './CardView';
 import type { WoodSide } from '../prefs';
 import type { Card, PlayerInfo, Tableau } from '../../game/types';
@@ -37,7 +37,7 @@ export function OpponentStrip(props: {
   return (
     <div className="opp-strip">
       {rows.map(([uid, p]) => {
-        const b = BADGES[p.badgeId];
+        const b = badgeFor(p.badgeId);
         const t = props.tableaus[uid];
         const woodTop = t && t.woodIndex > 0 ? t.wood[t.woodIndex - 1] ?? null : null;
         const dashTop = t ? t.dash[t.dash.length - 1] ?? null : null;

@@ -6,7 +6,8 @@ Database, hosted on GitHub Pages.
 
 ## Local development (no Firebase account needed)
 
-Prereqs: Node 20+, and Java 11+ for the Firebase emulator. If you don't have
+Prereqs: Node 22 (20.19 or newer also works), and Java 21+ for the Firebase
+emulator (firebase-tools refuses to start it on anything older). If you don't have
 Java system-wide, drop a portable JRE at `.tools/jre` (gitignored) -
 `scripts/with-java.mjs` puts it on PATH for the emulator scripts automatically,
 and falls back to system Java when that folder is absent.
@@ -88,6 +89,19 @@ database rather than generating a charge. That changes if you upgrade to Blaze.
 3. If abuse ever becomes real, add [App Check](https://firebase.google.com/docs/app-check),
    which attests that requests come from the genuine web app. Overkill for a game
    you text to friends.
+
+**What the client trusts.** Every field under a room was written by some player's
+client, so the app reads a room defensively: a badge it does not know is drawn
+grey rather than taking the screen down, a stack entry that is not a card is not
+in the pile, and the board and post counts are held to what a real deal can
+produce before anything allocates on them. The rules bound WHO may write each
+path but not WHAT; validation rules that would bound the what are proposed in
+`docs/audit-2026-09-03.md` and wait on being deployed.
+
+**No third parties.** The page talks to Firebase and nothing else. The Outfit
+font is served from this site (`public/fonts`, SIL Open Font License) rather than
+from Google, so loading the game discloses a player's address to nobody but the
+game's own database.
 
 **Do not** apply the common advice to reject anonymous users in rules
 (`sign_in_provider != 'anonymous'`). Every player here is anonymous by design;

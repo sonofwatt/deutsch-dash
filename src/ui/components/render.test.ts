@@ -590,3 +590,24 @@ describe('raceFlashes', () => {
     expect(html.indexOf('😇')).toBeLessThan(html.indexOf('😠')); // space 0 before space 1
   });
 });
+
+describe('an unknown badge', () => {
+  const player: PlayerInfo = { name: 'Eve', badgeId: 'unicorn' as never, joinedAt: 1, connected: true,
+                               stuckAt: null, awayAt: null, score: 3 };
+  it('is drawn grey on the score sheet, the strip and a card, not thrown', () => {
+    // Every one of these indexed BADGES by the id in the player record and read
+    // .color off the result - a TypeError in render that took the tree down for
+    // everybody in the room. The record is written by the player's own client.
+    expect(() => renderToStaticMarkup(createElement(ScoreRow, { player }))).not.toThrow();
+    const strip = renderToStaticMarkup(createElement(OpponentStrip, {
+      me: 'me', players: { eve: player }, tableaus: { eve: tableau() },
+    }));
+    expect(strip).toContain('Eve');
+    expect(strip).toContain('#6b7280');
+    const grid = renderToStaticMarkup(createElement(CenterGrid, {
+      spaces: [{ stack: [c(1, 'red', 'eve')], history: [] }], highlight: [],
+      badgeOf: () => 'unicorn' as never, onTap: noop, onSnapTap: noop,
+    }));
+    expect(grid).toContain('?');
+  });
+});

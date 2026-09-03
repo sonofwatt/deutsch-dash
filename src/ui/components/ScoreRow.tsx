@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { BADGES, EMOJI } from '../../game/badges';
+import { badgeFor, EMOJI } from '../../game/badges';
 import { signed, type Move } from '../scoreRanks';
 import type { PlayerInfo, RoundScore } from '../../game/types';
 
@@ -25,7 +25,7 @@ export function ScoreRow(
     // Game over is not, and passes nothing.
     showReady?: boolean },
 ) {
-  const badge = BADGES[player.badgeId];
+  const badge = badgeFor(player.badgeId);
   return (
     <motion.div layout transition={{ type: 'spring', stiffness: 420, damping: 34 }}
       className={`score-row${move ? ` moved-${move}` : ''}`}>

@@ -131,7 +131,7 @@ export function Game() {
   }, [stuckAt]);
   const stuckAwhile = stuckAt != null && offerFor === stuckAt;
 
-  const { drag, startDrag } = useDrag((source: PlaySource, target: DropTarget, at: Point) => {
+  const { drag, startDrag, pointer } = useDrag((source: PlaySource, target: DropTarget, at: Point) => {
     gameStore.setState({ selection: source }); // direct set - select() would TOGGLE an already-selected source off
     if ('nearest' in target) {
       // No particular square was chosen. The candidates are the spaces this card
@@ -291,7 +291,7 @@ export function Game() {
            are at this table, not waiting outside it, and the way in is the bar
            where their own cards will be. */
         : <OpponentStrip me={uid} players={room.players} tableaus={round.tableaus} woodSide={woodSide} />}
-      <CenterGrid spaces={round.spaces} highlight={targets.spaces} badgeOf={badgeOf}
+      <CenterGrid spaces={round.spaces} highlight={targets.spaces} badgeOf={badgeOf} me={uid}
         onTap={i => void playTo({ space: i })} races={races}
         snapping={targets.spaces.length > 0} hint={hint}
         openings={openings} stall={stall}
@@ -340,7 +340,7 @@ export function Game() {
           <p className="muted standby-hand">Your cards arrive with the next deal.</p>
         )}
       </div>
-      {hand && drag && <DragGhost drag={drag} badgeId={me.badgeId} />}
+      {hand && drag && <DragGhost drag={drag} pointer={pointer} badgeId={me.badgeId} />}
     </div>
   );
 }

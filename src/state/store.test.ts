@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createGameStore, legalTargets, tableReady, HOST_AWAY_MS, AWAY_MS, type Deps } from './store';
 import type { PlayResult } from '../net/plays';
+import type { JoinResult } from '../net/rooms';
 import { deal, buildDeck } from '../game/deck';
 import type { Card, CenterSpace, PlayerInfo, RoomMeta, Suit, Room, Tableau } from '../game/types';
 
@@ -26,6 +27,7 @@ function fakeDeps(over: Partial<Deps> = {}): Deps {
     playToCenter: vi.fn(async () => ({ committed: true, winner: null })),
     reportRace: vi.fn(async () => {}),
     persistTableau: vi.fn(async () => {}),
+    persistWoodIndex: vi.fn(async () => {}),
     declareStuck: vi.fn(async () => {}),
     clearStuck: vi.fn(async () => {}),
     markAway: vi.fn(async () => {}),
@@ -143,7 +145,9 @@ describe('optimistic play', () => {
     const store = createGameStore(deps);
     const t: Tableau = { dash: [c(7, 'green')],
                          post: [[c(8, 'red')], [c(2, 'blue')], [c(5, 'yellow')]], wood: [], woodIndex: 0 };
-    store.setState({ uid: 'me', code: 'ABCDEF', room: playingRoom(t), tableau: t });
+    const room = playingRoom(t);
+    room.players.me.stuckAt = 1; // declared stuck a moment ago, so there is a claim to withdraw
+    store.setState({ uid: 'me', code: 'ABCDEF', room, tableau: t });
 
     store.getState().select({ kind: 'dash' });
     await store.getState().playTo({ post: 0 }); // green 7 builds on red 8
@@ -810,7 +814,34 @@ describe('AI players', () => {
     const deps = await run('someone-else');
     expect(deps.playToCenter).not.toHaveBeenCalled();
     expect(deps.persistTableau).not.toHaveBeenCalledWith('ABCDEF', 'bot_star', expect.anything());
-    expect(deps.persistTableau).toHaveBeenCalledWith('ABCDEF', 'me', expect.anything()); // still adopts its own
+    expect(deps.persistWoodIndex).not.toHaveBeenCalledWith('ABCDEF', 'bot_star', expect.anything());
+  });
+
+  it('a bot already declared stuck stops turning wood over', async () => {
+    // Its whole cycle has been proven empty, so another turn cannot help - it only
+    // sent the hand round the room again on every tick. A Genius bot did that
+    // twice a second for as long as the table stayed stalled.
+    let cb!: (r: Room | null) => void;
+    const deps = fakeDeps({
+      watchRoom: vi.fn((_code: string, f: (room: Room | null) => void) => { cb = f; return () => {}; }),
+    });
+    const store = createGameStore(deps);
+    await store.getState().enterRoom('ABCDEF', 'D', 'tulip');
+    const room = roomWithBot('me');
+    room.players.bot_star.stuckAt = 500;
+    // Only a red 6 could land, and the bot holds nothing but blue 9s.
+    room.round!.spaces = [{ stack: [c(5, 'red')], history: [] }];
+    room.round!.tableaus.bot_star = {
+      dash: [c(9, 'blue', 'bot_star')], post: [[], [], []],
+      wood: Array.from({ length: 6 }, () => c(9, 'blue', 'bot_star')), woodIndex: 0,
+    };
+    vi.useFakeTimers();
+    cb(room);
+    await vi.advanceTimersByTimeAsync(9000);
+    store.getState().leave();
+    vi.useRealTimers();
+    expect(deps.persistWoodIndex).not.toHaveBeenCalledWith('ABCDEF', 'bot_star', expect.anything());
+    expect(deps.persistTableau).not.toHaveBeenCalledWith('ABCDEF', 'bot_star', expect.anything());
   });
 });
 
@@ -1072,5 +1103,104 @@ describe('away players', () => {
     after.cb(idleTable(7000));
     expect(after.deps.incrementStuckRounds).toHaveBeenCalledTimes(1);
     after.store.getState().leave();
+  });
+});
+
+describe('what a turn writes', () => {
+  it('a wood turn writes the index alone, not the whole hand', () => {
+    // Turning wood is the most frequent action in the game and it changes one
+    // integer. Writing the whole hand for it was about half of a round's traffic.
+    const deps = fakeDeps();
+    const store = createGameStore(deps);
+    const t = seededTableau();
+    store.setState({ uid: 'me', code: 'ABCDEF', room: playingRoom(t), tableau: t });
+    store.getState().flip();
+    expect(deps.persistWoodIndex).toHaveBeenCalledWith('ABCDEF', 'me', 3);
+    expect(deps.persistTableau).not.toHaveBeenCalled();
+  });
+
+  it('a play by a player who was never stuck does not clear a stuck flag', async () => {
+    const deps = fakeDeps();
+    const store = createGameStore(deps);
+    const t = seededTableau();
+    const rigged: Tableau = { ...t, dash: [...t.dash.slice(0, -1), c(1, 'red')] };
+    store.setState({ uid: 'me', code: 'ABCDEF', room: playingRoom(rigged), tableau: rigged });
+    store.getState().select({ kind: 'dash' });
+    await store.getState().playTo({ space: 0 });
+    expect(deps.playToCenter).toHaveBeenCalled();
+    expect(deps.clearStuck).not.toHaveBeenCalled();
+  });
+});
+
+describe('adopting a hand', () => {
+  async function adopt(room: Room) {
+    let cb!: (r: Room | null) => void;
+    const deps = fakeDeps({
+      watchRoom: vi.fn((_code: string, f: (r: Room | null) => void) => { cb = f; return () => {}; }),
+    });
+    const store = createGameStore(deps);
+    await store.getState().enterRoom('ABCDEF', 'D', 'tulip');
+    cb(room);
+    return { deps, store };
+  }
+
+  it('takes the hand the deal left and writes nothing back when it needs no reconciling', async () => {
+    // Eight players each echoing the hand the host had just written was eight
+    // snapshots on every phone at the moment the board appeared, for nothing.
+    const t = seededTableau();
+    const { deps, store } = await adopt(playingRoom(t));
+    expect(store.getState().tableau).toEqual(t);
+    expect(deps.persistTableau).not.toHaveBeenCalled();
+  });
+
+  it('writes back a hand that reconciling trimmed', async () => {
+    // A card whose centre play landed but whose hand write did not: the adopted
+    // hand is the corrected one, and the correction is worth a write.
+    const t = seededTableau();
+    const top = t.dash[t.dash.length - 1];
+    const room = playingRoom(t);
+    room.round!.spaces[0] = { stack: [top], history: [] };
+    const { deps, store } = await adopt(room);
+    expect(store.getState().tableau!.dash).toHaveLength(t.dash.length - 1);
+    expect(deps.persistTableau).toHaveBeenCalledWith('ABCDEF', 'me', store.getState().tableau);
+  });
+});
+
+describe('leaving while a join is in flight', () => {
+  it('a join that resolves after leave() does not put the player back in the room', async () => {
+    // joinRoom starts presence and then resolves; the player tapped Home in
+    // between. The resolution used to subscribe to the room anyway, behind the
+    // home screen, downloading every delta of a game they were no longer in.
+    let resolveJoin!: (r: JoinResult) => void;
+    const deps = fakeDeps({
+      joinRoom: vi.fn(() => new Promise<JoinResult>(res => { resolveJoin = res; })),
+    });
+    const store = createGameStore(deps);
+    const inFlight = store.getState().enterRoom('ABCDEF', 'D', 'tulip');
+    await vi.waitFor(() => expect(deps.joinRoom).toHaveBeenCalled()); // signed in, join on the wire
+    store.getState().leave();
+    resolveJoin({ ok: true, code: 'ABCDEF' });
+    await inFlight;
+    expect(deps.watchRoom).not.toHaveBeenCalled();
+    expect(deps.stopPresence).toHaveBeenCalled();
+    expect(store.getState().joinPhase).toBe('idle');
+    expect(store.getState().code).toBeNull();
+  });
+
+  it('a newer join supersedes an older one that resolves late', async () => {
+    let resolveFirst!: (r: JoinResult) => void;
+    const deps = fakeDeps({
+      joinRoom: vi.fn()
+        .mockImplementationOnce(() => new Promise<JoinResult>(res => { resolveFirst = res; }))
+        .mockImplementationOnce(async (code: string) => ({ ok: true as const, code })),
+    });
+    const store = createGameStore(deps);
+    const first = store.getState().enterRoom('AAAAAA', 'D', 'tulip');
+    await store.getState().enterRoom('BBBBBB', 'D', 'tulip');
+    resolveFirst({ ok: true, code: 'AAAAAA' });
+    await first;
+    expect(store.getState().code).toBe('BBBBBB');
+    expect(deps.watchRoom).toHaveBeenCalledTimes(1);
+    expect(deps.watchRoom).toHaveBeenCalledWith('BBBBBB', expect.any(Function));
   });
 });

@@ -5,14 +5,15 @@ should cost a flag and not a rebuild.
 
 # Project Handoff - Deutsch Dash
 
-_Last updated: 2026-09-02. Working tree clean, CI green including the emulator
+_Last updated: 2026-09-03. Working tree clean, CI green including the emulator
 suite. A commit sitting unpushed has already invalidated one playtest - what
 people are playing is whatever last reached Pages - so check `git status -sb`
 before trusting what a table reports._
 
-_**385 tests green** (361 unit + 24 emulator). This is the only place in the repo
-that quotes a count - it drifted three separate ways when it lived in four
-places, so keep it here and nowhere else._
+_**431 tests** (383 unit and 24 in a real browser, green; 24 against the
+emulator, green on CI). This is the only place in the repo that quotes a count -
+it drifted three separate ways when it lived in four places, so keep it here and
+nowhere else._
 
 **The version is `src/version.ts` and nowhere else** - the same one-place rule the
 test count above keeps. `v<major>.<minor>.<patch>`, shown at the foot of the home
@@ -469,6 +470,17 @@ pointer actually was and translates by the difference (`ghostFix` in
 painted, re-measuring on `visualViewport` events. On a browser that was already
 right the correction is zero. The `translate(-50%, -55%)` lift is intentional -
 it keeps the card out from under the thumb.
+
+**The pointer position is not React state.** It was, and every pointermove
+therefore re-rendered the game screen and the whole board under it: 75 card
+nodes at eight players, 36 of them framer-motion layout nodes measuring
+themselves twice per render. A headless Chromium bench put one move at 4.6 ms,
+and 29 ms with a 4x CPU throttle, which is more than a frame. The position now
+lives in a `PointerTrack` (`useDrag.ts`) that only `DragGhost` subscribes to,
+writing one transform per event onto its own element; React hears about a drag
+twice, at the start and at the end. The ghost sets no `style` prop at all, so a
+snapshot landing mid-drag cannot put it back where React last saw it. See
+`docs/audit-2026-09-03.md`.
 
 ### Dash on screen and in the code
 
@@ -2001,7 +2013,29 @@ the ledgered pointer-capture re-select check on mouse drags.
 - Test counts are quoted in the header of this file and nowhere else, because
   they drifted three separate ways when they lived in four places. If you add
   tests, update that one line or delete the number.
-- Bundle is one 586 kB chunk, over Vite's 500 kB warning threshold. No code-split.
+- Bundle is two chunks since the audit: vendor 538 kB (165 kB gzip) and app
+  104 kB (35 kB gzip). The vendor chunk still trips Vite's 500 kB warning, which
+  is cosmetic; the split saves no first-load bytes, it lets a returning player
+  keep the vendor chunk across deploys. No route-level split: the keeper route
+  measured at 8.5 kB minified, not worth a loading state. Firebase is 229 kB of
+  the vendor chunk and cannot leave the home screen without dismantling the
+  module-scope store singleton.
+- `database.rules.json` bounds WHO may write each path and not WHAT: no
+  `.validate` on names, tableaus or spaces, so a 16 MB write is legal. The client
+  reads defensively since the audit; the rules that would bound the data are
+  written out in `docs/audit-2026-09-03.md` and wait on a deploy and an
+  emulator test, which the audit's sandbox could not run.
+- Rooms are never deleted and cannot be (no `.write` on `rooms/$code`).
+  About 28 kB per finished game; Spark's 1 GB holds decades of them and the
+  10 GB/month download quota binds first. The rule and client hook for a
+  creator-side sweep are in the audit doc.
+- `npm audit` reports 8 moderate advisories, all under the `firebase-tools`
+  dev dependency, none reachable from the bundle, none cleared by 15.29.0.
+  Re-check on each `firebase-tools` bump; do not run `npm audit fix --force`,
+  which downgrades it a major.
+- CI runs on push to `main` only, so it gates the deploy and not the merge, and
+  the actions are on floating major tags with no Dependabot. Both are fine for
+  one author pushing to main and worth revisiting when a second appears.
 - `oxlint` reports 7 warnings, all `react(only-export-components)` fast-refresh
   hints plus two pre-existing `RoomScreen` warnings. Zero errors.
 - ShareInvite clipboard try/catch; rejection-shake remounts the tableau;
@@ -2085,6 +2119,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `404cafd` | A desktop animates whatever the OS says; Dash everywhere on screen |
 | `21aceac` | The code says dash too: keys, types, CSS, tests |
 | `aa4ec3e` | The emulator project and the borrowed game name follow |
+| `audit` | Security and performance audit: the ghost off the render path, memoised cards, defensive reads, one-field wood writes, self-hosted fonts, least-privilege CI |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.

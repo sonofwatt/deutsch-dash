@@ -1,4 +1,21 @@
 import { useCallback, useState } from 'react';
+import { isBadgeId, type BadgeId } from '../game/badges';
+
+/**
+ * The badge this phone used last time, if it is still one that exists. Whatever
+ * is in localStorage was cast straight to a BadgeId before, and a retired or
+ * hand-edited value went out with the join and came back to every client in the
+ * room as a badge nobody could draw.
+ */
+export function readSavedBadge(): BadgeId | null {
+  if (typeof localStorage === 'undefined') return null;
+  try {
+    const v = localStorage.getItem('bz.badge');
+    return isBadgeId(v) ? v : null;
+  } catch {
+    return null;
+  }
+}
 
 export type WoodSide = 'left' | 'right';
 const KEY = 'bz.woodSide';

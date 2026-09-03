@@ -348,6 +348,11 @@
     transform: translate(-50%, -50%) rotate(var(--a)) translateX(var(--d))
                rotate(calc(-1 * var(--a))); }
   [data-platform] .faller { animation: none; opacity: .9; top: 16vh; }
+  /* The fireworks were missed when this block was written: 705 flying, flickering
+     elements on a phone that had asked for stillness. Gone entirely rather than
+     parked - a still firework is a smear of dots, and the glitter above already
+     carries the celebration. */
+  [data-platform] .shell b, [data-platform] .shell i { animation: none; opacity: 0; }
 }
 
 /* The build, at the foot of the home and lobby screens. Deliberately the

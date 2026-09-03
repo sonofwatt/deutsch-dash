@@ -7,13 +7,31 @@ import type { BadgeId } from '../game/badges';
 import { botId, type BotLevel } from '../game/bot';
 import type { PlayerInfo, Room, RoomMeta, RoundState } from '../game/types';
 import { normalizeSpaces, normalizeTableau } from '../game/center';
-import { postCountForPlayers, spaceCountForPlayers } from '../game/rules';
+import { MAX_SPACES, postCountForPlayers, spaceCountForPlayers } from '../game/rules';
 import { normalizeStats } from '../game/stats';
 
 export const ROOM_TTL_MS = 24 * 60 * 60 * 1000;
 // Mirrored in database.rules.json's rooms/$code/meta/playerCount .validate
 // rule (the literal 8 there) - keep the two in sync.
 export const MAX_PLAYERS = 8;
+/** The join forms cap a name here; normalizeRoom holds every name to it too. */
+export const MAX_NAME_LENGTH = 14;
+/** The most posts a hand can hold: five at two players (postCountForPlayers). */
+const MAX_POSTS = 5;
+
+/**
+ * Defensive reads of a room, for the same reason as isCard in game/center.ts:
+ * every field arrived from some client, and several from any authed client. A
+ * number that is not a number turns totals into NaN, and a count that is not a
+ * count is worse - normalizeSpaces and normalizeTableau build arrays of that
+ * length, so a forged spaceCount of a billion was a RangeError on every client
+ * in the room, on every snapshot, until the round was replaced.
+ */
+const finite = (v: unknown, fallback: number): number =>
+  typeof v === 'number' && Number.isFinite(v) ? v : fallback;
+const count = (v: unknown, lo: number, hi: number): number | undefined =>
+  typeof v === 'number' && Number.isInteger(v) && v >= lo && v <= hi ? v : undefined;
+const record = <T>(v: unknown): T | null => (v && typeof v === 'object' && !Array.isArray(v) ? v as T : null);
 
 export type JoinResult =
   | { ok: true; code: string }
@@ -29,8 +47,14 @@ export function normalizeRoom(raw: unknown): Room | null {
   if (!r.meta || !r.players) return null;
   const players: Record<string, PlayerInfo> = {};
   for (const [uid, p] of Object.entries(r.players)) {
-    players[uid] = { ...p, stuckAt: p.stuckAt ?? null, awayAt: p.awayAt ?? null,
-                     connected: p.connected ?? false, score: p.score ?? 0 };
+    if (!p || typeof p !== 'object') continue;
+    players[uid] = {
+      ...p,
+      name: typeof p.name === 'string' ? p.name.slice(0, MAX_NAME_LENGTH) : '',
+      joinedAt: finite(p.joinedAt, 0),
+      stuckAt: p.stuckAt ?? null, awayAt: p.awayAt ?? null,
+      connected: p.connected === true, score: finite(p.score, 0),
+    };
   }
   // Both of these default ON rather than off, which is the opposite of every
   // other host option here. They are what the table wants by default - flinging
@@ -43,6 +67,9 @@ export function normalizeRoom(raw: unknown): Room | null {
     creatorId: r.meta.creatorId ?? r.meta.hostId,
     flingOn: r.meta.flingOn ?? true,
     paleCards: r.meta.paleCards ?? true,
+    targetScore: finite(r.meta.targetScore, 75),
+    roundNumber: finite(r.meta.roundNumber, 0),
+    countdown: typeof r.meta.countdown === 'number' && Number.isFinite(r.meta.countdown) ? r.meta.countdown : null,
   };
   const playerCount = Object.keys(players).length;
   const orderly = meta.orderlyGrid ?? false;
@@ -53,25 +80,29 @@ export function normalizeRoom(raw: unknown): Room | null {
     // Deriving it from the live player count renormalized every hand the moment
     // somebody walked in - five posts to three at a two-player table, which drops
     // cards off the end of everybody's tableau.
-    const postCount = rr.postCount ?? postCountForPlayers(playerCount);
+    // Both counts are held to what a real deal can produce before anything
+    // allocates on them - see `count` above for what a forged one did.
+    const spaceCount = count(rr.spaceCount, 1, MAX_SPACES);
+    const postCount = count(rr.postCount, 1, MAX_POSTS);
+    const tableaus = record<Record<string, unknown>>(rr.tableaus) ?? {};
     round = {
       // The size this round was dealt with, not the size the room implies now: a
       // spectator arriving mid-round must not grow the board under everybody.
       spaces: normalizeSpaces(
-        rr.spaces, rr.spaceCount ?? spaceCountForPlayers(playerCount, orderly), orderly),
+        rr.spaces, spaceCount ?? spaceCountForPlayers(playerCount, orderly), orderly),
       tableaus: Object.fromEntries(
-        Object.entries(rr.tableaus ?? {}).map(([uid, t]) => [uid, normalizeTableau(t, postCount)]),
+        Object.entries(tableaus).map(([uid, t]) => [uid, normalizeTableau(t, postCount ?? postCountForPlayers(playerCount))]),
       ),
-      dashedBy: rr.dashedBy ?? null,
-      scores: rr.scores ?? null,
-      races: rr.races ?? null,
-      duels: rr.duels ?? null,
-      spaceCount: rr.spaceCount,
-      postCount: rr.postCount,
-      seats: rr.seats,
-      stuckRounds: rr.stuckRounds ?? 0,
-      startedAt: rr.startedAt ?? 0,
-      endedAt: rr.endedAt ?? null,
+      dashedBy: typeof rr.dashedBy === 'string' ? rr.dashedBy : null,
+      scores: record(rr.scores),
+      races: record(rr.races),
+      duels: record(rr.duels),
+      spaceCount,
+      postCount,
+      seats: Array.isArray(rr.seats) ? rr.seats.filter((s): s is string => typeof s === 'string') : undefined,
+      stuckRounds: finite(rr.stuckRounds, 0),
+      startedAt: finite(rr.startedAt, 0),
+      endedAt: typeof rr.endedAt === 'number' ? rr.endedAt : null,
     };
   }
   return { meta, players, round, stats: normalizeStats(r.stats) };

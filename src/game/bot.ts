@@ -122,6 +122,16 @@ export function botDelay(level: BotLevel, rng: Rng = Math.random): number {
   return Math.round(p.minDelay + rng() * (p.maxDelay - p.minDelay));
 }
 
+/**
+ * The level a bot record actually carries, held to the table. botLevel is written
+ * by the host's client and read by `BOT_PROFILES[level]`, which on an unknown
+ * value is undefined and throws from inside the snapshot handler - on the host,
+ * which is the one client that drives the bots and commits the scores.
+ */
+export function botLevelOf(v: unknown): BotLevel {
+  return typeof v === 'string' && Object.hasOwn(BOT_PROFILES, v) ? v as BotLevel : 'medium';
+}
+
 /** Deterministic, readable, and collision-free because badges are unique in a room. */
 export function botId(badgeId: string): string { return `bot_${badgeId}`; }
 export function isBotId(uid: string): boolean { return uid.startsWith('bot_'); }

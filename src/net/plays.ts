@@ -147,6 +147,23 @@ export function persistTableau(code: string, uid: string, t: Tableau): Promise<v
   return set(r(code, `round/tableaus/${uid}`), t);
 }
 
+/**
+ * A wood turn changes exactly one field of the hand, so it writes exactly one.
+ *
+ * It used to go through persistTableau: about 2 KB of cards - every one carrying
+ * a 28-character owner id - to move an integer, fanned out to every client in
+ * the room, on the most frequent action in the game (turning wood is what a
+ * player does whenever nothing is playable). At eight players that was roughly
+ * half of a round's download. The readers do not care: normalizeTableau reads
+ * woodIndex on its own, and reconcileTableau only ever adjusts it.
+ *
+ * Every OTHER wood mutation (playing the face-up card, sinking it, the table-wide
+ * rotation) changes the array as well and keeps the full write.
+ */
+export function persistWoodIndex(code: string, uid: string, woodIndex: number): Promise<void> {
+  return update(r(code, `round/tableaus/${uid}`), { woodIndex });
+}
+
 export function declareStuck(code: string, uid: string): Promise<void> {
   return set(r(code, `players/${uid}/stuckAt`), serverTimestamp());
 }

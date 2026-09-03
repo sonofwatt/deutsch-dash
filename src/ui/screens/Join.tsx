@@ -4,6 +4,7 @@ import { peekRoom } from '../../net/rooms';
 import { ensureSignedIn } from '../../net/firebase';
 import { BadgePicker } from '../components/BadgePicker';
 import { JOIN_REASONS } from '../joinReasons';
+import { readSavedBadge } from '../prefs';
 import type { BadgeId } from '../../game/badges';
 
 export function Join({ code }: { code: string }) {
@@ -11,7 +12,7 @@ export function Join({ code }: { code: string }) {
   const joinPhase = useGameStore(s => s.joinPhase);
   const joinError = useGameStore(s => s.joinError);
   const [name, setName] = useState(localStorage.getItem('bz.name') ?? '');
-  const [badge, setBadge] = useState<BadgeId | null>(localStorage.getItem('bz.badge') as BadgeId | null);
+  const [badge, setBadge] = useState<BadgeId | null>(readSavedBadge);
   const [taken, setTaken] = useState<BadgeId[]>([]);
   const [resuming, setResuming] = useState(false);
   const [resumeFailed, setResumeFailed] = useState(false);

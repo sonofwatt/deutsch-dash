@@ -5,6 +5,7 @@ import { Home } from './ui/screens/Home';
 import { RoomScreen } from './ui/screens/RoomScreen';
 import { Keeper } from './ui/screens/Keeper';
 import { ThemeToggle } from './ui/components/ThemeToggle';
+import { CrashGuard } from './ui/components/CrashGuard';
 import { configMissing } from './net/firebase';
 import { gameStore, useGameStore } from './state/store';
 import './theme.css';
@@ -50,7 +51,7 @@ export default function App() {
   if (route.screen === 'keeper') {
     return (
       <MotionConfig reducedMotion={motion}>
-        <Keeper />
+        <CrashGuard><Keeper /></CrashGuard>
         <span className="corner-btns"><ThemeToggle /></span>
       </MotionConfig>
     );
@@ -68,7 +69,7 @@ export default function App() {
   }
   return (
     <MotionConfig reducedMotion={motion}>
-      {route.screen === 'room' ? <RoomScreen code={route.code} /> : <Home />}
+      <CrashGuard>{route.screen === 'room' ? <RoomScreen code={route.code} /> : <Home />}</CrashGuard>
       {!boardUp && <span className="corner-btns"><ThemeToggle /></span>}
     </MotionConfig>
   );

@@ -6,12 +6,12 @@ import { canBuildOnPost, canPlayToSpace, isStuck, placeOnPost, sourceTop, takeCa
 import { flipWood, rotateWood, sinkWoodTop, WOOD_STEP } from '../game/wood';
 import { reconcileTableau } from '../game/center';
 import { buildDeck, deal, shuffle } from '../game/deck';
-import { botDelay, chooseBotAction, type BotLevel } from '../game/bot';
+import { botDelay, botLevelOf, chooseBotAction, type BotLevel } from '../game/bot';
 import * as netRooms from '../net/rooms';
 import * as netPlays from '../net/plays';
 import type { PlayResult } from '../net/plays';
 import { pickNextHost, allConnectedStuck } from '../net/plays';
-import { reconnect, watchConnected } from '../net/firebase';
+import { ensureSignedIn, reconnect, watchConnected } from '../net/firebase';
 import type { JoinResult } from '../net/rooms';
 
 // How long the host may stay disconnected in the watchdog below before a stand-in claims
@@ -62,6 +62,8 @@ export interface Deps {
   playToCenter(code: string, space: number, card: Card): Promise<PlayResult>;
   reportRace(code: string, space: number, loser: string, winner: string | null): Promise<void>;
   persistTableau(code: string, uid: string, t: Tableau): Promise<void>;
+  /** A wood turn: one field of the hand, not the whole hand. See plays.ts. */
+  persistWoodIndex(code: string, uid: string, woodIndex: number): Promise<void>;
   declareStuck(code: string, uid: string): Promise<void>;
   clearStuck(code: string, uid: string): Promise<void>;
   markAway(code: string, uid: string): Promise<void>;
@@ -232,6 +234,15 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
   // NOW - never when they took it. `reported` makes one near miss one race, so
   // somebody jabbing at a space that has just filled reports it once.
   const spaceTouched = new Map<number, { at: number; by: string; reported: boolean }>();
+  /**
+   * Which join or create is the current one. joinRoom starts presence and then
+   * resolves; if the player tapped Home in between, leave() has already run and
+   * the resolution must not subscribe to the room again behind the home screen -
+   * that left a listener downloading every delta of a game the player was no
+   * longer in, and a presence flag saying they were. A newer attempt supersedes
+   * an older one for the same reason.
+   */
+  let joinAttempt = 0;
 
   const store = createStore<GameStore>((set, get) => {
 
@@ -239,6 +250,9 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
       const { code, uid } = get();
       if (code && uid) await deps.persistTableau(code, uid, t);
     }
+
+    /** True once a newer join has started or the player has left. See joinAttempt. */
+    const stale = (attempt: number) => attempt !== joinAttempt || get().joinPhase !== 'joining';
 
     /**
      * Declare or withdraw a player's stuck claim to match the board. Replaces the
@@ -432,7 +446,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
       if (!isHost(s0)) return; // exactly one client drives the bots: whoever is host
       const p = room.players[id];
       if (!p?.isBot) return;
-      const level: BotLevel = p.botLevel ?? 'medium';
+      const level: BotLevel = botLevelOf(p.botLevel);
 
       let t = get().botTableaus[id];
       if (!t) {
@@ -454,9 +468,15 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
       };
 
       if (action.kind === 'flip') {
+        // Declared stuck means the whole cycle has been proven empty (isStuck), so
+        // turning more cards cannot help and only sends the hand round the room
+        // again on every tick - a Genius bot did that twice a second for as long
+        // as the table stayed stalled. The next board change runs syncAllStuck and
+        // withdraws the claim, and the bot picks up from there.
+        if (p.stuckAt != null) return;
         const next = flipWood(t);
         setBotTableau(id, next);
-        void deps.persistTableau(code, id, next);
+        void deps.persistWoodIndex(code, id, next.woodIndex);
         flips.set(id, (flips.get(id) ?? 0) + 1);
         syncStuck(id, next);
         return;
@@ -490,7 +510,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
           const s = get();
           const p = s.room?.players[id];
           if (p?.isBot && s.online && s.room?.meta.phase === 'playing' && isHost(s)) {
-            scheduleBot(id, p.botLevel ?? 'medium');
+            scheduleBot(id, botLevelOf(p.botLevel));
           }
         });
       };
@@ -503,7 +523,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
       const shouldRun = room.meta.phase === 'playing' && isHost({ uid: s.uid, room }) && s.online;
       if (!shouldRun) { stopBots(); return; }
       for (const [id, p] of Object.entries(room.players)) {
-        if (p.isBot) scheduleBot(id, p.botLevel ?? 'medium');
+        if (p.isBot) scheduleBot(id, botLevelOf(p.botLevel));
       }
     }
 
@@ -546,7 +566,12 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         if (phase === 'playing' && !get().tableau && room.round?.tableaus[me]) {
           const adopted = reconcileTableau(room.round.tableaus[me], room.round.spaces);
           set({ tableau: adopted });
-          void persist(adopted);
+          // Written back only when reconcile took something out - a card whose
+          // centre play landed but whose hand write did not. At a fresh deal it
+          // returns its input by reference, and eight players each echoing the
+          // 2.5 KB hand the host had just written was eight snapshots on every
+          // phone at the moment the board appeared, for nothing.
+          if (adopted !== room.round.tableaus[me]) void persist(adopted);
         }
         if (phase !== 'playing' && get().tableau) set({ tableau: null, selection: null });
         // (2) AI players. Bot hands belong to a single round, exactly like ours.
@@ -687,10 +712,12 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
       // Firebase's get()/update() reject exactly like that, so the wedge was
       // reachable from the most ordinary thing a phone does.
       async hostRoom(name, badgeId) {
+        const attempt = ++joinAttempt;
         set({ joinPhase: 'joining', joinError: null });
         try {
           const uid = await deps.ensureSignedIn();
           const code = await deps.createRoom(name, badgeId);
+          if (stale(attempt)) { deps.stopPresence(); return code; }
           watch(code, uid);
           return code;
         } catch (e) {
@@ -700,10 +727,12 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
       },
 
       async enterRoom(code, name, badgeId) {
+        const attempt = ++joinAttempt;
         set({ joinPhase: 'joining', joinError: null });
         try {
           const uid = await deps.ensureSignedIn();
           const res = await deps.joinRoom(code, name, badgeId);
+          if (stale(attempt)) { if (res.ok) deps.stopPresence(); return res; }
           if (res.ok) watch(code, uid);
           else set({ joinPhase: 'idle', joinError: res.reason });
           return res;
@@ -756,7 +785,10 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
           set({ tableau: next });
           void persist(next);
           flips.set(uid, 0); // progress: the wood cycle counts from here again
-          void deps.clearStuck(code, uid);
+          // Guarded like the bot driver and syncStuck: a player who was never stuck
+          // has nothing to clear, and the write was a round trip for nothing on
+          // every play.
+          if (room?.players[uid]?.stuckAt != null) void deps.clearStuck(code, uid);
           endRescue();
           if (next.dash.length === 0) void deps.announceDash(code, uid);
           return;
@@ -793,7 +825,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         }
         void persist(taken.next);
         flips.set(uid, 0);
-        void deps.clearStuck(code, uid);
+        if (get().room?.players[uid]?.stuckAt != null) void deps.clearStuck(code, uid);
         endRescue();
         if (taken.next.dash.length === 0) void deps.announceDash(code, uid);
       },
@@ -828,7 +860,9 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         noteActivity();
         const next = flipWood(t, woodStep(get().room));
         set({ tableau: next, selection: null });
-        void persist(next);
+        // The index alone: see persistWoodIndex for what the full write cost.
+        const code = get().code;
+        if (code) void deps.persistWoodIndex(code, uid, next.woodIndex);
         flips.set(uid, (flips.get(uid) ?? 0) + 1);
         syncStuck(uid, next); // one more flip may be the one that proves it
       },
@@ -949,7 +983,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         // other screen colours this player's cards, so it cannot move under a
         // hand that has already been dealt.
         if (room!.meta.phase !== 'lobby' || me.ready) return;
-        const trimmed = name.trim().slice(0, 14) || me.name;
+        const trimmed = name.trim().slice(0, netRooms.MAX_NAME_LENGTH) || me.name;
         if (trimmed === me.name && badgeId === me.badgeId) return;
         hostAction(deps.setIdentity(code, uid, trimmed, badgeId, me.badgeId),
           badgeId === me.badgeId ? 'change your name' : 'change your badge');
@@ -979,7 +1013,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
 }
 
 const realDeps: Deps = {
-  ensureSignedIn: () => import('../net/firebase').then(m => m.ensureSignedIn()),
+  ensureSignedIn,
   watchRoom: netRooms.watchRoom,
   joinRoom: netRooms.joinRoom,
   createRoom: netRooms.createRoom,
@@ -997,6 +1031,7 @@ const realDeps: Deps = {
   playToCenter: netPlays.playToCenter,
   reportRace: netPlays.reportRace,
   persistTableau: netPlays.persistTableau,
+  persistWoodIndex: netPlays.persistWoodIndex,
   declareStuck: netPlays.declareStuck,
   clearStuck: netPlays.clearStuck,
   markAway: netPlays.markAway,

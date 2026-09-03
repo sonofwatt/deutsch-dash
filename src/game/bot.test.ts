@@ -148,3 +148,15 @@ describe('the difficulty ladder', () => {
     expect(action).toEqual({ kind: 'center', source: { kind: 'dash' }, space: 0 });
   });
 });
+
+describe('botLevelOf', () => {
+  it('drives at medium when the record carries a level that does not exist', async () => {
+    // BOT_PROFILES[level] on an unknown value is undefined and throws from inside
+    // the snapshot handler, on the host - the one client that drives the bots.
+    const { botLevelOf } = await import('./bot');
+    expect(botLevelOf('genius')).toBe('genius');
+    expect(botLevelOf('impossible')).toBe('medium');
+    expect(botLevelOf('hasOwnProperty')).toBe('medium');
+    expect(botLevelOf(undefined)).toBe('medium');
+  });
+});
