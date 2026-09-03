@@ -10,8 +10,13 @@ suite. A commit sitting unpushed has already invalidated one playtest - what
 people are playing is whatever last reached Pages - so check `git status -sb`
 before trusting what a table reports._
 
-_**431 tests** (383 unit and 24 in a real browser, green; 24 against the
-emulator, green on CI). This is the only place in the repo that quotes a count -
+_**The audit commits of 2026-09-03 changed `database.rules.json`** (type, enum
+and range bounds on every field a client writes). Until `npx firebase deploy
+--only database` has been run, the live database is on the older rules, which
+is exactly the trap "Editing `database.rules.json` is half the job" describes._
+
+_**441 tests** (383 unit and 24 in a real browser; 34 against the emulator, all
+green). This is the only place in the repo that quotes a count -
 it drifted three separate ways when it lived in four places, so keep it here and
 nowhere else._
 
@@ -160,6 +165,19 @@ skipped deploy makes race flashes and rivalry commentary silently vanish.
   player while wedging the counter at 8.
 - `MAX_PLAYERS = 8` in `src/net/rooms.ts` is mirrored as a bare literal `8` in
   `database.rules.json`. Change both or client and server disagree.
+- **In a sandbox whose egress policy blocks the CLI's rules upload** (the
+  database emulator loads rules through a call to `firebase-public.firebaseio.com`
+  that some proxies refuse, and the CLI then reports "Unable to parse JSON"),
+  the suite still runs: start the auth emulator with
+  `firebase emulators:start --only auth --project demo-dash`, the database jar
+  directly with `java -jar ~/.cache/firebase/emulators/firebase-database-emulator-*.jar
+  --host 127.0.0.1 --port 9000 --functions_emulator_host 127.0.0.1
+  --functions_emulator_port 5001`, PUT the rules file to
+  `http://127.0.0.1:9000/.settings/rules.json?ns=demo-dash-default-rtdb` with
+  `Authorization: Bearer owner`, and run `EMULATOR=1 npx vitest run`. **Wipe
+  every namespace between runs** (`DELETE /.json?ns=<each>`): the jar keeps data,
+  and a re-seeded `playerCount` of 1 over a stored 8 is refused by the
+  non-decreasing rule, which looks exactly like a rules regression and is not.
 - **RTDB does not run validate rules on a delete.** That is what lets a player
   release a claimed badge with no rules change (see the lobby identity editor).
 - **`players/$uid` no longer has a `.validate`.** It used to gate a brand-new
@@ -202,12 +220,24 @@ Locally, `npm test` skipping the rules tests is fine and intended - but run
 ### Trust model
 
 **Knowing the room code is the credential.** Room `.read` and the writes to
-`round/spaces`, `dashedBy`, `scores` and `stuckRounds` are gated only on
-`auth != null`, and anonymous tokens can be minted straight from the Firebase
+`round/spaces`, `dashedBy`, `races`, `duels` and `stuckRounds` are gated only
+on `auth != null`, and anonymous tokens can be minted straight from the Firebase
 REST API. Only `players/$uid` and `round/tableaus/$uid` are genuinely bound to a
 uid. `endRoundStalled` and `incrementStuckRounds` are host-by-convention and
 explicitly not enforced. See the README's security section for why this is
 deliberate.
+
+**Since the audit the rules bound WHAT is written as well as who writes it**:
+a badge id is a badge, the phase is a phase, every number is a number in range,
+a card is a card and a hand holds only its owner's cards, and `round/scores` and
+`round/startedAt` are the host's (nothing else ever wrote them, and a pre-written
+`scores` node silently stopped the host's commit for the rest of the game). Two
+things the rules still do not do, and the client covers instead: a client can
+write its own `players/$uid` record without the `playerCount` bump, so the
+8-seat cap holds only for the app's own join path; and nothing bounds the SIZE
+of a write. Both are in `docs/audit-2026-09-03.md` with the rule text, and wait
+on a production probe because the emulator evaluates ancestor validates and
+cross-path reads of a multi-path write in ways production is not documented to.
 
 ### State and host continuity
 
@@ -2020,11 +2050,13 @@ the ledgered pointer-capture re-select check on mouse drags.
   measured at 8.5 kB minified, not worth a loading state. Firebase is 229 kB of
   the vendor chunk and cannot leave the home screen without dismantling the
   module-scope store singleton.
-- `database.rules.json` bounds WHO may write each path and not WHAT: no
-  `.validate` on names, tableaus or spaces, so a 16 MB write is legal. The client
-  reads defensively since the audit; the rules that would bound the data are
-  written out in `docs/audit-2026-09-03.md` and wait on a deploy and an
-  emulator test, which the audit's sandbox could not run.
+- `database.rules.json` bounds types, enums and ranges on every leaf since the
+  audit, but not the SIZE of a write (no `$other: false`, no `hasChildren` on
+  containers) and not the shape of a bare `players/$uid` write against the seat
+  counter. That structural tier is `docs/database.rules.proposed.json`, explained
+  in `docs/audit-2026-09-03.md`, and waits on a production probe of two rule
+  semantics the emulator alone cannot prove. The client reads defensively either
+  way.
 - Rooms are never deleted and cannot be (no `.write` on `rooms/$code`).
   About 28 kB per finished game; Spark's 1 GB holds decades of them and the
   10 GB/month download quota binds first. The rule and client hook for a
@@ -2119,7 +2151,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `404cafd` | A desktop animates whatever the OS says; Dash everywhere on screen |
 | `21aceac` | The code says dash too: keys, types, CSS, tests |
 | `aa4ec3e` | The emulator project and the borrowed game name follow |
-| `dc78867` | Security and performance audit: the ghost off the render path, memoised cards, defensive reads, one-field wood writes, self-hosted fonts, least-privilege CI |
+| `dc78867` → `368f718` | Security and performance audit: the ghost off the render path, memoised cards, defensive reads, one-field wood writes, self-hosted fonts, least-privilege CI |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
