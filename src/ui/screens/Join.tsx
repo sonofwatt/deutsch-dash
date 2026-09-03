@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useGameStore } from '../../state/store';
-import { peekRoom } from '../../net/rooms';
+import { MAX_NAME_LENGTH, peekRoom } from '../../net/rooms';
 import { ensureSignedIn } from '../../net/firebase';
 import { BadgePicker } from '../components/BadgePicker';
 import { JOIN_REASONS } from '../joinReasons';
@@ -11,7 +11,7 @@ export function Join({ code }: { code: string }) {
   const enterRoom = useGameStore(s => s.enterRoom);
   const joinPhase = useGameStore(s => s.joinPhase);
   const joinError = useGameStore(s => s.joinError);
-  const [name, setName] = useState(localStorage.getItem('bz.name') ?? '');
+  const [name, setName] = useState((localStorage.getItem('bz.name') ?? '').slice(0, MAX_NAME_LENGTH));
   const [badge, setBadge] = useState<BadgeId | null>(readSavedBadge);
   const [taken, setTaken] = useState<BadgeId[]>([]);
   const [resuming, setResuming] = useState(false);

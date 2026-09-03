@@ -4,6 +4,7 @@ import { BadgePicker } from '../components/BadgePicker';
 import { JOIN_REASONS } from '../joinReasons';
 import { APP_VERSION } from '../../version';
 import { readSavedBadge } from '../prefs';
+import { MAX_NAME_LENGTH } from '../../net/rooms';
 import type { BadgeId } from '../../game/badges';
 
 export function Home() {
@@ -11,7 +12,7 @@ export function Home() {
   const enterRoom = useGameStore(s => s.enterRoom);
   const joinPhase = useGameStore(s => s.joinPhase);
   const joinError = useGameStore(s => s.joinError);
-  const [name, setName] = useState(localStorage.getItem('bz.name') ?? '');
+  const [name, setName] = useState((localStorage.getItem('bz.name') ?? '').slice(0, MAX_NAME_LENGTH));
   const [badge, setBadge] = useState<BadgeId | null>(readSavedBadge);
   const [code, setCode] = useState('');
   const ready = name.trim().length > 0 && badge != null;

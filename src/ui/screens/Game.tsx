@@ -15,7 +15,7 @@ import { aimedAt, nearestSpace, spaceCentres, useDrag, type DropTarget, type Poi
 import { raceFlashes } from '../raceFlash';
 import { useOpenings } from '../openings';
 import { useWoodSide } from '../prefs';
-import type { CenterSpace, PlaySource } from '../../game/types';
+import type { CenterSpace, PlayerInfo, PlaySource } from '../../game/types';
 import '../game.css';
 
 // Module-level so its identity is stable. useOpenings compares `spaces` by
@@ -118,8 +118,11 @@ export function Game() {
   }, [hintsOn, activity]);
 
   const round = room.round;
-  const me = room.players[uid];
-  const badgeOf = (owner: string): BadgeId => room.players[owner]?.badgeId ?? me.badgeId;
+  // Possibly absent: the host may delete any player record (the lobby's Remove
+  // does it for bots), and the record is what every line below reads. The early
+  // return that handles that is below the hooks, where React lets it be.
+  const me: PlayerInfo | undefined = room.players[uid];
+  const badgeOf = (owner: string): BadgeId => room.players[owner]?.badgeId ?? me?.badgeId ?? 'star';
 
   // Unconditional and above every early return, like every other hook on this
   // screen - sitting out makes those returns reachable mid-round.
@@ -169,6 +172,15 @@ export function Game() {
   // used to sit lower on the reasoning that a round either has a board for its
   // whole life or never does, which sitting out is exactly the end of.
   const openings = useOpenings(round?.spaces ?? NO_SPACES, hand, uid, hintsOn);
+  if (!me) {
+    return (
+      <div className="screen stack">
+        <h1 className="title">Not at this table</h1>
+        <p className="muted">Your seat in this room is gone. You can join again from the room link, or go home.</p>
+        <a className="muted keep-back" href="#/">Home</a>
+      </div>
+    );
+  }
   if (!round) return <div className="screen"><p className="muted">dealing…</p></div>;
   // Two ways to be off the board, and they end differently. Sitting out KEEPS the
   // hand, so returning drops straight back into the round in progress. Having no
