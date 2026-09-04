@@ -2270,6 +2270,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `aa4ec3e` | The emulator project and the borrowed game name follow |
 | `dc78867` → `e3c6676` | Security and performance audit: the ghost off the render path, memoised cards, defensive reads, one-field wood writes, self-hosted fonts, least-privilege CI |
 | `cecb628` → `0b29024` | The audit's analysis finished by hand after the limit: the verdict ledger, the seventh reader, and the four small gaps it found closed (late-play rollback, write-once createdAt, an absent host recovered, a CSPRNG room code) |
+| `b150224` → `31df523` | Where the multiplayer latency actually goes: a centre play is invisible to the player who made it for a round trip and silently drops their next one, entry costs four serialized round trips on the resume path, and the database is already in the right region because every player is Eastern |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
