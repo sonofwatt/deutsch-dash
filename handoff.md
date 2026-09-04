@@ -2093,7 +2093,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `404cafd` | A desktop animates whatever the OS says; Dash everywhere on screen |
 | `21aceac` | The code says dash too: keys, types, CSS, tests |
 | `aa4ec3e` | The emulator project and the borrowed game name follow |
-| `c73e341` → `PENDING` | The last em dash swept out, and a test so none come back |
+| `c73e341` → `0bdb136` | The last em dash swept out, and a test so none come back |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
