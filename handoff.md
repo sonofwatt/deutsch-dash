@@ -5,7 +5,7 @@ should cost a flag and not a rebuild.
 
 # Project Handoff - Deutsch Dash
 
-_Last updated: 2026-09-03. Working tree clean, CI green including the emulator
+_Last updated: 2026-09-04. Working tree clean, CI green including the emulator
 suite. A commit sitting unpushed has already invalidated one playtest - what
 people are playing is whatever last reached Pages - so check `git status -sb`
 before trusting what a table reports._
@@ -2061,6 +2061,29 @@ the ledgered pointer-capture re-select check on mouse drags.
   About 28 kB per finished game; Spark's 1 GB holds decades of them and the
   10 GB/month download quota binds first. The rule and client hook for a
   creator-side sweep are in the audit doc.
+- One anonymous uid is assumed to be one client. Auth persistence is shared
+  across same-origin tabs, so a player with the game open twice writes
+  `connected: false` for themselves when either tab closes (presence re-asserts
+  only on a connection transition), and two host tabs both drive the bots and
+  both tick the countdown. Self-inflicted, and the spec's multi-tab playtest is
+  where it shows. A per-tab presence child or a `BroadcastChannel` leader
+  election is the fix when wanted.
+- A stranger holding the code can still delete `meta/hostId`: a validate never
+  runs on a delete. The creator's client reclaims on its next snapshot; with the
+  creator gone the stand-in watchdog does nothing, because it keys on a host
+  record that is disconnected rather than absent. The structural tier closes the
+  write and a watchdog change closes the consequence (audit doc, seventh reader).
+- `joinRoom`'s expiry check is the one cross-device clock comparison left in the
+  app (see "Two phones do not agree on the time"), it runs before the rejoin
+  branch, and `createdAt` is writable by anyone with the code until a write-once
+  validate ships. Fix pending; the audit doc's seventh-reader section has it.
+- The optimistic centre play rolls back to the hand as it was before the
+  transaction, not as it is, and persists the pre-await hand on a win. Fix
+  pending, same section; the store test that pins the old rollback changes with
+  it.
+- Long-session memory has never been measured. The store's maps are bounded by
+  inspection; the heap after ten rounds of remounting the board is a number
+  nobody has.
 - `npm audit` reports 8 moderate advisories, all under the `firebase-tools`
   dev dependency, none reachable from the bundle, none cleared by 15.29.0.
   Re-check on each `firebase-tools` bump; do not run `npm audit fix --force`,

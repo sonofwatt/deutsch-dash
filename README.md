@@ -87,6 +87,17 @@ player-chosen display names and card positions - no emails, no payment details.
 On the free Spark plan there is no billing exposure: exhausting quota stops the
 database rather than generating a charge. That changes if you upgrade to Blaze.
 
+Two paths cost the attacker nothing and the rules cannot touch, because rules
+neither rate-limit reads nor count connections. Probing room codes never finds a
+specific room in useful time (above), but every miss is a download that is
+accounted with its protocol overhead, and one machine probing steadily spends the
+Spark plan's 10 GB a month within about a day; the database then refuses every
+room until the month turns. And Spark allows 100 simultaneous connections,
+counted when a socket opens and before any token is presented, so 100 idle
+sockets keep every real client reconnecting for as long as they are held. Both
+degrade the service for everyone rather than costing money, and App Check (below)
+is the only control that reaches either.
+
 **Mitigations, in order of value:**
 
 1. Enable automatic clean-up of anonymous accounts (setup step 7). It deletes
@@ -106,10 +117,11 @@ produce before anything allocates on them. The rules bound the same things at
 the door (see above), so a hostile write is refused and, for the ones already
 stored, drawn harmlessly.
 
-**No third parties.** The page talks to Firebase and nothing else. The Outfit
-font is served from this site (`public/fonts`, SIL Open Font License) rather than
-from Google, so loading the game discloses a player's address to nobody but the
-game's own database.
+**One origin besides the database.** The page talks to Firebase and nothing
+else. The Outfit font is served from this site (`public/fonts`, SIL Open Font
+License) rather than from Google Fonts, so the first paint waits on no
+cross-origin stylesheet and no second service sees a player's address. Firebase
+is Google's too, so this is one service fewer, not anonymity.
 
 **Do not** apply the common advice to reject anonymous users in rules
 (`sign_in_provider != 'anonymous'`). Every player here is anonymous by design;
