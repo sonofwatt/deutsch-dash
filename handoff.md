@@ -5,7 +5,7 @@ should cost a flag and not a rebuild.
 
 # Project Handoff - Deutsch Dash
 
-_Last updated: 2026-09-02. Working tree clean, CI green including the emulator
+_Last updated: 2026-09-04. Working tree clean, CI green including the emulator
 suite. A commit sitting unpushed has already invalidated one playtest - what
 people are playing is whatever last reached Pages - so check `git status -sb`
 before trusting what a table reports._
@@ -508,11 +508,14 @@ landed - it fails if the app's databaseURL and the namespace the rules load into
 ever part company again, so `npm run test:emu` is the check, not reading the
 diff.
 
-**The game this one descends from is no longer named in the repo.** It was in the
-README's opening line, the scorepad's two doc comments and `rankMove`'s
-reasoning; each now says what it meant without the borrowed name. The one
-survivor is the FAQ link under the deferred post-pile move, where the URL is the
-citation and changing it would break the evidence.
+**The game this one descends from is no longer named in the working repo.** It
+was in the README's opening line, the scorepad's two doc comments and
+`rankMove`'s reasoning; each now says what it meant without the borrowed name.
+Two survivors, both deliberate: the FAQ link under the deferred post-pile move,
+where the URL is the citation and changing it would break the evidence, and the
+`docs/superpowers/` ledger, filenames included, which is the frozen record of
+what was planned under that name. A grep will find them; neither is vocabulary
+the app uses.
 
 **The History table says Dash throughout as well**, including the three rows for
 commits that shipped under the old name. The table is an index of what the work
@@ -928,15 +931,14 @@ never be behind it.**
   rig that says what differs and why, and any verdict the pending rule decided
   carries a second `pending` tag beside `played`.
 
-**Pending right now: the sweep is the LAST resort on the bench, and the third
-rule in the game.** Asked for on 2026-08-31: a slot swept at the start of a flick
-is the oldest thing the gesture knows, and the flick carried on past it, so
-anything the END of the throw has to say - where it stopped, what it stopped near,
-where it was pointing - outranks it. On the bench the order is stop point, near
-radius, cone, then sweep. In `useDrag.ts` the sweep still sits at 3, ahead of the
-cone, and the four-rule list above describes THAT, which is the shipped order
-until this is judged. Shipping it is a matter of moving one block below the cone
-block in `aimedAt` and swapping the two rules in that list.
+**Nothing is pending: the sweep order is the only rule to have been through the
+gate.** Asked for on 2026-08-31: a slot swept at the start of a flick is the
+oldest thing the gesture knows, and the flick carried on past it, so anything the
+END of the throw has to say - where it stopped, what it stopped near, where it
+was pointing - outranks it. It sat on the bench alone for a day and shipped in
+`e9bf58c` on 2026-09-01, once a thumb had agreed. Bench and game now run the same
+order: stop point, near radius, cone, then sweep, which is the four-rule list
+above.
 - Tuning a number both already share - the near radius, the cone, the speed
   floor - is not a new rule and does not need the gate. Those move in both at
   once, which is the whole point of the sliders.
