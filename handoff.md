@@ -2317,7 +2317,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `b150224` → `31df523` | Where the multiplayer latency actually goes: a centre play is invisible to the player who made it for a round trip and silently drops their next one, entry costs four serialized round trips on the resume path, and the database is already in the right region because every player is Eastern |
 | `c73e341` → `0bdb136` | The last em dash swept out, and a test so none come back |
 | `75dec4b` | A centre play its own player can see, so the next one is judged on a board that has it; `createRoom` as one atomic write; the rejoin presence write no longer awaited; and no join form offered to somebody already in the room |
-| `PENDING` | The room the join screen already read, threaded into the join, so entry stops downloading it twice |
+| `e4b029d` | The room the join screen already read, threaded into the join, so entry stops downloading it twice |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
