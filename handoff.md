@@ -2050,35 +2050,99 @@ the ledgered pointer-capture re-select check on mouse drags.
   measured at 8.5 kB minified, not worth a loading state. Firebase is 229 kB of
   the vendor chunk and cannot leave the home screen without dismantling the
   module-scope store singleton.
+- **A centre play is invisible to the player who made it for one whole round
+  trip, and it silently drops their next play.** `playToCenter`
+  (`src/net/plays.ts`) passes `{ applyLocally: false }` to `runTransaction`.
+  The SDK files that write as hidden, so it raises no local event. The hand
+  updates optimistically (`src/state/store.ts`, `playTo`), but the centre pile is
+  rendered straight off server state, so for one round trip the card is in
+  neither place. Measured on the wire against the emulator: with the option, the
+  room event fires after the server answers; without it, one millisecond before
+  the put frame goes out. The worse half is not the animation. `playTo` gates the
+  next play on `room.round.spaces[target.space]`, which is stale for that same
+  round trip, so playing a red 3 and then a red 4 onto the same space drops the
+  second one with no card and no scowl. Dropping the option is a one-line fix and
+  the rollback path (`putBack`, `lastRejected`) already exists and already runs.
+  Two things to watch at a table: a refused play will now flash onto the pile and
+  be pulled off rather than never appearing, and on a `datastale` retry a
+  contested space can flicker twice.
 - **The database is in us-central1, and that is a fixed floor under every other
   latency fix.** `databaseURL` is `holland-hustle-default-rtdb.firebaseio.com`,
-  and the bare `.firebaseio.com` domain is the original default instance; a
-  regional one would read `<name>.<region>.firebasedatabase.app`. For European
-  players that is roughly 90 to 110 ms of round trip before any code runs. It
-  does not show up as your own cards feeling slow, because a play is applied
-  optimistically and the acting player never waits on the server: it shows up in
-  how quickly everyone else sees your move, and in how a contested race for a
-  pile resolves, which is the game. An instance cannot be moved and Spark allows
-  only one per project, so changing it means a new Firebase project with its
-  database created in `europe-west1` and a new `src/net/firebaseConfig.ts`. What
-  makes that cheap here is that there is nothing durable to migrate: rooms carry
-  a 24-hour TTL and every identity is anonymous.
-- **Every card in a hand stores a 28-character owner id it does not need.** A
-  card is `{v, suit, owner}` and the owner is an anonymous uid, about 40 of the
-  63 bytes the audit's byte model gives a card. Inside `round/tableaus/$uid`
-  that field is redundant, and `database.rules.json` says so itself
-  (`newData.child('owner').val() === $uid`): the path already names the owner.
-  Dropping it from tableau writes alone, and keeping it on centre cards where
-  scoring counts them per owner, would take a full hand write from about 2.5 kB
-  to about 0.9 kB. The migration is a fallback in `normalizeTableau`
-  (`owner ?? uid`) so a room written by an older client keeps working, plus the
-  `hasChildren` clause in the rules. Not done.
-- The other network items the audit found and left are in
-  `docs/audit-2026-09-03.md` under "Recorded, not fixed": three full room
-  downloads on entry, plays writing the whole hand rather than the changed
-  piles, and the `stuckRounds` reset. The entry one is the clearest pure latency
-  win left, because those three downloads are sequential before the board
-  appears; the others are quota rather than time.
+  and only us-central1 instances are served on the legacy `.firebaseio.com`
+  domain; a regional one reads `<name>.<region>.firebasedatabase.app`. For a
+  European player that is roughly 90 to 110 ms of round trip before any code
+  runs, computed from geography and not measured, because the sandbox cannot
+  reach the host. One round trip per centre play is already optimal: a play
+  cannot reach another player faster than actor to server to other player. An
+  instance's location is fixed at creation, so moving it means a second instance
+  in `europe-west1`, which needs the Blaze plan since Spark allows exactly one
+  per project, or else a whole new project. Nothing durable has to migrate,
+  because rooms carry a 24-hour TTL and every identity is anonymous, but rooms
+  in flight at the cutover strand as `not-found`, and North American players get
+  materially worse: San Francisco goes from about 32 ms to about 124 ms. Nobody
+  has verified where the players actually are. The evidence is the app's name, a
+  latin-ext font subset and an EU privacy comment, not analytics.
+- **Entry costs four serialized round trips on the resume path, which is how
+  this app is usually entered** (reload, phone lock, tab away to send the invite
+  and back). `peekRoom` reads the whole room, then `joinRoom` opens with its own
+  unconditional `get` of the same node, then the listener hashes an empty cache
+  and downloads it a third time. Measured at 47,373 bytes of identical payload
+  for one entry. The SDK keeps nothing between the two gets: `repoGetValue`
+  caches only active queries and drops the sync point on its way out. Two cheap
+  fixes, in order: thread the room `Join.tsx` already holds into `joinRoom` so
+  the second get disappears, and stop awaiting the rejoin branch's
+  `connected: true` write, which `startPresence` makes again two lines later
+  anyway. Scope the first to the resume path only: on the form path the peek can
+  be minutes stale by the time the player taps, and the pre-checks would then
+  report `race` instead of `full` or `badge-taken`. Nothing corrupts either way,
+  because the rules and `increment(1)` enforce the cap for real.
+- **`createRoom`'s two sequential writes are held together by a comment that
+  outlived its rule.** It splits `set(meta)` from `update(players + badges)`
+  because the `players/$uid` validate used to read `meta/phase`. It does not any
+  more: `phase` appears once in `database.rules.json`, as its own validate, and
+  the lobby-only gate went when spectators were admitted mid-game. One atomic
+  multi-path update is rules-legal, because `root` is evaluated against the
+  pre-write tree, and it makes a create that cannot leave meta with no players.
+- **After a successful join the player sees the join form again**, live button
+  and all, for one listen round trip: `RoomScreen` gates on `joinPhase` and
+  `room` together, `watch()` sets `joinPhase` synchronously, and `room` stays
+  null until the first snapshot. A second tap re-runs `enterRoom` and churns the
+  presence writer through the stale-attempt branch. Render the `Rejoining...`
+  placeholder `Join` already has.
+- **Every card in a hand stores a 28-character owner id it does not need**, but
+  the ordering to remove it is a trap. Inside `round/tableaus/$uid` the field is
+  redundant and `database.rules.json` proves it, validating the owner against
+  the path key. Dropping it would roughly halve a 21.7 kB eight-player deal.
+  This is bandwidth, not latency: that deal is about 35 ms of host uplink
+  against the 90 to 110 ms floor, it costs no extra round trip, and the frame
+  split at 16 kB is not a latency mechanism. The trap is that the rules
+  currently REQUIRE `owner`, so a client shipped ahead of a rules deploy has its
+  entire atomic deal refused and the whole table gets no round, which is exactly
+  the failure this file already records from the first iPhone playtest. A
+  client on a cached older bundle renders every dealt hand empty, because
+  `isCard` wants a string owner. The rules deploy, the `normalizeTableau`
+  fallback and re-attaching owner on the play path all have to land before any
+  writer stops sending it. Not for a latency pass.
+- **Two things that are already right, so nobody spends a week on them.** Do not
+  narrow the room listener: `startRound` is one multi-path update at the room
+  root, and a whole-room listener gets it as one consistent callback, where four
+  narrow listeners were probed and split into three frames in different
+  macrotasks. The dangerous tear is the re-deal, where `meta.roundNumber` bumps
+  while `round` still holds the previous round's board, which reads as valid and
+  fires the new-round branch against the wrong spaces. And do not optimise
+  `normalizeRoom`: measured at 0.0148 ms against `snap.val()`'s 0.109 ms, call
+  it 0.5 to 1 ms on a phone against 90 to 110 ms of network. If per-snapshot
+  work ever needs cutting, the order is the render, then `snap.val()`, then
+  `normalizeRoom` last.
+- The remaining network items the audit found and left are in
+  `docs/audit-2026-09-03.md` under "Recorded, not fixed". Two of them were
+  re-measured since and are smaller than they read: `centerPlayTxn` rewriting a
+  whole space is 331 to 366 bytes and no extra round trip, and the `stuckRounds`
+  reset is a 67-byte pipelined put that produces no delta and therefore no
+  fan-out at all. Do not add the obvious client-side guard to that reset: a
+  player who plays inside the round trip before the host's all-stuck increment
+  fans out would skip it and leave the stall counter standing, and three of
+  those end a round that is being actively played.
 - `database.rules.json` bounds types, enums and ranges on every leaf since the
   audit, but not the SIZE of a write (no `$other: false`, no `hasChildren` on
   containers) and not the shape of a bare `players/$uid` write against the seat
