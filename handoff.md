@@ -2486,7 +2486,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `4a10893` | A wood turn brings three across the turn-over, so the pile stops showing the same four cards for ever |
 | `05279d9` | Framer-motion off the entry path: a first load drops from 199 kB gzip to 140, and the animation code comes down with the board |
 | `a025086` | A flick no longer dies on a square it flew over: the square under the finger wins only if the card can go there |
-| `PENDING` | The turn that takes the wood pile over keeps all three of its cards on the flipped pile, and the pile is written with the index |
+| `206765e` | The turn that takes the wood pile over keeps all three of its cards on the flipped pile, and the pile is written with the index |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
