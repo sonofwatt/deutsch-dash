@@ -2366,7 +2366,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `75dec4b` | A centre play its own player can see, so the next one is judged on a board that has it; `createRoom` as one atomic write; the rejoin presence write no longer awaited; and no join form offered to somebody already in the room |
 | `e4b029d` | The room the join screen already read, threaded into the join, so entry stops downloading it twice |
 | `4b05de8` | The bolt that says who dashed, on the sheet that ends the game and on the scorepad's |
-| `PENDING` | A wood turn brings three across the turn-over, so the pile stops showing the same four cards for ever |
+| `4a10893` | A wood turn brings three across the turn-over, so the pile stops showing the same four cards for ever |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
