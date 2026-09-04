@@ -2412,7 +2412,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `e4b029d` | The room the join screen already read, threaded into the join, so entry stops downloading it twice |
 | `4b05de8` | The bolt that says who dashed, on the sheet that ends the game and on the scorepad's |
 | `4a10893` | A wood turn brings three across the turn-over, so the pile stops showing the same four cards for ever |
-| `PENDING` | Framer-motion off the entry path: a first load drops from 199 kB gzip to 140, and the animation code comes down with the board |
+| `05279d9` | Framer-motion off the entry path: a first load drops from 199 kB gzip to 140, and the animation code comes down with the board |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
