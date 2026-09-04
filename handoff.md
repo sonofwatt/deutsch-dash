@@ -2050,6 +2050,35 @@ the ledgered pointer-capture re-select check on mouse drags.
   measured at 8.5 kB minified, not worth a loading state. Firebase is 229 kB of
   the vendor chunk and cannot leave the home screen without dismantling the
   module-scope store singleton.
+- **The database is in us-central1, and that is a fixed floor under every other
+  latency fix.** `databaseURL` is `holland-hustle-default-rtdb.firebaseio.com`,
+  and the bare `.firebaseio.com` domain is the original default instance; a
+  regional one would read `<name>.<region>.firebasedatabase.app`. For European
+  players that is roughly 90 to 110 ms of round trip before any code runs. It
+  does not show up as your own cards feeling slow, because a play is applied
+  optimistically and the acting player never waits on the server: it shows up in
+  how quickly everyone else sees your move, and in how a contested race for a
+  pile resolves, which is the game. An instance cannot be moved and Spark allows
+  only one per project, so changing it means a new Firebase project with its
+  database created in `europe-west1` and a new `src/net/firebaseConfig.ts`. What
+  makes that cheap here is that there is nothing durable to migrate: rooms carry
+  a 24-hour TTL and every identity is anonymous.
+- **Every card in a hand stores a 28-character owner id it does not need.** A
+  card is `{v, suit, owner}` and the owner is an anonymous uid, about 40 of the
+  63 bytes the audit's byte model gives a card. Inside `round/tableaus/$uid`
+  that field is redundant, and `database.rules.json` says so itself
+  (`newData.child('owner').val() === $uid`): the path already names the owner.
+  Dropping it from tableau writes alone, and keeping it on centre cards where
+  scoring counts them per owner, would take a full hand write from about 2.5 kB
+  to about 0.9 kB. The migration is a fallback in `normalizeTableau`
+  (`owner ?? uid`) so a room written by an older client keeps working, plus the
+  `hasChildren` clause in the rules. Not done.
+- The other network items the audit found and left are in
+  `docs/audit-2026-09-03.md` under "Recorded, not fixed": three full room
+  downloads on entry, plays writing the whole hand rather than the changed
+  piles, and the `stuckRounds` reset. The entry one is the clearest pure latency
+  win left, because those three downloads are sequential before the board
+  appears; the others are quota rather than time.
 - `database.rules.json` bounds types, enums and ranges on every leaf since the
   audit, but not the SIZE of a write (no `$other: false`, no `hasChildren` on
   containers) and not the shape of a bare `players/$uid` write against the seat
