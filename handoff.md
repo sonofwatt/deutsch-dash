@@ -10,9 +10,17 @@ suite. A commit sitting unpushed has already invalidated one playtest - what
 people are playing is whatever last reached Pages - so check `git status -sb`
 before trusting what a table reports._
 
-_**388 tests green** (364 unit + 24 emulator). This is the only place in the repo
-that quotes a count - it drifted three separate ways when it lived in four
-places, so keep it here and nowhere else._
+_**The audit commits of 2026-09-03 changed `database.rules.json`** (type, enum
+and range bounds on every field a client writes). Until `npx firebase deploy
+--only database` has been run, the live database is on the older rules, which
+is exactly the trap "Editing `database.rules.json` is half the job" describes._
+
+_**462 tests** (401 unit and 24 in a real browser; 37 against the emulator, all
+green). This is the only place in the repo that quotes a count -
+it drifted three separate ways when it lived in four places, so keep it here and
+nowhere else. Both sides of the 2026-09-04 merge rewrote this line, which is the
+drift it warns about happening in miniature: neither number was right afterwards,
+and the figure above was measured rather than added up._
 
 **The version is `src/version.ts` and nowhere else** - the same one-place rule the
 test count above keeps. `v<major>.<minor>.<patch>`, shown at the foot of the home
@@ -165,6 +173,19 @@ skipped deploy makes race flashes and rivalry commentary silently vanish.
   player while wedging the counter at 8.
 - `MAX_PLAYERS = 8` in `src/net/rooms.ts` is mirrored as a bare literal `8` in
   `database.rules.json`. Change both or client and server disagree.
+- **In a sandbox whose egress policy blocks the CLI's rules upload** (the
+  database emulator loads rules through a call to `firebase-public.firebaseio.com`
+  that some proxies refuse, and the CLI then reports "Unable to parse JSON"),
+  the suite still runs: start the auth emulator with
+  `firebase emulators:start --only auth --project demo-dash`, the database jar
+  directly with `java -jar ~/.cache/firebase/emulators/firebase-database-emulator-*.jar
+  --host 127.0.0.1 --port 9000 --functions_emulator_host 127.0.0.1
+  --functions_emulator_port 5001`, PUT the rules file to
+  `http://127.0.0.1:9000/.settings/rules.json?ns=demo-dash-default-rtdb` with
+  `Authorization: Bearer owner`, and run `EMULATOR=1 npx vitest run`. **Wipe
+  every namespace between runs** (`DELETE /.json?ns=<each>`): the jar keeps data,
+  and a re-seeded `playerCount` of 1 over a stored 8 is refused by the
+  non-decreasing rule, which looks exactly like a rules regression and is not.
 - **RTDB does not run validate rules on a delete.** That is what lets a player
   release a claimed badge with no rules change (see the lobby identity editor).
 - **`players/$uid` no longer has a `.validate`.** It used to gate a brand-new
@@ -207,12 +228,24 @@ Locally, `npm test` skipping the rules tests is fine and intended - but run
 ### Trust model
 
 **Knowing the room code is the credential.** Room `.read` and the writes to
-`round/spaces`, `dashedBy`, `scores` and `stuckRounds` are gated only on
-`auth != null`, and anonymous tokens can be minted straight from the Firebase
+`round/spaces`, `dashedBy`, `races`, `duels` and `stuckRounds` are gated only
+on `auth != null`, and anonymous tokens can be minted straight from the Firebase
 REST API. Only `players/$uid` and `round/tableaus/$uid` are genuinely bound to a
 uid. `endRoundStalled` and `incrementStuckRounds` are host-by-convention and
 explicitly not enforced. See the README's security section for why this is
 deliberate.
+
+**Since the audit the rules bound WHAT is written as well as who writes it**:
+a badge id is a badge, the phase is a phase, every number is a number in range,
+a card is a card and a hand holds only its owner's cards, and `round/scores` and
+`round/startedAt` are the host's (nothing else ever wrote them, and a pre-written
+`scores` node silently stopped the host's commit for the rest of the game). Two
+things the rules still do not do, and the client covers instead: a client can
+write its own `players/$uid` record without the `playerCount` bump, so the
+8-seat cap holds only for the app's own join path; and nothing bounds the SIZE
+of a write. Both are in `docs/audit-2026-09-03.md` with the rule text, and wait
+on a production probe because the emulator evaluates ancestor validates and
+cross-path reads of a multi-path write in ways production is not documented to.
 
 ### State and host continuity
 
@@ -475,6 +508,17 @@ pointer actually was and translates by the difference (`ghostFix` in
 painted, re-measuring on `visualViewport` events. On a browser that was already
 right the correction is zero. The `translate(-50%, -55%)` lift is intentional -
 it keeps the card out from under the thumb.
+
+**The pointer position is not React state.** It was, and every pointermove
+therefore re-rendered the game screen and the whole board under it: 75 card
+nodes at eight players, 36 of them framer-motion layout nodes measuring
+themselves twice per render. A headless Chromium bench put one move at 4.6 ms,
+and 29 ms with a 4x CPU throttle, which is more than a frame. The position now
+lives in a `PointerTrack` (`useDrag.ts`) that only `DragGhost` subscribes to,
+writing one transform per event onto its own element; React hears about a drag
+twice, at the start and at the end. The ghost sets no `style` prop at all, so a
+snapshot landing mid-drag cannot put it back where React last saw it. See
+`docs/audit-2026-09-03.md`.
 
 ### Dash on screen and in the code
 
@@ -2009,7 +2053,160 @@ the ledgered pointer-capture re-select check on mouse drags.
 - Test counts are quoted in the header of this file and nowhere else, because
   they drifted three separate ways when they lived in four places. If you add
   tests, update that one line or delete the number.
-- Bundle is one 586 kB chunk, over Vite's 500 kB warning threshold. No code-split.
+- Bundle is two chunks since the audit: vendor 538 kB (165 kB gzip) and app
+  104 kB (35 kB gzip). The vendor chunk still trips Vite's 500 kB warning, which
+  is cosmetic; the split saves no first-load bytes, it lets a returning player
+  keep the vendor chunk across deploys. No route-level split: the keeper route
+  measured at 8.5 kB minified, not worth a loading state. Firebase is 229 kB of
+  the vendor chunk and cannot leave the home screen without dismantling the
+  module-scope store singleton.
+- **A centre play used to be invisible to the player who made it for a whole
+  round trip, and silently dropped their next one. Fixed on 2026-09-04.**
+  `playToCenter` passed `{ applyLocally: false }`, so the write raised no local
+  event and the centre pile, which renders straight off server state, did not
+  have the card while the hand no longer did. The expensive half was never the
+  animation: `playTo` gates the next play on `room.round.spaces[space]`, stale
+  for the same window, so a red 3 followed by a red 4 onto one space lost the
+  second with no card and no scowl, and flinging made that routine. The option is
+  gone, the reasoning is in the comment above `runTransaction` in
+  `src/net/plays.ts`, and `plays.emu.test.ts` pins it: the listener must hold the
+  card while the transaction is still in flight. **Two things to watch at a
+  table**, both new and neither covered by a test: a refused play now flashes
+  onto the pile and is pulled off rather than never appearing, and on a
+  `datastale` retry a contested space can flicker twice.
+- **The database is in us-central1, and that is the right place for it. Do not
+  move it.** `databaseURL` is `holland-hustle-default-rtdb.firebaseio.com`, and
+  only us-central1 instances are served on the legacy `.firebaseio.com` domain;
+  a regional one reads `<name>.<region>.firebasedatabase.app`. The owner
+  confirmed on 2026-09-04 that every player is in US Eastern, which settles a
+  question an earlier latency pass had to leave open. Eastern to Iowa is roughly
+  30 ms of round trip, near enough optimal, and one round trip per centre play
+  is already the floor: a play cannot reach another player faster than actor to
+  server to other player. Moving the instance to `europe-west1`, which an
+  earlier draft of this file suggested while the player base was unknown, would
+  roughly triple that for everybody. The name of the game is not evidence about
+  where it is played.
+  The number matters beyond this bullet, because everything else on the latency
+  list is priced against it. A round trip here is worth about 30 ms, not the
+  100 ms a transatlantic hop would cost, so removing a round trip buys a third
+  of what it would in Europe, and the BYTES on the entry path now cost more than
+  the trips do. Re-read the entry and bundle bullets below with that in mind.
+- **Entry costs three serialized round trips on the resume path, which is how
+  this app is usually entered** (reload, phone lock, tab away to send the invite
+  and back). It was four. `peekRoom` reads the whole room, then `joinRoom` opens
+  with its own unconditional `get` of the same node, then the listener hashes an
+  empty cache and downloads it a third time: 47,373 bytes of identical payload
+  for one entry, and the SDK keeps nothing between the two gets, because
+  `repoGetValue` caches only active queries and drops the sync point on its way
+  out. The fourth was the rejoin branch's `connected: true` write, which is no
+  longer awaited (2026-09-04): `startPresence` makes the same write a line later
+  the moment `.info/connected` reports true, so awaiting it bought nothing.
+  **What is left is the duplicated `get`**: thread the room `Join.tsx` already
+  holds into `joinRoom` so the second one disappears. Scope it to the resume path
+  only. On the form path the peek can be minutes stale by the time the player
+  taps, and the pre-checks would then report `race` instead of `full` or
+  `badge-taken`. Nothing corrupts either way, because the rules and
+  `increment(1)` enforce the cap for real. On the domestic floor this is worth
+  more for the 47 kB than for the trip: a round trip here is about 30 ms.
+- **`createRoom` is one atomic write as of 2026-09-04.** It was two sequential
+  ones, held apart by a comment that outlived its rule: the `players/$uid`
+  validate used to read `meta/phase`, and that cross-reference only worked
+  against already-committed data. Nothing reads `meta/phase` from the rules now.
+  The merge is legal because `root` is the PRE-write tree, where the room has no
+  players yet, which is the branch `hostId` and `creatorId`'s validate take, and
+  badges only checks the writer's own uid. Proved against the rules engine in
+  `rooms.emu.test.ts` ("ONE atomic write"), **and separately against the rules
+  that are live today**, because this branch's rules file has not been deployed
+  and a create that only passed under the new one would have broken every new
+  room until it was. It buys a round trip, and it means a create can no longer be
+  interrupted between the two writes and leave a meta behind with no players.
+- **The join form no longer comes back after a successful join.** For one listen
+  round trip `joinPhase` is `in-room` while `room` is still null, and
+  `RoomScreen` tested the two together, so it re-rendered the live form, button
+  and all, to somebody who had already joined; a second tap re-ran `enterRoom` and
+  churned the presence writer through the stale-attempt branch. It now shows the
+  `Rejoining` placeholder, which moved out of `Join.tsx` into a component both
+  screens share. The decision is `roomView` in `src/ui/screens/roomView.ts`, pure
+  and tested, and it is a separate function for a reason worth knowing: zustand
+  hands server rendering the INITIAL state, so a `renderToStaticMarkup` of
+  `RoomScreen` shows the store as it was at import no matter what a test sets.
+  A store-backed screen cannot be render-tested here; pull the decision out and
+  test that instead.
+- **Every card in a hand stores a 28-character owner id it does not need**, but
+  the ordering to remove it is a trap. Inside `round/tableaus/$uid` the field is
+  redundant and `database.rules.json` proves it, validating the owner against
+  the path key. Dropping it would roughly halve a 21.7 kB eight-player deal.
+  This is bandwidth, not latency, but note it is no longer dwarfed by the
+  network: that deal is about 35 ms of host uplink against a round trip of about
+  30 ms, so on the domestic floor the bytes and the trip cost about the same. It
+  still costs no extra round trip, and the frame split at 16 kB is not a latency
+  mechanism. The trap is that the rules
+  currently REQUIRE `owner`, so a client shipped ahead of a rules deploy has its
+  entire atomic deal refused and the whole table gets no round, which is exactly
+  the failure this file already records from the first iPhone playtest. A
+  client on a cached older bundle renders every dealt hand empty, because
+  `isCard` wants a string owner. The rules deploy, the `normalizeTableau`
+  fallback and re-attaching owner on the play path all have to land before any
+  writer stops sending it. Not for a latency pass.
+- **Two things that are already right, so nobody spends a week on them.** Do not
+  narrow the room listener: `startRound` is one multi-path update at the room
+  root, and a whole-room listener gets it as one consistent callback, where four
+  narrow listeners were probed and split into three frames in different
+  macrotasks. The dangerous tear is the re-deal, where `meta.roundNumber` bumps
+  while `round` still holds the previous round's board, which reads as valid and
+  fires the new-round branch against the wrong spaces. And do not optimise
+  `normalizeRoom`: measured at 0.0148 ms against `snap.val()`'s 0.109 ms, call
+  it 0.5 to 1 ms on a phone against about 30 ms of network. If per-snapshot
+  work ever needs cutting, the order is the render, then `snap.val()`, then
+  `normalizeRoom` last.
+- The remaining network items the audit found and left are in
+  `docs/audit-2026-09-03.md` under "Recorded, not fixed". Two of them were
+  re-measured since and are smaller than they read: `centerPlayTxn` rewriting a
+  whole space is 331 to 366 bytes and no extra round trip, and the `stuckRounds`
+  reset is a 67-byte pipelined put that produces no delta and therefore no
+  fan-out at all. Do not add the obvious client-side guard to that reset: a
+  player who plays inside the round trip before the host's all-stuck increment
+  fans out would skip it and leave the stall counter standing, and three of
+  those end a round that is being actively played.
+- `database.rules.json` bounds types, enums and ranges on every leaf since the
+  audit, but not the SIZE of a write (no `$other: false`, no `hasChildren` on
+  containers) and not the shape of a bare `players/$uid` write against the seat
+  counter. That structural tier is `docs/database.rules.proposed.json`, explained
+  in `docs/audit-2026-09-03.md`, and waits on a production probe of two rule
+  semantics the emulator alone cannot prove. The client reads defensively either
+  way.
+- Rooms are never deleted and cannot be (no `.write` on `rooms/$code`).
+  About 28 kB per finished game; Spark's 1 GB holds decades of them and the
+  10 GB/month download quota binds first. The rule and client hook for a
+  creator-side sweep are in the audit doc.
+- One anonymous uid is assumed to be one client. Auth persistence is shared
+  across same-origin tabs, so a player with the game open twice writes
+  `connected: false` for themselves when either tab closes (presence re-asserts
+  only on a connection transition), and two host tabs both drive the bots and
+  both tick the countdown. Self-inflicted, and the spec's multi-tab playtest is
+  where it shows. A per-tab presence child or a `BroadcastChannel` leader
+  election is the fix when wanted.
+- A stranger holding the code can still delete `meta/hostId` or the host's
+  record: a validate never runs on a delete. The consequence is handled: the
+  stand-in watchdog now treats an absent host like a disconnected one, so the
+  room recovers a host even with the creator gone. The write itself waits on the
+  structural tier (audit doc, seventh reader).
+- `joinRoom`'s expiry check is the one cross-device clock comparison left in the
+  app (see "Two phones do not agree on the time"). It now runs AFTER the rejoin
+  branch, so a member is never told their own room expired, and `createdAt` is
+  write-once in the rules (not live until deployed). The skew still turns a
+  newcomer away whose clock is a whole day out; that would need a server-side
+  comparison.
+- Long-session memory has never been measured. The store's maps are bounded by
+  inspection; the heap after ten rounds of remounting the board is a number
+  nobody has.
+- `npm audit` reports 8 moderate advisories, all under the `firebase-tools`
+  dev dependency, none reachable from the bundle, none cleared by 15.29.0.
+  Re-check on each `firebase-tools` bump; do not run `npm audit fix --force`,
+  which downgrades it a major.
+- CI runs on push to `main` only, so it gates the deploy and not the merge, and
+  the actions are on floating major tags with no Dependabot. Both are fine for
+  one author pushing to main and worth revisiting when a second appears.
 - `oxlint` reports 7 warnings, all `react(only-export-components)` fast-refresh
   hints plus two pre-existing `RoomScreen` warnings. Zero errors.
 - ShareInvite clipboard try/catch; rejection-shake remounts the tableau;
@@ -2093,7 +2290,11 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `404cafd` | A desktop animates whatever the OS says; Dash everywhere on screen |
 | `21aceac` | The code says dash too: keys, types, CSS, tests |
 | `aa4ec3e` | The emulator project and the borrowed game name follow |
+| `dc78867` → `e3c6676` | Security and performance audit: the ghost off the render path, memoised cards, defensive reads, one-field wood writes, self-hosted fonts, least-privilege CI |
+| `cecb628` → `0b29024` | The audit's analysis finished by hand after the limit: the verdict ledger, the seventh reader, and the four small gaps it found closed (late-play rollback, write-once createdAt, an absent host recovered, a CSPRNG room code) |
+| `b150224` → `31df523` | Where the multiplayer latency actually goes: a centre play is invisible to the player who made it for a round trip and silently drops their next one, entry costs four serialized round trips on the resume path, and the database is already in the right region because every player is Eastern |
 | `c73e341` → `0bdb136` | The last em dash swept out, and a test so none come back |
+| `75dec4b` | A centre play its own player can see, so the next one is judged on a board that has it; `createRoom` as one atomic write; the rejoin presence write no longer awaited; and no join form offered to somebody already in the room |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.

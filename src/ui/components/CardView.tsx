@@ -1,7 +1,8 @@
+import { memo } from 'react';
 import { motion } from 'framer-motion';
-import { BADGES, type BadgeId } from '../../game/badges';
+import { badgeFor, type BadgeId } from '../../game/badges';
 import { faceGroup } from '../../game/rules';
-import type { Card, FaceGroup } from '../../game/types';
+import { cardId, type Card, type FaceGroup } from '../../game/types';
 
 /**
  * Boy/girl marker, drawn as an actual washroom-door sign: a white figure knocked
@@ -45,12 +46,39 @@ export function FaceGlyph({ group }: { group: FaceGroup }) {
   );
 }
 
-export function CardView(props: {
+interface CardViewProps {
   card: Card; badgeId: BadgeId; size?: 'md' | 'sm'; selected?: boolean; dimmed?: boolean;
   layoutId?: string; flipKey?: number;
-}) {
+}
+
+/**
+ * The props that decide what a card looks like, compared by VALUE. Every room
+ * snapshot rebuilds every card object (normalizeRoom), so an identity compare
+ * would never match and the memo below would buy nothing.
+ */
+function sameCardProps(a: CardViewProps, b: CardViewProps): boolean {
+  return cardId(a.card) === cardId(b.card) && a.badgeId === b.badgeId && a.size === b.size
+    && !!a.selected === !!b.selected && !!a.dimmed === !!b.dimmed
+    && a.layoutId === b.layoutId && a.flipKey === b.flipKey;
+}
+
+/**
+ * Memoised, and this is the single biggest saving on the board. Every write by
+ * any player raises a snapshot on every client, and the game screen re-renders
+ * on each one; without the memo all 75 cards of an eight-player board went
+ * through framer-motion's per-node update (prop diff, animation check, and for
+ * the layoutId cards two forced layout measurements) although nothing about them
+ * had changed. Measured at roughly half of the render cost of a snapshot.
+ *
+ * One thing it gives up: a memoised card that did not re-render is not measured,
+ * so when only the GRID changes shape (a rotation, a column-count change) the
+ * cards jump to their new slots rather than sliding. A card moving between piles
+ * still animates: it is a different element with the same layoutId, and framer
+ * snapshots the leaving one on unmount.
+ */
+export const CardView = memo(function CardView(props: CardViewProps) {
   const { card, badgeId } = props;
-  const b = BADGES[badgeId];
+  const b = badgeFor(badgeId);
   return (
     <motion.div
       layoutId={props.layoutId}
@@ -66,10 +94,10 @@ export function CardView(props: {
       <span className="card-badge">{b.glyph}</span>
     </motion.div>
   );
-}
+}, sameCardProps);
 
 export function CardBack({ badgeId, size }: { badgeId: BadgeId; size?: 'md' | 'sm' }) {
-  const b = BADGES[badgeId];
+  const b = badgeFor(badgeId);
   return (
     <div className={`card card-back ${size ?? 'md'}`} style={{ ['--badge' as string]: b.color }}>
       <span className="card-badge-big">{b.glyph}</span>

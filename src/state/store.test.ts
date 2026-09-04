@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createGameStore, legalTargets, tableReady, HOST_AWAY_MS, AWAY_MS, type Deps } from './store';
 import type { PlayResult } from '../net/plays';
+import type { JoinResult } from '../net/rooms';
 import { deal, buildDeck } from '../game/deck';
 import type { Card, CenterSpace, PlayerInfo, RoomMeta, Suit, Room, Tableau } from '../game/types';
 
@@ -26,6 +27,7 @@ function fakeDeps(over: Partial<Deps> = {}): Deps {
     playToCenter: vi.fn(async () => ({ committed: true, winner: null })),
     reportRace: vi.fn(async () => {}),
     persistTableau: vi.fn(async () => {}),
+    persistWoodIndex: vi.fn(async () => {}),
     declareStuck: vi.fn(async () => {}),
     clearStuck: vi.fn(async () => {}),
     markAway: vi.fn(async () => {}),
@@ -40,6 +42,7 @@ function fakeDeps(over: Partial<Deps> = {}): Deps {
     addBot: vi.fn(async () => 'bot_star'),
     removeBot: vi.fn(async () => {}),
     stopPresence: vi.fn(),
+    startPresence: vi.fn(() => () => {}),
     ...over,
   };
 }
@@ -143,7 +146,9 @@ describe('optimistic play', () => {
     const store = createGameStore(deps);
     const t: Tableau = { dash: [c(7, 'green')],
                          post: [[c(8, 'red')], [c(2, 'blue')], [c(5, 'yellow')]], wood: [], woodIndex: 0 };
-    store.setState({ uid: 'me', code: 'ABCDEF', room: playingRoom(t), tableau: t });
+    const room = playingRoom(t);
+    room.players.me.stuckAt = 1; // declared stuck a moment ago, so there is a claim to withdraw
+    store.setState({ uid: 'me', code: 'ABCDEF', room, tableau: t });
 
     store.getState().select({ kind: 'dash' });
     await store.getState().playTo({ post: 0 }); // green 7 builds on red 8
@@ -642,6 +647,32 @@ describe('stale-session guards', () => {
     }
   });
 
+  it('claims host after HOST_AWAY_MS when the host record is gone, or hostId is', async () => {
+    // A stranger holding the code can delete either (a validate never runs on a
+    // delete). The creator reclaims only while present; without this the room
+    // would have no host for ever.
+    for (const gone of ['record', 'hostId'] as const) {
+      let cb: ((room: Room | null) => void) | undefined;
+      const deps = fakeDeps({
+        watchRoom: vi.fn((_code: string, f: (room: Room | null) => void) => { cb = f; return () => {}; }),
+      });
+      const store = createGameStore(deps);
+      await store.getState().enterRoom('AAAAAA', 'D', 'tulip');
+      vi.useFakeTimers();
+      try {
+        const room = mkRoom();
+        if (gone === 'record') delete room.players.h;
+        else room.meta.hostId = undefined as unknown as string;
+        cb!(room);
+        vi.advanceTimersByTime(HOST_AWAY_MS + 1);
+        expect(deps.claimHost).toHaveBeenCalledWith('AAAAAA', 'me');
+      } finally {
+        vi.useRealTimers();
+        store.getState().leave();
+      }
+    }
+  });
+
   it('claims host after HOST_AWAY_MS when the host is disconnected in the lobby (previously impossible)', async () => {
     let cb: ((room: Room | null) => void) | undefined;
     const deps = fakeDeps({
@@ -810,7 +841,34 @@ describe('AI players', () => {
     const deps = await run('someone-else');
     expect(deps.playToCenter).not.toHaveBeenCalled();
     expect(deps.persistTableau).not.toHaveBeenCalledWith('ABCDEF', 'bot_star', expect.anything());
-    expect(deps.persistTableau).toHaveBeenCalledWith('ABCDEF', 'me', expect.anything()); // still adopts its own
+    expect(deps.persistWoodIndex).not.toHaveBeenCalledWith('ABCDEF', 'bot_star', expect.anything());
+  });
+
+  it('a bot already declared stuck stops turning wood over', async () => {
+    // Its whole cycle has been proven empty, so another turn cannot help - it only
+    // sent the hand round the room again on every tick. A Genius bot did that
+    // twice a second for as long as the table stayed stalled.
+    let cb!: (r: Room | null) => void;
+    const deps = fakeDeps({
+      watchRoom: vi.fn((_code: string, f: (room: Room | null) => void) => { cb = f; return () => {}; }),
+    });
+    const store = createGameStore(deps);
+    await store.getState().enterRoom('ABCDEF', 'D', 'tulip');
+    const room = roomWithBot('me');
+    room.players.bot_star.stuckAt = 500;
+    // Only a red 6 could land, and the bot holds nothing but blue 9s.
+    room.round!.spaces = [{ stack: [c(5, 'red')], history: [] }];
+    room.round!.tableaus.bot_star = {
+      dash: [c(9, 'blue', 'bot_star')], post: [[], [], []],
+      wood: Array.from({ length: 6 }, () => c(9, 'blue', 'bot_star')), woodIndex: 0,
+    };
+    vi.useFakeTimers();
+    cb(room);
+    await vi.advanceTimersByTimeAsync(9000);
+    store.getState().leave();
+    vi.useRealTimers();
+    expect(deps.persistWoodIndex).not.toHaveBeenCalledWith('ABCDEF', 'bot_star', expect.anything());
+    expect(deps.persistTableau).not.toHaveBeenCalledWith('ABCDEF', 'bot_star', expect.anything());
   });
 });
 
@@ -1072,5 +1130,200 @@ describe('away players', () => {
     after.cb(idleTable(7000));
     expect(after.deps.incrementStuckRounds).toHaveBeenCalledTimes(1);
     after.store.getState().leave();
+  });
+});
+
+describe('what a turn writes', () => {
+  it('a wood turn writes the index alone, not the whole hand', () => {
+    // Turning wood is the most frequent action in the game and it changes one
+    // integer. Writing the whole hand for it was about half of a round's traffic.
+    const deps = fakeDeps();
+    const store = createGameStore(deps);
+    const t = seededTableau();
+    store.setState({ uid: 'me', code: 'ABCDEF', room: playingRoom(t), tableau: t });
+    store.getState().flip();
+    expect(deps.persistWoodIndex).toHaveBeenCalledWith('ABCDEF', 'me', 3);
+    expect(deps.persistTableau).not.toHaveBeenCalled();
+  });
+
+  it('a play by a player who was never stuck does not clear a stuck flag', async () => {
+    const deps = fakeDeps();
+    const store = createGameStore(deps);
+    const t = seededTableau();
+    const rigged: Tableau = { ...t, dash: [...t.dash.slice(0, -1), c(1, 'red')] };
+    store.setState({ uid: 'me', code: 'ABCDEF', room: playingRoom(rigged), tableau: rigged });
+    store.getState().select({ kind: 'dash' });
+    await store.getState().playTo({ space: 0 });
+    expect(deps.playToCenter).toHaveBeenCalled();
+    expect(deps.clearStuck).not.toHaveBeenCalled();
+  });
+});
+
+describe('adopting a hand', () => {
+  async function adopt(room: Room) {
+    let cb!: (r: Room | null) => void;
+    const deps = fakeDeps({
+      watchRoom: vi.fn((_code: string, f: (r: Room | null) => void) => { cb = f; return () => {}; }),
+    });
+    const store = createGameStore(deps);
+    await store.getState().enterRoom('ABCDEF', 'D', 'tulip');
+    cb(room);
+    return { deps, store };
+  }
+
+  it('takes the hand the deal left and writes nothing back when it needs no reconciling', async () => {
+    // Eight players each echoing the hand the host had just written was eight
+    // snapshots on every phone at the moment the board appeared, for nothing.
+    const t = seededTableau();
+    const { deps, store } = await adopt(playingRoom(t));
+    expect(store.getState().tableau).toEqual(t);
+    expect(deps.persistTableau).not.toHaveBeenCalled();
+  });
+
+  it('writes back a hand that reconciling trimmed', async () => {
+    // A card whose centre play landed but whose hand write did not: the adopted
+    // hand is the corrected one, and the correction is worth a write.
+    const t = seededTableau();
+    const top = t.dash[t.dash.length - 1];
+    const room = playingRoom(t);
+    room.round!.spaces[0] = { stack: [top], history: [] };
+    const { deps, store } = await adopt(room);
+    expect(store.getState().tableau!.dash).toHaveLength(t.dash.length - 1);
+    expect(deps.persistTableau).toHaveBeenCalledWith('ABCDEF', 'me', store.getState().tableau);
+  });
+});
+
+describe('leaving while a join is in flight', () => {
+  it('a join that resolves after leave() does not put the player back in the room', async () => {
+    // joinRoom starts presence and then resolves; the player tapped Home in
+    // between. The resolution used to subscribe to the room anyway, behind the
+    // home screen, downloading every delta of a game they were no longer in.
+    let resolveJoin!: (r: JoinResult) => void;
+    const deps = fakeDeps({
+      joinRoom: vi.fn(() => new Promise<JoinResult>(res => { resolveJoin = res; })),
+    });
+    const store = createGameStore(deps);
+    const inFlight = store.getState().enterRoom('ABCDEF', 'D', 'tulip');
+    await vi.waitFor(() => expect(deps.joinRoom).toHaveBeenCalled()); // signed in, join on the wire
+    store.getState().leave();
+    resolveJoin({ ok: true, code: 'ABCDEF' });
+    await inFlight;
+    expect(deps.watchRoom).not.toHaveBeenCalled();
+    expect(deps.stopPresence).toHaveBeenCalled();
+    expect(store.getState().joinPhase).toBe('idle');
+    expect(store.getState().code).toBeNull();
+  });
+
+  it('a newer join supersedes an older one that resolves late', async () => {
+    let resolveFirst!: (r: JoinResult) => void;
+    const deps = fakeDeps({
+      joinRoom: vi.fn()
+        .mockImplementationOnce(() => new Promise<JoinResult>(res => { resolveFirst = res; }))
+        .mockImplementationOnce(async (code: string) => ({ ok: true as const, code })),
+    });
+    const store = createGameStore(deps);
+    const first = store.getState().enterRoom('AAAAAA', 'D', 'tulip');
+    await store.getState().enterRoom('BBBBBB', 'D', 'tulip');
+    resolveFirst({ ok: true, code: 'AAAAAA' });
+    await first;
+    expect(store.getState().code).toBe('BBBBBB');
+    expect(deps.watchRoom).toHaveBeenCalledTimes(1);
+    expect(deps.watchRoom).toHaveBeenCalledWith('BBBBBB', expect.any(Function));
+    // The late join armed presence for AAAAAA on its way out (rooms.ts does that
+    // inside joinRoom, last writer wins), so the room the player is actually in
+    // gets its writer back.
+    expect(deps.startPresence).toHaveBeenCalledWith('BBBBBB', 'me');
+    expect(deps.stopPresence).not.toHaveBeenCalled();
+  });
+});
+
+describe('a centre play that resolves late', () => {
+  // The transaction is a round trip, and the hand does not stand still for it.
+  // Everything after the await works from the hand as it is then.
+  const deferred = () => {
+    let resolve!: (v: PlayResult) => void;
+    const p = new Promise<PlayResult>(r => { resolve = r; });
+    return { p, resolve };
+  };
+
+  it('a lost race puts the card back into the hand as it is now, wood turns kept', async () => {
+    const d = deferred();
+    const deps = fakeDeps({ playToCenter: vi.fn(() => d.p) });
+    const store = createGameStore(deps);
+    const t = seededTableau();
+    const rigged: Tableau = { ...t, dash: [...t.dash.slice(0, -1), c(1, 'red')] };
+    store.setState({ uid: 'me', code: 'ABCDEF', room: playingRoom(rigged), tableau: rigged });
+    store.getState().select({ kind: 'dash' });
+    const play = store.getState().playTo({ space: 0 });
+    store.getState().flip();
+    store.getState().flip();
+    expect(store.getState().tableau?.woodIndex).toBe(6);
+    d.resolve({ committed: false, winner: 'ann' });
+    await play;
+    const after = store.getState().tableau!;
+    expect(after.woodIndex).toBe(6);            // the turns made in flight stand
+    expect(after.dash).toEqual(rigged.dash);    // the card is back
+    // The table sees the same hand this player does.
+    expect(deps.persistTableau).toHaveBeenLastCalledWith('ABCDEF', 'me', after);
+    expect(store.getState().lastRejected?.card).toEqual(c(1, 'red'));
+  });
+
+  it('a play that committed while another was in flight stays played when the other loses', async () => {
+    const d = deferred();
+    let n = 0;
+    const deps = fakeDeps({
+      playToCenter: vi.fn(() => (++n === 1 ? d.p : Promise.resolve({ committed: true, winner: null }))),
+    });
+    const store = createGameStore(deps);
+    const t = seededTableau();
+    const rigged: Tableau = { ...t, dash: [...t.dash.slice(0, -2), c(3, 'green'), c(1, 'red')] };
+    const room = playingRoom(rigged);
+    room.round!.spaces[1] = { suit: 'green', stack: [c(1, 'green', 'ann'), c(2, 'green', 'ann')], history: [] };
+    store.setState({ uid: 'me', code: 'ABCDEF', room, tableau: rigged });
+    store.getState().select({ kind: 'dash' });
+    const first = store.getState().playTo({ space: 0 });   // the red 1, pending
+    store.getState().select({ kind: 'dash' });
+    await store.getState().playTo({ space: 1 });           // the green 3, committed
+    d.resolve({ committed: false, winner: 'ann' });
+    await first;
+    const dash = store.getState().tableau!.dash;
+    expect(dash.some(x => x.suit === 'green' && x.v === 3)).toBe(false); // on the board, not in the hand
+    expect(dash.at(-1)).toEqual(c(1, 'red'));                            // the lost card is back
+  });
+
+  it('a win persists the hand as it is now, not as it was when the card left', async () => {
+    const d = deferred();
+    const deps = fakeDeps({ playToCenter: vi.fn(() => d.p) });
+    const store = createGameStore(deps);
+    const t = seededTableau();
+    const rigged: Tableau = { ...t, dash: [...t.dash.slice(0, -1), c(1, 'red')] };
+    store.setState({ uid: 'me', code: 'ABCDEF', room: playingRoom(rigged), tableau: rigged });
+    store.getState().select({ kind: 'dash' });
+    const play = store.getState().playTo({ space: 0 });
+    store.getState().flip();
+    d.resolve({ committed: true, winner: null });
+    await play;
+    expect(deps.persistTableau).toHaveBeenCalledTimes(1);
+    expect((deps.persistTableau as ReturnType<typeof vi.fn>).mock.calls[0]![2]).toMatchObject({ woodIndex: 3 });
+  });
+
+  it('a continuation from a round that has since ended is dropped', async () => {
+    const d = deferred();
+    const deps = fakeDeps({ playToCenter: vi.fn(() => d.p) });
+    const store = createGameStore(deps);
+    const t = seededTableau();
+    const rigged: Tableau = { ...t, dash: [...t.dash.slice(0, -1), c(1, 'red')] };
+    const room = playingRoom(rigged);
+    store.setState({ uid: 'me', code: 'ABCDEF', room, tableau: rigged });
+    store.getState().select({ kind: 'dash' });
+    const play = store.getState().playTo({ space: 0 });
+    // The phone slept; the next round has been dealt by the time this resolves.
+    const fresh = seededTableau();
+    store.setState({ room: { ...room, meta: { ...room.meta, roundNumber: 2 } }, tableau: fresh });
+    d.resolve({ committed: false, winner: 'ann' });
+    await play;
+    expect(store.getState().tableau).toBe(fresh);       // last round's card did not come back
+    expect(deps.persistTableau).not.toHaveBeenCalled(); // and last round's hand was not written
+    expect(store.getState().lastRejected).toBeNull();
   });
 });

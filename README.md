@@ -6,7 +6,8 @@ Database, hosted on GitHub Pages.
 
 ## Local development (no Firebase account needed)
 
-Prereqs: Node 20+, and Java 11+ for the Firebase emulator. If you don't have
+Prereqs: Node 22 (20.19 or newer also works), and Java 21+ for the Firebase
+emulator (firebase-tools refuses to start it on anything older). If you don't have
 Java system-wide, drop a portable JRE at `.tools/jre` (gitignored) -
 `scripts/with-java.mjs` puts it on PATH for the emulator scripts automatically,
 and falls back to system Java when that folder is absent.
@@ -67,6 +68,14 @@ What that means in practice:
   server resolves it atomically and concurrent joins can't both slip through.
   (`numChildren()` would be the obvious way to count players, but the RTDB
   emulator's rules engine rejects it at parse time, so it can't be tested locally.)
+  One honest limit: the cap holds for the app's own join path. A client that
+  writes its own `players/$uid` record directly bypasses the counter; the rule
+  that would close that is in `docs/database.rules.proposed.json`, waiting on a
+  production probe.
+- **Bounded server-side.** Since the audit the rules also say what may be
+  stored: a badge id must be a badge, the phase a phase, every number a number
+  in range, a card a card owned by the hand it sits in, and the host alone
+  writes the scores. Like every rules change it takes effect once deployed.
 - **Deliberately open.** Reading a room and writing the shared center piles
   require only `auth != null`. Someone who has a room code can watch or interfere
   with that game. Codes are 6 characters from a 32-letter alphabet (~1 billion
@@ -78,6 +87,17 @@ player-chosen display names and card positions - no emails, no payment details.
 On the free Spark plan there is no billing exposure: exhausting quota stops the
 database rather than generating a charge. That changes if you upgrade to Blaze.
 
+Two paths cost the attacker nothing and the rules cannot touch, because rules
+neither rate-limit reads nor count connections. Probing room codes never finds a
+specific room in useful time (above), but every miss is a download that is
+accounted with its protocol overhead, and one machine probing steadily spends the
+Spark plan's 10 GB a month within about a day; the database then refuses every
+room until the month turns. And Spark allows 100 simultaneous connections,
+counted when a socket opens and before any token is presented, so 100 idle
+sockets keep every real client reconnecting for as long as they are held. Both
+degrade the service for everyone rather than costing money, and App Check (below)
+is the only control that reaches either.
+
 **Mitigations, in order of value:**
 
 1. Enable automatic clean-up of anonymous accounts (setup step 7). It deletes
@@ -88,6 +108,20 @@ database rather than generating a charge. That changes if you upgrade to Blaze.
 3. If abuse ever becomes real, add [App Check](https://firebase.google.com/docs/app-check),
    which attests that requests come from the genuine web app. Overkill for a game
    you text to friends.
+
+**What the client trusts.** Every field under a room was written by some player's
+client, so the app reads a room defensively: a badge it does not know is drawn
+grey rather than taking the screen down, a stack entry that is not a card is not
+in the pile, and the board and post counts are held to what a real deal can
+produce before anything allocates on them. The rules bound the same things at
+the door (see above), so a hostile write is refused and, for the ones already
+stored, drawn harmlessly.
+
+**One origin besides the database.** The page talks to Firebase and nothing
+else. The Outfit font is served from this site (`public/fonts`, SIL Open Font
+License) rather than from Google Fonts, so the first paint waits on no
+cross-origin stylesheet and no second service sees a player's address. Firebase
+is Google's too, so this is one service fewer, not anonymity.
 
 **Do not** apply the common advice to reject anonymous users in rules
 (`sign_in_provider != 'anonymous'`). Every player here is anonymous by design;

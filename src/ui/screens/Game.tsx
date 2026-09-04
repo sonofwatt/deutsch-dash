@@ -15,7 +15,7 @@ import { aimedAt, nearestSpace, spaceCentres, useDrag, type DropTarget, type Poi
 import { raceFlashes } from '../raceFlash';
 import { useOpenings } from '../openings';
 import { useWoodSide } from '../prefs';
-import type { CenterSpace, PlaySource } from '../../game/types';
+import type { CenterSpace, PlayerInfo, PlaySource } from '../../game/types';
 import '../game.css';
 
 // Module-level so its identity is stable. useOpenings compares `spaces` by
@@ -118,8 +118,11 @@ export function Game() {
   }, [hintsOn, activity]);
 
   const round = room.round;
-  const me = room.players[uid];
-  const badgeOf = (owner: string): BadgeId => room.players[owner]?.badgeId ?? me.badgeId;
+  // Possibly absent: the host may delete any player record (the lobby's Remove
+  // does it for bots), and the record is what every line below reads. The early
+  // return that handles that is below the hooks, where React lets it be.
+  const me: PlayerInfo | undefined = room.players[uid];
+  const badgeOf = (owner: string): BadgeId => room.players[owner]?.badgeId ?? me?.badgeId ?? 'star';
 
   // Unconditional and above every early return, like every other hook on this
   // screen - sitting out makes those returns reachable mid-round.
@@ -131,7 +134,7 @@ export function Game() {
   }, [stuckAt]);
   const stuckAwhile = stuckAt != null && offerFor === stuckAt;
 
-  const { drag, startDrag } = useDrag((source: PlaySource, target: DropTarget, at: Point) => {
+  const { drag, startDrag, pointer } = useDrag((source: PlaySource, target: DropTarget, at: Point) => {
     gameStore.setState({ selection: source }); // direct set - select() would TOGGLE an already-selected source off
     if ('nearest' in target) {
       // No particular square was chosen. The candidates are the spaces this card
@@ -169,6 +172,15 @@ export function Game() {
   // used to sit lower on the reasoning that a round either has a board for its
   // whole life or never does, which sitting out is exactly the end of.
   const openings = useOpenings(round?.spaces ?? NO_SPACES, hand, uid, hintsOn);
+  if (!me) {
+    return (
+      <div className="screen stack">
+        <h1 className="title">Not at this table</h1>
+        <p className="muted">Your seat in this room is gone. You can join again from the room link, or go home.</p>
+        <a className="muted keep-back" href="#/">Home</a>
+      </div>
+    );
+  }
   if (!round) return <div className="screen"><p className="muted">dealing…</p></div>;
   // Two ways to be off the board, and they end differently. Sitting out KEEPS the
   // hand, so returning drops straight back into the round in progress. Having no
@@ -291,7 +303,7 @@ export function Game() {
            are at this table, not waiting outside it, and the way in is the bar
            where their own cards will be. */
         : <OpponentStrip me={uid} players={room.players} tableaus={round.tableaus} woodSide={woodSide} />}
-      <CenterGrid spaces={round.spaces} highlight={targets.spaces} badgeOf={badgeOf}
+      <CenterGrid spaces={round.spaces} highlight={targets.spaces} badgeOf={badgeOf} me={uid}
         onTap={i => void playTo({ space: i })} races={races}
         snapping={targets.spaces.length > 0} hint={hint}
         openings={openings} stall={stall}
@@ -340,7 +352,7 @@ export function Game() {
           <p className="muted standby-hand">Your cards arrive with the next deal.</p>
         )}
       </div>
-      {hand && drag && <DragGhost drag={drag} badgeId={me.badgeId} />}
+      {hand && drag && <DragGhost drag={drag} pointer={pointer} badgeId={me.badgeId} />}
     </div>
   );
 }

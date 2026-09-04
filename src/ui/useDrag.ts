@@ -12,7 +12,39 @@ export type DropTarget =
   | { nearest: true; aim?: Throw; loose: boolean };
 export interface Point { x: number; y: number }
 
-export interface DragState { card: Card; source: PlaySource; x: number; y: number }
+/** What is in the air. Where it is lives in a PointerTrack, not here - see below. */
+export interface DragState { card: Card; source: PlaySource }
+
+/**
+ * Where the finger is, kept OUT of React state on purpose.
+ *
+ * The position used to ride in DragState, and every pointermove therefore
+ * re-rendered whatever component owned the drag - which is the game screen, and
+ * under it the whole board: up to 32 centre cards, the hand and the opponent
+ * strip, every one a framer-motion node that re-measures itself on update. At
+ * the 60 to 120 pointermoves a second a phone delivers, that was the single
+ * most expensive thing the game did, spent on the one gesture it is about:
+ * measured at 4.6 ms a move on an eight-player board in headless Chromium, and
+ * 29 ms with a 4x CPU throttle, which is more than a whole frame.
+ *
+ * Only the ghost needs the coordinates, so it subscribes here and moves itself
+ * with one style write per event. React is told about a drag exactly twice: when
+ * it starts and when it ends.
+ */
+export interface PointerTrack {
+  current: Point;
+  subscribe(cb: (p: Point) => void): () => void;
+}
+interface Track extends PointerTrack { set(p: Point): void }
+function createTrack(): Track {
+  const listeners = new Set<(p: Point) => void>();
+  const track: Track = {
+    current: { x: 0, y: 0 },
+    subscribe(cb) { listeners.add(cb); return () => { listeners.delete(cb); }; },
+    set(p) { track.current = p; for (const cb of listeners) cb(p); },
+  };
+  return track;
+}
 
 /**
  * Where the pointer sits on the dragged card, as a fraction of the card's own
@@ -406,6 +438,10 @@ export function useDrag(
 ) {
   const [drag, setDrag] = useState<DragState | null>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
+  // One track for the life of the hook: the ghost subscribes to it once per drag.
+  // State with a lazy initialiser rather than a ref, so nothing reads a ref during
+  // render; it is never set again, so it never causes a render either.
+  const [track] = useState(createTrack);
 
   // remove window listeners if we unmount mid-drag
   useEffect(() => () => { cleanupRef.current?.(); }, []);
@@ -418,11 +454,11 @@ export function useDrag(
     // window listeners below do not already cover.
     try { (e.target as Element).setPointerCapture?.(e.pointerId); } catch { /* no capture */ }
     const pointerId = e.pointerId;
-    setDrag({ card, source, x: e.clientX, y: e.clientY });
+    track.set({ x: e.clientX, y: e.clientY });
+    setDrag({ card, source });
 
-    // Kept in a ref rather than in state: every pointermove appends one, and the
-    // ghost's own re-render is already paying for the position. Trimmed to the
-    // window throwOf reads, so a long drag cannot grow it without bound.
+    // Kept in a ref rather than in state: every pointermove appends one. Trimmed
+    // to the window throwOf reads, so a long drag cannot grow it without bound.
     const samples: Sample[] = [{ x: e.clientX, y: e.clientY, t: performance.now() }];
     const sample = (x: number, y: number) => {
       const t = performance.now();
@@ -433,7 +469,8 @@ export function useDrag(
     const move = (ev: PointerEvent) => {
       if (ev.pointerId !== pointerId) return;
       sample(ev.clientX, ev.clientY);
-      setDrag(d => (d ? { ...d, x: ev.clientX, y: ev.clientY } : d));
+      // Not setState: this is the hot path, and only the ghost is listening.
+      track.set({ x: ev.clientX, y: ev.clientY });
     };
     const up = (ev: PointerEvent) => {
       if (ev.pointerId !== pointerId) return;
@@ -476,5 +513,5 @@ export function useDrag(
     window.addEventListener('pointercancel', up);
   }
 
-  return { drag, startDrag };
+  return { drag, startDrag, pointer: track as PointerTrack };
 }

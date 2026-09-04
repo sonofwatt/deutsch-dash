@@ -1,6 +1,6 @@
 /// <reference types="node" />
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createRoom, joinRoom, normalizeRoom, peekRoom, setIdentity, MAX_PLAYERS } from './rooms';
+import { createRoom, joinRoom, normalizeRoom, peekRoom, setIdentity, MAX_PLAYERS, ROOM_TTL_MS } from './rooms';
 import { startRound } from './plays';
 import { makeRoomCode } from './roomCodes';
 import {
@@ -40,6 +40,39 @@ emu('rooms against emulator', () => {
     // same anonymous uid rejoining its own room is always ok
     const rejoin = await joinRoom(code, 'Dav', 'tulip');
     expect(rejoin).toEqual({ ok: true, code });
+  });
+
+  it('an expired room turns a newcomer away and still lets a member back in', async () => {
+    // Only time can age a room now that createdAt is write-once, so the aged
+    // room is seeded with the rules off, in the namespace the app's own db uses.
+    // Expiry used to run before the rejoin check, so it gated every reload and
+    // every resume after a phone slept, against this device's clock.
+    const { ensureSignedIn } = await import('./firebase');
+    const me = await ensureSignedIn();
+    // rules-unit-testing addresses the namespace named by its projectId, with no
+    // suffix, so this is the app's demo-dash-default-rtdb and not demo-dash.
+    const aged = await initializeTestEnvironment({
+      projectId: 'demo-dash-default-rtdb', database: { host: '127.0.0.1', port: 9000 },
+    });
+    try {
+      const code = makeRoomCode();
+      await aged.withSecurityRulesDisabled(async ctx => {
+        await set(ref(ctx.database(), `rooms/${code}`), {
+          meta: { createdAt: Date.now() - ROOM_TTL_MS - 60_000, hostId: 'old-host', creatorId: 'old-host',
+                  targetScore: 75, phase: 'lobby', roundNumber: 0, playerCount: 1 },
+          players: { 'old-host': { name: 'Old', badgeId: 'tulip', joinedAt: 1, connected: false, score: 0 } },
+          badges: { tulip: 'old-host' },
+        });
+      });
+      expect(await joinRoom(code, 'New', 'star')).toEqual({ ok: false, reason: 'expired' });
+      await aged.withSecurityRulesDisabled(async ctx => {
+        await set(ref(ctx.database(), `rooms/${code}/players/${me}`),
+          { name: 'Me', badgeId: 'star', joinedAt: 1, connected: false, score: 0 });
+      });
+      expect(await joinRoom(code, 'Me', 'star')).toEqual({ ok: true, code });
+    } finally {
+      await aged.cleanup();
+    }
   });
 });
 
@@ -209,25 +242,28 @@ emu('server-side player cap and badge uniqueness (database.rules.json)', () => {
     expect(realUid).toBeTruthy();
   });
 
-  it('createRoom still succeeds end-to-end under the new validate rule, and claims the badge', async () => {
-    // Guards the "cross-reference the same write" trap: the players/$uid
-    // .validate rule reads meta/phase to gate new joins, and that read is
-    // only reliable when meta is data already committed by a PRIOR write -
-    // not data being written in the SAME operation as the player (verified
-    // empirically; see the report). createRoom() writes meta first, then
-    // players/badges, specifically so this reference is safe. This
-    // replicates that exact two-step shape directly against the rules
-    // engine, since (per the note above this describe block) the regular
-    // client SDK can't be used to prove rule compliance here.
+  it('createRoom succeeds as ONE atomic write, and claims the badge', async () => {
+    // This used to be two sequential writes, and this test used to assert that
+    // shape, because the players/$uid .validate read meta/phase and that
+    // cross-reference only worked against already-committed data. No rule reads
+    // meta/phase any more, so the write is now one multi-path update, and this is
+    // what proves that against the rules engine rather than by reading them:
+    // hostId and creatorId validate against `root`, which is the PRE-write tree,
+    // where this room has no players at all, and that is the branch of their
+    // condition that has to carry a create. If a future rule reads across the
+    // write again, this goes red before a player ever meets a room that cannot be
+    // made. (The regular client SDK cannot prove rule compliance here; see the
+    // note above this describe block.)
     const code = 'CREATENEW';
     const db = hostCtx.database();
-    await assertSucceeds(db.ref(`rooms/${code}/meta`).set({
-      createdAt: Date.now(), hostId: HOST, targetScore: 75, phase: 'lobby', roundNumber: 0, playerCount: 1,
-    }));
     await assertSucceeds(db.ref(`rooms/${code}`).update({
+      meta: { createdAt: Date.now(), hostId: HOST, creatorId: HOST, targetScore: 75, phase: 'lobby', roundNumber: 0, playerCount: 1 },
       [`players/${HOST}`]: { name: 'Host', badgeId: 'clownfish', joinedAt: 1, connected: true, stuckAt: null, awayAt: null, score: 0, ready: true },
       'badges/clownfish': HOST,
     }));
+    // and the whole room is there, rather than a meta with nobody in it
+    expect((await db.ref(`rooms/${code}/meta/hostId`).get()).val()).toBe(HOST);
+    expect((await db.ref(`rooms/${code}/badges/clownfish`).get()).val()).toBe(HOST);
 
     // Functional regression: the real createRoom() (regular SDK) still
     // produces this same shape end-to-end.
@@ -598,5 +634,208 @@ emu('app writes under real security rules (regular client SDK, correct namespace
     room = (await peekRoom(code))!;
     expect(Object.keys(room.players)).toHaveLength(2);
     expect(room.meta.playerCount).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The audit's validation rules (2026-09-03). The rules used to bound WHO may
+// write each path and never WHAT: a player's own record took any badgeId, any
+// type in any field, and every one of those was a crash for every client in the
+// room, because the render sites indexed BADGES with it or handed an object to
+// React as a child. The client reads defensively now (badgeFor, isCard, the
+// counts in normalizeRoom); these rules refuse the writes at the door as well.
+// Every bound below is pinned by one refused write and, where the shape matters,
+// one accepted one. Leaf validates only: no $other, no hasChildren on
+// containers, no cross-path reads of the write itself - the structural tier is
+// written out in docs/audit-2026-09-03.md and waits on a production probe.
+// ---------------------------------------------------------------------------
+emu('validation rules bound what a client may store (database.rules.json)', () => {
+  const HOST = 'val-host';
+  const OTHER = 'val-other';
+  let testEnv: RulesTestEnvironment;
+  let hostCtx: RulesTestContext;
+  let otherCtx: RulesTestContext;
+
+  beforeAll(async () => {
+    testEnv = await initializeTestEnvironment({
+      // Its own namespace, for the reason the block above gives for its own.
+      projectId: 'demo-dash-validate-test',
+      database: { host: '127.0.0.1', port: 9000, rules: readFileSync(rulesPath, 'utf8') },
+    });
+    hostCtx = testEnv.authenticatedContext(HOST);
+    otherCtx = testEnv.authenticatedContext(OTHER);
+  });
+
+  afterAll(async () => {
+    await testEnv?.cleanup();
+  });
+
+  const player = (name: string, badgeId = 'star') =>
+    ({ name, badgeId, joinedAt: 1, connected: true, stuckAt: null, awayAt: null, score: 0 });
+  const card = (v: number, suit: string, owner: string) => ({ v, suit, owner });
+
+  /** A two-player room the way createRoom and joinRoom leave one. */
+  async function room(code: string): Promise<void> {
+    const db = hostCtx.database();
+    await assertSucceeds(db.ref(`rooms/${code}/meta`).set({
+      createdAt: Date.now(), hostId: HOST, creatorId: HOST, targetScore: 75, phase: 'lobby', roundNumber: 0, playerCount: 1,
+    }));
+    await assertSucceeds(db.ref(`rooms/${code}`).update({
+      [`players/${HOST}`]: player('Host', 'tulip'), 'badges/tulip': HOST,
+    }));
+    await assertSucceeds(otherCtx.database().ref(`rooms/${code}`).update({
+      [`players/${OTHER}`]: player('Other', 'clover'), 'badges/clover': OTHER, 'meta/playerCount': 2,
+    }));
+  }
+
+  it('a badge that does not exist is refused on a player record, and a retired one is not', async () => {
+    const code = 'VALBADGE';
+    await room(code);
+    const mine = otherCtx.database().ref(`rooms/${code}/players/${OTHER}/badgeId`);
+    await assertFails(mine.set('not-a-badge'));
+    await assertFails(mine.set(7));
+    await assertSucceeds(mine.set('kite')); // retired, still drawable: a room may still hold one
+    await assertFails(otherCtx.database().ref(`rooms/${code}/badges/zzz-not-a-badge`).set(OTHER));
+  });
+
+  it('createdAt is written once, by the room\'s first write, and never again', async () => {
+    // One write of 0 by anyone holding the code used to make every join and every
+    // rejoin say the room had expired for as long as it stood. room() above is
+    // the proof that a fresh room's createdAt is accepted.
+    const code = 'VALBORN';
+    await room(code);
+    await assertFails(otherCtx.database().ref(`rooms/${code}/meta/createdAt`).set(0));
+    await assertFails(hostCtx.database().ref(`rooms/${code}/meta/createdAt`).set(Date.now()));
+    await assertFails(otherCtx.database().ref(`rooms/${code}/meta/createdAt`).set('yesterday'));
+  });
+
+  it('a name is a string of at most 32 characters, and the numbers are numbers', async () => {
+    const code = 'VALTYPES';
+    await room(code);
+    const me = otherCtx.database().ref(`rooms/${code}/players/${OTHER}`);
+    await assertFails(me.child('name').set('n'.repeat(33)));
+    await assertFails(me.child('name').set({ evil: 1 }));
+    await assertFails(me.child('name').set(''));
+    await assertSucceeds(me.child('name').set('A perfectly fine name'));
+    await assertFails(me.child('score').set('twelve'));
+    await assertFails(me.child('joinedAt').set('yesterday'));
+    await assertFails(me.child('connected').set('yes'));
+    await assertSucceeds(me.child('score').set(-4));
+  });
+
+  it('a human cannot become a bot, and a bot level is one of the four', async () => {
+    const code = 'VALBOT';
+    await room(code);
+    const me = otherCtx.database().ref(`rooms/${code}/players/${OTHER}`);
+    await assertFails(me.child('isBot').set(true));          // the uid does not start with bot_
+    await assertFails(me.child('botLevel').set('impossible'));
+    const bot = hostCtx.database().ref(`rooms/${code}/players/bot_bell`);
+    await assertSucceeds(bot.set({ ...player('Ada', 'bell'), ready: true, isBot: true, botLevel: 'hard' }));
+    await assertFails(bot.child('botLevel').set('lol'));
+  });
+
+  it('host and creator can only be a human who is in the room', async () => {
+    const code = 'VALHOST';
+    await room(code);
+    await assertSucceeds(hostCtx.database().ref(`rooms/${code}/players/bot_bell`)
+      .set({ ...player('Ada', 'bell'), ready: true, isBot: true, botLevel: 'hard' }));
+    const meta = otherCtx.database().ref(`rooms/${code}/meta`);
+    await assertFails(meta.child('hostId').set('bot_bell'));
+    await assertFails(meta.child('hostId').set({ deep: 1 }));
+    await assertFails(meta.child('creatorId').set('a-stranger'));
+    await assertFails(meta.child('creatorId').set('bot_bell'));
+    await assertSucceeds(meta.child('hostId').set(OTHER));
+    await assertSucceeds(meta.child('creatorId').set(OTHER));
+  });
+
+  it('the phase is a phase and the meta numbers are numbers in range', async () => {
+    const code = 'VALMETA';
+    await room(code);
+    const meta = otherCtx.database().ref(`rooms/${code}/meta`);
+    await assertFails(meta.child('phase').set('nonsense'));
+    await assertFails(meta.child('targetScore').set('abc'));
+    await assertFails(meta.child('targetScore').set(0));
+    await assertFails(meta.child('roundNumber').set({ a: 1 }));
+    await assertFails(meta.child('countdown').set(1e12));
+    await assertFails(meta.child('countdown').set('GO'));
+    await assertFails(meta.child('hintsOn').set('on'));
+    await assertSucceeds(meta.child('phase').set('playing'));
+    await assertSucceeds(meta.child('targetScore').set(100));
+    await assertSucceeds(meta.child('countdown').set(3));
+    await assertSucceeds(meta.child('countdown').set(null)); // a delete is never validated
+  });
+
+  it('the board is dealt at a size a deal can produce', async () => {
+    const code = 'VALCOUNT';
+    await room(code);
+    const round = hostCtx.database().ref(`rooms/${code}/round`);
+    await assertFails(round.child('spaceCount').set(1e9));
+    await assertFails(round.child('spaceCount').set(0));
+    await assertFails(round.child('spaceCount').set('lots'));
+    await assertFails(round.child('postCount').set(4));
+    await assertSucceeds(round.child('spaceCount').set(16));
+    await assertSucceeds(round.child('postCount').set(5));
+    await assertFails(round.child('seats/9').set(HOST));
+    await assertSucceeds(round.child('seats/0').set(HOST));
+  });
+
+  it('scores and startedAt are the host\'s alone now; stuckRounds stays open but numeric', async () => {
+    // A stranger could pre-write round/scores, and commitScores, which is
+    // idempotent on scores existing, would then never run: totals frozen for
+    // the rest of the game with no error anywhere. Only the host ever wrote it.
+    const code = 'VALSCORE';
+    await room(code);
+    const other = otherCtx.database().ref(`rooms/${code}/round`);
+    await assertFails(other.child('scores').set({ [HOST]: { centerCount: 0, dashLeft: 10, delta: -20 } }));
+    await assertFails(other.child('startedAt').set(1));
+    await assertFails(other.child('stuckRounds').set('x'));
+    await assertSucceeds(other.child('stuckRounds').set(1));
+    const host = hostCtx.database().ref(`rooms/${code}/round`);
+    await assertSucceeds(host.child('scores').set({ [HOST]: { centerCount: 3, dashLeft: 2, delta: -1 } }));
+    await assertFails(host.child('scores').set({ [HOST]: { centerCount: 'three' } }));
+    await assertSucceeds(host.child('startedAt').set(Date.now()));
+  });
+
+  it('only cards go in a centre space, and only on a space the board has', async () => {
+    const code = 'VALSPACE';
+    await room(code);
+    const spaces = otherCtx.database().ref(`rooms/${code}/round/spaces`);
+    await assertFails(spaces.child('0/stack').set([true]));
+    await assertFails(spaces.child('0/stack').set([{ v: 1, suit: 'red' }]));           // no owner
+    await assertFails(spaces.child('0/stack').set([card(11, 'red', OTHER)]));          // no such card
+    await assertFails(spaces.child('0/stack').set([card(1, 'plaid', OTHER)]));
+    await assertFails(spaces.child('0/history').set([7]));
+    await assertFails(spaces.child('0/suit').set('purple'));
+    await assertFails(spaces.child('999').set({ stack: [card(1, 'red', OTHER)] }));
+    await assertSucceeds(spaces.child('0').set({ stack: [card(1, 'red', OTHER)], history: [[card(1, 'blue', HOST)]] }));
+  });
+
+  it('a hand holds only its owner\'s cards, and the wood index stays in the pile', async () => {
+    const code = 'VALHAND';
+    await room(code);
+    const mine = otherCtx.database().ref(`rooms/${code}/round/tableaus/${OTHER}`);
+    await assertFails(mine.set({ dash: [card(1, 'red', HOST)], post: [[]], wood: [], woodIndex: 0 }));
+    await assertFails(mine.set({ dash: ['junk'], woodIndex: 0 }));
+    await assertFails(mine.set({ dash: [card(1, 'red', OTHER)], woodIndex: 99 }));
+    await assertFails(mine.set({ dash: [card(1, 'red', OTHER)], post: { 7: [card(2, 'red', OTHER)] }, woodIndex: 0 }));
+    await assertSucceeds(mine.set({
+      dash: [card(1, 'red', OTHER)], post: [[card(2, 'blue', OTHER)], [], []],
+      wood: [card(3, 'green', OTHER), card(4, 'yellow', OTHER)], woodIndex: 2,
+    }));
+  });
+
+  it('a race record and a duel tally keep their shape', async () => {
+    const code = 'VALRACE';
+    await room(code);
+    const round = otherCtx.database().ref(`rooms/${code}/round`);
+    await assertFails(round.child('races/3').set('me'));
+    await assertFails(round.child('races/3').set({ by: OTHER }));                        // no nonce
+    await assertFails(round.child('races/99').set({ by: OTHER, at: 1 }));
+    await assertSucceeds(round.child('races/3').set({ by: OTHER, at: 1 }));
+    await assertFails(round.child(`duels/${OTHER}/${HOST}`).set('two'));
+    await assertFails(round.child(`duels/${OTHER}/${HOST}`).set(-1));
+    await assertSucceeds(round.child(`duels/${OTHER}/${HOST}`).set(2));
+    await assertFails(round.child('dashedBy').set({ uid: OTHER }));
+    await assertSucceeds(round.child('dashedBy').set(OTHER));
   });
 });

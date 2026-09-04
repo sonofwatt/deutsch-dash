@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useGameStore, isHost, tableReady } from '../../state/store';
-import { BADGES, BADGE_IDS, type BadgeId } from '../../game/badges';
-import { BOT_LABELS, BOT_LEVELS, type BotLevel } from '../../game/bot';
+import { badgeFor, BADGES, BADGE_IDS, type BadgeId } from '../../game/badges';
+import { BOT_LABELS, BOT_LEVELS, botLevelOf, type BotLevel } from '../../game/bot';
 import { APP_VERSION } from '../../version';
 import { MAX_PLAYERS } from '../../net/rooms';
 import { ShareInvite } from '../components/ShareInvite';
@@ -121,12 +121,12 @@ export function Lobby({ code }: { code: string }) {
                 out. Only ever your own, and only before you are ready. */}
             {editing
               ? <button className="chip chip-btn" aria-label="Change your badge"
-                  style={{ ['--badge' as string]: BADGES[p.badgeId].color }}
+                  style={{ ['--badge' as string]: badgeFor(p.badgeId).color }}
                   onClick={() => { commitName(); setPicking(v => !v); }}>
-                  {BADGES[p.badgeId].glyph}
+                  {badgeFor(p.badgeId).glyph}
                 </button>
-              : <span className="chip" style={{ ['--badge' as string]: BADGES[p.badgeId].color }}>
-                  {BADGES[p.badgeId].glyph}
+              : <span className="chip" style={{ ['--badge' as string]: badgeFor(p.badgeId).color }}>
+                  {badgeFor(p.badgeId).glyph}
                 </span>}
             {editing && draftName != null
               ? <input className="field name-field" autoFocus maxLength={14} value={draftName}
@@ -139,7 +139,7 @@ export function Lobby({ code }: { code: string }) {
                     {p.name}{id === room.meta.hostId ? ' (host)' : ''}
                   </button>
                 : <span>{p.name}{id === room.meta.hostId ? ' (host)' : ''}</span>}
-            {p.isBot && <span className="tag">AI · {BOT_LABELS[p.botLevel ?? 'medium']}</span>}
+            {p.isBot && <span className="tag">AI · {BOT_LABELS[botLevelOf(p.botLevel)]}</span>}
             <span className="spacer" />
             {/* My own state is the big button at the bottom, not a second copy
                 up here - one player, one place to read it. */}

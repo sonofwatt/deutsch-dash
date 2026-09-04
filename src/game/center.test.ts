@@ -121,3 +121,32 @@ describe('reconcileTableau', () => {
     expect(out.woodIndex).toBe(2); // top is now red 2, same as a normal play would leave it
   });
 });
+
+describe('a pile is read defensively', () => {
+  // The centre spaces are writable by any authed client, so a stack is whatever
+  // was put there. A null in it used to reach cardId() in reconcileTableau and
+  // throw on every client in the room.
+  it('keeps only the entries that are cards', () => {
+    const junk = [c(1, 'red'), null, 7, 'card', { v: 2 }, { v: '3', suit: 'red', owner: 'me' }, c(2, 'red')];
+    expect(normalizeSpace({ stack: junk }).stack).toEqual([c(1, 'red'), c(2, 'red')]);
+    expect(normalizeTableau({ dash: junk, post: { 0: junk }, wood: junk }, 3).dash).toEqual([c(1, 'red'), c(2, 'red')]);
+    // A history entry with no cards in it is dropped outright: the rails read
+    // run[0].suit off every one.
+    expect(normalizeSpace({ history: [junk, 'nope', 5, []] }).history).toEqual([[c(1, 'red'), c(2, 'red')]]);
+  });
+  it('ignores a suit that is not a suit', () => {
+    expect('suit' in normalizeSpace({ suit: 'plaid' })).toBe(false);
+    expect('suit' in normalizeSpace({ suit: 7 })).toBe(false);
+  });
+  it('holds the wood index inside the pile', () => {
+    const wood = [c(1, 'red'), c(2, 'red')];
+    expect(normalizeTableau({ wood, woodIndex: 99 }, 3).woodIndex).toBe(2);
+    expect(normalizeTableau({ wood, woodIndex: -4 }, 3).woodIndex).toBe(0);
+    expect(normalizeTableau({ wood, woodIndex: 'two' }, 3).woodIndex).toBe(0);
+    expect(normalizeTableau({ wood, woodIndex: 1 }, 3).woodIndex).toBe(1);
+  });
+  it('reads a pile that is not an object as empty', () => {
+    expect(normalizeTableau('nope', 3)).toEqual({ dash: [], post: [[], [], []], wood: [], woodIndex: 0 });
+    expect(normalizeSpace('nope')).toEqual({ stack: [], history: [] });
+  });
+});

@@ -1,6 +1,9 @@
 /// <reference types="node" />
 import { initializeApp } from 'firebase/app';
-import { connectAuthEmulator, getAuth, signInAnonymously, type Auth } from 'firebase/auth';
+import {
+  browserLocalPersistence, connectAuthEmulator, indexedDBLocalPersistence, initializeAuth,
+  signInAnonymously, type Auth,
+} from 'firebase/auth';
 import { connectDatabaseEmulator, getDatabase, goOffline, goOnline, onValue, ref, type Database } from 'firebase/database';
 import { firebaseConfig, isConfigured } from './firebaseConfig';
 
@@ -27,7 +30,16 @@ export const demoConfig = { apiKey: 'demo', projectId: 'demo-dash', databaseURL:
 const app = initializeApp(usingEmulator || configMissing ? demoConfig : firebaseConfig);
 
 export const db: Database = getDatabase(app);
-export const auth: Auth = getAuth(app);
+// initializeAuth rather than getAuth: getAuth wires in the popup and redirect
+// resolver and session persistence, about 10 kB of minified code for sign-in
+// flows this app never runs (signInAnonymously is the only auth call). The two
+// persistences named here are exactly the ones getAuth would have used FIRST, in
+// the same order, so the anonymous identity a phone already holds in IndexedDB is
+// still found and nobody loses their seat over the change. Do not drop
+// indexedDBLocalPersistence for the same reason.
+export const auth: Auth = initializeAuth(app, {
+  persistence: [indexedDBLocalPersistence, browserLocalPersistence],
+});
 
 if (usingEmulator) {
   connectDatabaseEmulator(db, '127.0.0.1', 9000);

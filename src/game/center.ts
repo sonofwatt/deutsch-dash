@@ -1,20 +1,40 @@
 import type { Card, CenterSpace, Suit, Tableau } from './types';
 import { cardId } from './types';
 import { canPlayToSpace, suitForSpace } from './rules';
+import { SUITS } from './deck';
+
+/**
+ * Everything under a room is written by some client, and the centre spaces by
+ * ANY authed client, so a pile is whatever was put there. A stack entry that is
+ * not a card - a null, a number, an object missing its owner - used to reach
+ * cardId() in reconcileTableau and the snapshot handler and throw there, on
+ * every client in the room. Anything that is not a card is simply not in the pile.
+ */
+export function isCard(x: unknown): x is Card {
+  if (!x || typeof x !== 'object') return false;
+  const c = x as Partial<Card>;
+  return typeof c.v === 'number' && Number.isFinite(c.v)
+    && typeof c.suit === 'string' && typeof c.owner === 'string';
+}
 
 function asCards(raw: unknown): Card[] {
-  return Array.isArray(raw) ? (raw as Card[]) : raw ? (Object.values(raw) as Card[]) : [];
+  const list = Array.isArray(raw) ? raw : raw && typeof raw === 'object' ? Object.values(raw) : [];
+  return list.filter(isCard);
 }
 
 export function normalizeSpace(raw: unknown): CenterSpace {
-  const r = (raw ?? {}) as { stack?: unknown; history?: unknown; suit?: Suit };
-  const history = r.history
-    ? (Array.isArray(r.history) ? r.history : Object.values(r.history)).map(asCards)
+  const r = (raw && typeof raw === 'object' ? raw : {}) as { stack?: unknown; history?: unknown; suit?: unknown };
+  // A run that filtered down to nothing was never a run: the finished-pile rails
+  // read the first card of each for its colour.
+  const history = r.history && typeof r.history === 'object'
+    ? (Array.isArray(r.history) ? r.history : Object.values(r.history)).map(asCards).filter(run => run.length > 0)
     : [];
   const space: CenterSpace = { stack: asCards(r.stack), history };
   // Set only when it exists, never as `suit: undefined`: centerPlayTxn spreads
-  // this object straight back into RTDB, which rejects an undefined value.
-  if (r.suit) space.suit = r.suit;
+  // this object straight back into RTDB, which rejects an undefined value. And
+  // only when it is a suit: anything else would lock the space to a colour that
+  // no card has.
+  if (typeof r.suit === 'string' && (SUITS as string[]).includes(r.suit)) space.suit = r.suit as Suit;
   return space;
 }
 
@@ -35,13 +55,17 @@ export function orderlySpaces(count: number): CenterSpace[] {
 }
 
 export function normalizeTableau(raw: unknown, postCount: number): Tableau {
-  const r = (raw ?? {}) as { dash?: unknown; post?: unknown; wood?: unknown; woodIndex?: number };
-  const rawPost = (r.post ?? {}) as Record<number, unknown>;
+  const r = (raw && typeof raw === 'object' ? raw : {}) as { dash?: unknown; post?: unknown; wood?: unknown; woodIndex?: unknown };
+  const rawPost = (r.post && typeof r.post === 'object' ? r.post : {}) as Record<number, unknown>;
+  const wood = asCards(r.wood);
+  // Held inside the pile: an index past the end reads a card that is not there.
+  const woodIndex = typeof r.woodIndex === 'number' && Number.isInteger(r.woodIndex)
+    ? Math.min(Math.max(r.woodIndex, 0), wood.length) : 0;
   return {
     dash: asCards(r.dash),
     post: Array.from({ length: postCount }, (_, i) => asCards(rawPost[i])),
-    wood: asCards(r.wood),
-    woodIndex: r.woodIndex ?? 0,
+    wood,
+    woodIndex,
   };
 }
 

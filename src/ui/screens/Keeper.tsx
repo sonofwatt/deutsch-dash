@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { BADGES, BADGE_IDS } from '../../game/badges';
+import { badgeFor, BADGE_IDS } from '../../game/badges';
 import { ScoreList } from '../components/ScoreList';
 import { Commentary } from '../components/Commentary';
 import { commentary } from '../commentary';
@@ -132,10 +132,10 @@ export function Keeper() {
         </p>
         {game.players.map(p => (
           <div className="keep-setup-row" key={p.id}>
-            <button className="chip" aria-label={`Change ${BADGES[p.badgeId].label}`}
-              style={{ ['--badge' as string]: BADGES[p.badgeId].color }}
+            <button className="chip" aria-label={`Change ${badgeFor(p.badgeId).label}`}
+              style={{ ['--badge' as string]: badgeFor(p.badgeId).color }}
               disabled={!free.length} onClick={() => cycleBadge(p.id)}>
-              {BADGES[p.badgeId].glyph}
+              {badgeFor(p.badgeId).glyph}
             </button>
             <input className="field" placeholder="Name" maxLength={14} value={p.name}
               onChange={e => rename(p.id, e.target.value)} />
@@ -209,8 +209,8 @@ export function Keeper() {
           return (
             <div className="keep-card" key={p.id}>
               <div className="keep-card-head">
-                <span className="chip" style={{ ['--badge' as string]: BADGES[p.badgeId].color }}>
-                  {BADGES[p.badgeId].glyph}
+                <span className="chip" style={{ ['--badge' as string]: badgeFor(p.badgeId).color }}>
+                  {badgeFor(p.badgeId).glyph}
                 </span>
                 <span className="keep-name">{p.name}</span>
                 <span className={`keep-delta${delta < 0 ? ' score-neg' : ''}`}>{signed(delta)}</span>

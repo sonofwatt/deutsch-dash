@@ -36,7 +36,19 @@ if (!command) {
 // silently breaks any arg containing whitespace (e.g. the "cross-env ...
 // vitest run" script string passed to `firebase emulators:exec`). Quote
 // each arg ourselves and hand the shell a single command-line string.
-const quote = arg => (/[\s"]/.test(arg) ? `"${arg.replace(/"/g, '\\"')}"` : arg);
+//
+// Inside double quotes a POSIX shell still expands a dollar sign, a backtick
+// and a backslash, so those are escaped too; cmd.exe understands none of those
+// escapes and only needs the quotes. The arguments only ever come from
+// package.json today, but a wrapper that hands strings to a shell should not
+// depend on that staying true.
+const quote = arg => {
+  if (!/[\s"$`\\]/.test(arg)) return arg;
+  const inner = process.platform === 'win32'
+    ? arg.replace(/"/g, '\\"')
+    : arg.replace(/[\\"$`]/g, ch => '\\' + ch);
+  return `"${inner}"`;
+};
 const commandLine = [command, ...args].map(quote).join(' ');
 
 const child = spawn(commandLine, { stdio: 'inherit', shell: true, env });

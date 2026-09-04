@@ -13,11 +13,12 @@
           "playerCount": {
             ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 8 && (!data.exists() || newData.val() >= data.val())"
           },
+          ".validate": "newData.hasChildren(['createdAt', 'hostId', 'phase'])",
+          "createdAt": {
+            ".validate": "newData.isNumber()"
+          },
           "creatorId": {
             ".validate": "newData.isString() && (root.child('rooms').child($code).child('players').child(newData.val()).exists() || !root.child('rooms').child($code).child('players').exists()) && !root.child('rooms').child($code).child('players').child(newData.val()).child('isBot').exists()"
-          },
-          "createdAt": {
-            ".validate": "newData.isNumber() && !data.exists()"
           },
           "phase": {
             ".validate": "newData.val().matches(/^(lobby|playing|roundEnd|gameOver)$/)"
@@ -45,11 +46,15 @@
           },
           "paleCards": {
             ".validate": "newData.isBoolean()"
+          },
+          "$other": {
+            ".validate": false
           }
         },
         "players": {
           "$uid": {
             ".write": "auth != null && (auth.uid === $uid || root.child('rooms').child($code).child('meta').child('hostId').val() === auth.uid)",
+            ".validate": "newData.hasChildren(['name', 'badgeId']) && (data.exists() || auth.uid === root.child('rooms').child($code).child('meta').child('hostId').val() || newData.parent().parent().child('meta').child('playerCount').val() === root.child('rooms').child($code).child('meta').child('playerCount').val() + 1)",
             "name": {
               ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 32"
             },
@@ -59,6 +64,9 @@
             "joinedAt": {
               ".validate": "newData.isNumber()"
             },
+            "connected": {
+              ".validate": "newData.isBoolean()"
+            },
             "stuckAt": {
               ".validate": "newData.isNumber()"
             },
@@ -67,9 +75,6 @@
             },
             "score": {
               ".validate": "newData.isNumber() && newData.val() >= -100000 && newData.val() <= 100000"
-            },
-            "connected": {
-              ".validate": "newData.isBoolean()"
             },
             "ready": {
               ".validate": "newData.isBoolean()"
@@ -82,6 +87,9 @@
             },
             "botLevel": {
               ".validate": "newData.val().matches(/^(easy|medium|hard|genius)$/)"
+            },
+            "$other": {
+              ".validate": false
             }
           }
         },
@@ -98,13 +106,11 @@
           "spaces": {
             ".write": "auth != null",
             "$i": {
-              ".validate": "$i.matches(/^([0-9]|[1-2][0-9]|3[01])$/)",
-              "suit": {
-                ".validate": "newData.val().matches(/^(red|blue|green|yellow)$/)"
-              },
+              ".validate": "$i.matches(/^([0-9]|[1-2][0-9]|3[01])$/) && newData.hasChildren()",
               "stack": {
+                ".validate": "newData.hasChildren()",
                 "$j": {
-                  ".validate": "$j.matches(/^[0-9]$/) && newData.hasChildren(['v', 'suit', 'owner'])",
+                  ".validate": "$j.matches(/^[0-9]$/) && newData.hasChildren(['v', 'suit', 'owner']) && root.child('rooms').child($code).child('players').child(newData.child('owner').val()).exists()",
                   "v": {
                     ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 10"
                   },
@@ -113,14 +119,18 @@
                   },
                   "owner": {
                     ".validate": "newData.isString() && newData.val().length <= 64"
+                  },
+                  "$other": {
+                    ".validate": false
                   }
                 }
               },
               "history": {
+                ".validate": "newData.hasChildren()",
                 "$k": {
                   ".validate": "$k.matches(/^([0-9]|[1-5][0-9]|6[0-3])$/) && newData.hasChildren()",
                   "$j": {
-                    ".validate": "$j.matches(/^[0-9]$/) && newData.hasChildren(['v', 'suit', 'owner'])",
+                    ".validate": "$j.matches(/^[0-9]$/) && newData.hasChildren(['v', 'suit', 'owner']) && root.child('rooms').child($code).child('players').child(newData.child('owner').val()).exists()",
                     "v": {
                       ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 10"
                     },
@@ -129,33 +139,46 @@
                     },
                     "owner": {
                       ".validate": "newData.isString() && newData.val().length <= 64"
+                    },
+                    "$other": {
+                      ".validate": false
                     }
                   }
                 }
+              },
+              "suit": {
+                ".validate": "newData.val().matches(/^(red|blue|green|yellow)$/)"
+              },
+              "$other": {
+                ".validate": false
               }
             }
           },
           "dashedBy": {
             ".write": "auth != null",
-            ".validate": "newData.isString() && newData.val().length <= 64"
+            ".validate": "newData.isString() && root.child('rooms').child($code).child('players').child(newData.val()).exists()"
           },
           "races": {
             ".write": "auth != null",
             "$space": {
               ".validate": "$space.matches(/^([0-9]|[1-2][0-9]|3[01])$/) && newData.hasChildren(['by', 'at'])",
               "by": {
-                ".validate": "newData.isString() && newData.val().length <= 64"
+                ".validate": "newData.isString() && root.child('rooms').child($code).child('players').child(newData.val()).exists()"
               },
               "at": {
                 ".validate": "newData.isNumber()"
+              },
+              "$other": {
+                ".validate": false
               }
             }
           },
           "duels": {
             ".write": "auth != null",
             "$loser": {
+              ".validate": "root.child('rooms').child($code).child('players').child($loser).exists()",
               "$winner": {
-                ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10000"
+                ".validate": "root.child('rooms').child($code).child('players').child($winner).exists() && newData.isNumber() && newData.val() >= 0 && newData.val() <= 10000"
               }
             }
           },
@@ -167,7 +190,9 @@
           "tableaus": {
             "$uid": {
               ".write": "auth != null && (auth.uid === $uid || root.child('rooms').child($code).child('meta').child('hostId').val() === auth.uid)",
+              ".validate": "newData.hasChildren()",
               "dash": {
+                ".validate": "newData.hasChildren()",
                 "$i": {
                   ".validate": "$i.matches(/^([0-9]|[1-3][0-9])$/) && newData.hasChildren(['v', 'suit', 'owner']) && newData.child('owner').val() === $uid",
                   "v": {
@@ -178,10 +203,14 @@
                   },
                   "owner": {
                     ".validate": "newData.isString() && newData.val().length <= 64"
+                  },
+                  "$other": {
+                    ".validate": false
                   }
                 }
               },
               "wood": {
+                ".validate": "newData.hasChildren()",
                 "$i": {
                   ".validate": "$i.matches(/^([0-9]|[1-3][0-9])$/) && newData.hasChildren(['v', 'suit', 'owner']) && newData.child('owner').val() === $uid",
                   "v": {
@@ -192,12 +221,16 @@
                   },
                   "owner": {
                     ".validate": "newData.isString() && newData.val().length <= 64"
+                  },
+                  "$other": {
+                    ".validate": false
                   }
                 }
               },
               "post": {
+                ".validate": "newData.hasChildren()",
                 "$p": {
-                  ".validate": "$p.matches(/^[0-4]$/)",
+                  ".validate": "$p.matches(/^[0-4]$/) && newData.hasChildren()",
                   "$i": {
                     ".validate": "$i.matches(/^([0-9]|[1-3][0-9])$/) && newData.hasChildren(['v', 'suit', 'owner']) && newData.child('owner').val() === $uid",
                     "v": {
@@ -208,12 +241,18 @@
                     },
                     "owner": {
                       ".validate": "newData.isString() && newData.val().length <= 64"
+                    },
+                    "$other": {
+                      ".validate": false
                     }
                   }
                 }
               },
               "woodIndex": {
                 ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 40"
+              },
+              "$other": {
+                ".validate": false
               }
             }
           },
@@ -228,6 +267,9 @@
               },
               "delta": {
                 ".validate": "newData.isNumber() && newData.val() >= -100 && newData.val() <= 400"
+              },
+              "$other": {
+                ".validate": false
               }
             }
           },
@@ -245,8 +287,11 @@
           },
           "seats": {
             "$i": {
-              ".validate": "$i.matches(/^[0-7]$/) && newData.isString() && newData.val().length <= 64"
+              ".validate": "$i.matches(/^[0-7]$/) && root.child('rooms').child($code).child('players').child(newData.val()).exists()"
             }
+          },
+          "$other": {
+            ".validate": false
           }
         }
       }

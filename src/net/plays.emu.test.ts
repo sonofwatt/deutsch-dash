@@ -288,3 +288,46 @@ emu('sitting out leaves the round in progress', () => {
     expect(Object.keys(dealt)).toEqual([other]);
   });
 });
+
+emu('a centre play the player who made it can see', () => {
+  it('reaches this client before the server answers, so the next play is judged on a board that has it', async () => {
+    // The bug this pins: the hand updates optimistically but the centre pile is
+    // rendered straight off server state, so for one whole round trip the card
+    // is in neither place. The animation is the smaller half. `playTo` gates the
+    // next play on `room.round.spaces[space]`, so during that window a red 3
+    // followed by a red 4 onto the same space drops the second one with no card
+    // and no scowl, and flinging makes that window routine.
+    const code = await createRoom('Host', 'tulip');
+    const { db, ensureSignedIn } = await import('./firebase');
+    const uid = await ensureSignedIn();
+    const room: Room = {
+      meta: { createdAt: Date.now(), hostId: uid, creatorId: uid, targetScore: 75, phase: 'lobby', roundNumber: 0 },
+      players: { [uid]: { name: 'Host', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, awayAt: null, score: 0, ready: true } },
+      round: null,
+    };
+    await startRound(code, room);
+
+    // The listener the app itself runs. What it reports is what the player sees,
+    // because nothing renders the centre off the local hand.
+    const seen: (CenterSpace | null)[] = [];
+    let firstCallback!: () => void;
+    const ready = new Promise<void>(resolve => { firstCallback = resolve; });
+    const stop = onValue(ref(db, `rooms/${code}/round/spaces/0`), snap => {
+      seen.push(snap.val() as CenterSpace | null);
+      firstCallback();
+    });
+    await ready; // the empty board, before anything is played
+    const before = seen.length;
+
+    const one: Card = { v: 1, suit: 'red', owner: uid };
+    const inFlight = playToCenter(code, 0, one); // deliberately not awaited: this IS the window
+    // Microtasks only, so nothing here has had the chance to reach the server and
+    // come back. A card visible at this point can only be the local echo.
+    await Promise.resolve();
+    await Promise.resolve();
+    stop();
+
+    expect(seen.slice(before).at(-1)?.stack).toEqual([one]);
+    expect((await inFlight).committed).toBe(true);
+  });
+});

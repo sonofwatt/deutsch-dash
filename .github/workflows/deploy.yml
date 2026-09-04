@@ -3,13 +3,17 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+# Read-only for the build job. It is where the untrusted work happens - npm ci,
+# the test suites, the emulator, a browser - and none of it needs to publish.
+# The two grants that deploy a Pages site are on the deploy job alone, below.
 permissions:
   contents: read
-  pages: write
-  id-token: write
+# Never cancel a deployment mid-flight: GitHub's own Pages starter sets this to
+# false for that reason. Two quick pushes now both run to completion, the second
+# simply publishing after the first.
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -20,6 +24,10 @@ jobs:
       # Node 20 on 2025-09-19 and has been forcing those actions onto 24 with a
       # warning since; when it stops forcing, a v4 pinned here would simply fail.
       - uses: actions/checkout@v7
+        with:
+          # Nothing after the checkout talks to git, so the job token has no
+          # business sitting in .git/config for the rest of the run.
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: 22
@@ -31,14 +39,22 @@ jobs:
           distribution: temurin
           java-version: '21'
       # The database emulator jar (~30MB) is fetched on first run; cache it so a
-      # slow or flaky CDN cannot turn the rules tests into a red build.
+      # slow or flaky CDN cannot turn the rules tests into a red build. A cache
+      # entry is immutable once saved, so the key carries the lockfile hash: a
+      # firebase-tools bump that wants a newer jar gets a fresh entry, seeded from
+      # the old one through restore-keys, rather than restoring a stale jar and
+      # re-downloading the new one on every run for ever.
       - name: Cache Firebase emulator jars
         uses: actions/cache@v6
         with:
           path: ~/.cache/firebase/emulators
-          key: firebase-emulators-${{ runner.os }}
-      # Chromium for the layout suite, keyed on the Playwright version so a bump
+          key: firebase-emulators-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            firebase-emulators-${{ runner.os }}-
+      # Chromium for the layout suite, keyed on the lockfile so a Playwright bump
       # fetches the browser that version expects rather than reusing the old one.
+      # Any other dependency change refetches it too, which is the price of not
+      # having to read the installed version out in a step of its own.
       - name: Cache the Playwright browser
         uses: actions/cache@v6
         with:
@@ -66,6 +82,9 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

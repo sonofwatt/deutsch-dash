@@ -132,7 +132,7 @@ function DoneRail({ runs }: { runs: Card[][] }) {
       {overflow > 0 && <span className="done-more">+{overflow + 1}</span>}
       {shown.map((run, i) => (
         <div key={i} className="done-chip"
-          style={{ ['--suit' as string]: `var(--suit-${run[0].suit})` }} />
+          style={{ ['--suit' as string]: `var(--suit-${run[0]?.suit})` }} />
       ))}
     </div>
   );
@@ -165,6 +165,16 @@ export function CenterGrid(props: {
     canRescue: boolean;
     onRescue: () => void;
   };
+  /**
+   * Whose board this is. Only THIS player's cards get a layoutId: the shared
+   * element animation it exists for is a card leaving the hand (TableauView) and
+   * landing here under the same id, and nobody else's cards are ever drawn
+   * anywhere else on this screen with one. A layoutId on the other 28 to 31 tops
+   * cost two forced layout measurements per card on every render for an
+   * animation that could never play. Optional like everything else here, for
+   * render.test.ts; without it no card on the grid animates in.
+   */
+  me?: string;
 }) {
   // Above every early return there could ever be, and before anything that could
   // become one: this is a hook, and the board vanishing under a player who sits
@@ -221,7 +231,8 @@ export function CenterGrid(props: {
                   <div key={k} className="slot-layer" style={{ ['--k' as string]: String(layers - k) }} />
                 ))}
                 {top && (
-                  <CardView key={cardId(top)} card={top} badgeId={props.badgeOf(top.owner)} layoutId={cardId(top)} />
+                  <CardView key={cardId(top)} card={top} badgeId={props.badgeOf(top.owner)}
+                    layoutId={props.me != null && top.owner === props.me ? cardId(top) : undefined} />
                 )}
                 {/* Keyed by the race, so a new one remounts the span and replays
                     the animation. The element then simply sits at opacity 0 - no

@@ -55,3 +55,27 @@ export const BADGES: Record<BadgeId, Badge> = {
  */
 export const BADGE_IDS: BadgeId[] =
   ['tulip', 'clover', 'star', 'bell', 'clownfish', 'anchor', 'acorn', 'boat'];
+
+/** What a render site needs to draw a badge. */
+export type BadgeLook = Pick<Badge, 'label' | 'color' | 'glyph'>;
+
+export function isBadgeId(id: unknown): id is BadgeId {
+  return typeof id === 'string' && Object.hasOwn(BADGES, id);
+}
+
+/**
+ * The badge to DRAW for an id that came off the network or out of localStorage.
+ *
+ * A player's record is written by that player's own client, so its badgeId is
+ * whatever that client chose to send - and `BADGES[id]` on a key that is not in
+ * the table is undefined, so the `.color` read that follows throws in the middle
+ * of a render. With no error boundary that took the whole tree down: a blank
+ * screen for EVERY other client in the room, and again on every reload, for as
+ * long as the record stood. One forged field, one dead room. This draws a plain
+ * grey badge instead, so a forged or stale id costs one player a colour and
+ * nobody else anything.
+ */
+export const UNKNOWN_BADGE: BadgeLook = { label: 'Unknown', color: '#6b7280', glyph: '?' };
+export function badgeFor(id: unknown): BadgeLook {
+  return isBadgeId(id) ? BADGES[id] : UNKNOWN_BADGE;
+}

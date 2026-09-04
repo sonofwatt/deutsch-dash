@@ -22,12 +22,17 @@ const ANIMATED = [
   ['.wood-deal > *', 'wood-flip'],
   ['.faller', 'fall-down'],
   ['.spark', 'spark-out'],
+  // The fireworks: the ignition bloom and a spark. A spark runs two animations,
+  // and the computed name lists both.
+  ['.shell b', 'shell-flash'],
+  ['.shell i', 'firework, twinkle'],
 ] as const;
 
 const PAGE = `<!doctype html><html><head><style>${CSS}</style></head><body>
   <div class="wood-deal"><div class="card">7</div></div>
   <div class="faller">X</div>
   <div class="spark"></div>
+  <div class="fireworks"><span class="shell"><b></b><i></i></span></div>
 </body></html>`;
 
 describe.runIf(process.env.LAYOUT === '1')('the reduced-motion override', () => {
