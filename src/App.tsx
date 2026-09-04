@@ -1,15 +1,26 @@
-import { useEffect, useState } from 'react';
-import { MotionConfig } from 'framer-motion';
-import { honoursReducedMotion } from './ui/platform';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Home } from './ui/screens/Home';
 import { RoomScreen } from './ui/screens/RoomScreen';
-import { Keeper } from './ui/screens/Keeper';
 import { ThemeToggle } from './ui/components/ThemeToggle';
 import { CrashGuard } from './ui/components/CrashGuard';
 import { configMissing } from './net/firebase';
 import { gameStore, useGameStore } from './state/store';
 import './theme.css';
 import './ui/ui.css';
+
+/**
+ * The scorepad, loaded when somebody asks for it.
+ *
+ * Nothing this file imports reaches framer-motion any more, which is the point:
+ * the library is 43 kB gzip of a 199 kB first load, and it now arrives with the
+ * board or the scorepad rather than with the app. `MotionConfig` went with it -
+ * see `MotionShell`, which each lazy branch renders for itself, because importing
+ * the config here would have pulled the library straight back in.
+ */
+const KeeperRoute = lazy(() => import('./ui/screens/KeeperRoute'));
+
+/** Shown only while a route chunk is in flight, which is once per device. */
+const loading = <div className="screen stack"><p className="muted">Loading…</p></div>;
 
 export type Route = { screen: 'home' } | { screen: 'room'; code: string } | { screen: 'keeper' };
 
@@ -43,17 +54,14 @@ export default function App() {
     if (route.screen === 'home' && s.joinPhase !== 'idle') s.leave();
     if (route.screen === 'room' && s.code && s.code !== route.code) s.leave();
   }, [route]);
-  // Phones let the OS decide; a desktop animates regardless. See
-  // honoursReducedMotion for why the two are not treated alike.
-  const motion = honoursReducedMotion() ? 'user' : 'never';
   // Before the config gate on purpose: the scorepad is pure local arithmetic and
   // works in a deployment with no Firebase at all.
   if (route.screen === 'keeper') {
     return (
-      <MotionConfig reducedMotion={motion}>
-        <CrashGuard><Keeper /></CrashGuard>
+      <>
+        <CrashGuard><Suspense fallback={loading}><KeeperRoute /></Suspense></CrashGuard>
         <span className="corner-btns"><ThemeToggle /></span>
-      </MotionConfig>
+      </>
     );
   }
   if (configMissing) {
@@ -68,9 +76,9 @@ export default function App() {
     );
   }
   return (
-    <MotionConfig reducedMotion={motion}>
+    <>
       <CrashGuard>{route.screen === 'room' ? <RoomScreen code={route.code} /> : <Home />}</CrashGuard>
       {!boardUp && <span className="corner-btns"><ThemeToggle /></span>}
-    </MotionConfig>
+    </>
   );
 }

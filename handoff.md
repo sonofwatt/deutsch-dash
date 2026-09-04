@@ -1104,6 +1104,48 @@ their own cards in the middle, and it was the smallest thing on the face.
 at the inside edge of the padding box, so the same 14px on both sides put it
 almost on the border.
 
+### Framer-motion arrives with the board, not with the app _(#64)_
+
+43 kB gzip of a 199 kB first load was animation code, downloaded before the join
+screen could paint. It now comes down with the board or the scorepad, and a first
+load is **140 kB gzip instead of 199**. It buys one moment: somebody opening an
+invite link on a phone with a cold cache gets to the join screen sooner, and the
+library arrives while they are typing a name. A returning player is cached either
+way, and a cold reload straight into a running round is marginally worse, because
+the board needs the chunk at once and it is now a second request.
+
+**The boundary is inside `RoomScreen`, around `GameRoute`, and that placement is
+the whole trick.** An invite link mounts `RoomScreen` immediately, so splitting at
+the route above it in `App.tsx` would have deferred the library exactly until the
+moment it was needed and bought nothing on the one path this exists for. `Join`
+and `Lobby` reach framer-motion through nothing, which is what makes the split
+real: verified by walking the import graph, not by assuming.
+
+`MotionConfig` had to leave `App.tsx` with it - importing the config IS importing
+the library - so `MotionShell` renders it inside each lazy branch instead. There
+are two, and they are the only two things that animate: the board and the
+scorepad. **Anything new that animates must sit inside a branch that has a shell**,
+or it silently gets framer's defaults and ignores the reduced-motion preference.
+
+**Two traps, both of which made the split LOOK like it had worked.**
+
+- **A named manual chunk is not a lazy chunk.** Giving framer-motion its own
+  `advancedChunks` group produced a tidy `motion-*.js` file that the entry chunk
+  still statically imported and `index.html` still preloaded. The library has to
+  be EXCLUDED from the vendor group instead, with nothing of its own, so the
+  bundler places it where it is actually used.
+- **framer-motion is three packages.** `motion-dom` and `motion-utils` are
+  siblings in `node_modules` and carry most of the weight, so excluding only
+  `framer-motion/` left about 100 kB of it in the eager chunk. The vendor test
+  excludes all three.
+
+Neither is visible from the source, and the tests cannot see either: they are
+facts about the build output. **Check them the way they were found** - build, then
+read what `index.html` preloads and what the entry chunk statically imports. A
+browser run confirmed the rest end to end: the home screen and the lobby fetch no
+board chunk at all, starting a game fetches `GameRoute` and `MotionShell` on
+demand, the board renders, and the console stays clean.
+
 ### A wood turn brings three, across the turn-over _(#63)_
 
 Reported from a table: at the end of the pile the game counted out a short group
@@ -2105,13 +2147,16 @@ the ledgered pointer-capture re-select check on mouse drags.
 - Test counts are quoted in the header of this file and nowhere else, because
   they drifted three separate ways when they lived in four places. If you add
   tests, update that one line or delete the number.
-- Bundle is two chunks since the audit: vendor 538 kB (165 kB gzip) and app
-  104 kB (35 kB gzip). The vendor chunk still trips Vite's 500 kB warning, which
-  is cosmetic; the split saves no first-load bytes, it lets a returning player
-  keep the vendor chunk across deploys. No route-level split: the keeper route
-  measured at 8.5 kB minified, not worth a loading state. Firebase is 229 kB of
-  the vendor chunk and cannot leave the home screen without dismantling the
-  module-scope store singleton.
+- Bundle, measured 2026-09-04. **A first load is 140 kB gzip**: the entry at
+  16 kB and the vendor chunk at 123 kB. Everything that animates comes later, on
+  demand - see "Framer-motion arrives with the board" below. The vendor split
+  itself saves no first-load bytes; it lets a returning player keep that chunk
+  across deploys, which is most visits to a game that ships this often. Firebase
+  is 229 kB of it and cannot leave the home screen without dismantling the
+  module-scope store singleton, so it is the floor. The audit's note that a lazy
+  keeper route was not worth a loading state still holds on its own terms - the
+  route is 3 kB gzip - but it rides along free now, because the boundary exists
+  for the library rather than for the route.
 - **A centre play used to be invisible to the player who made it for a whole
   round trip, and silently dropped their next one. Fixed on 2026-09-04.**
   `playToCenter` passed `{ applyLocally: false }`, so the write raised no local
@@ -2367,6 +2412,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `e4b029d` | The room the join screen already read, threaded into the join, so entry stops downloading it twice |
 | `4b05de8` | The bolt that says who dashed, on the sheet that ends the game and on the scorepad's |
 | `4a10893` | A wood turn brings three across the turn-over, so the pile stops showing the same four cards for ever |
+| `PENDING` | Framer-motion off the entry path: a first load drops from 199 kB gzip to 140, and the animation code comes down with the board |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.

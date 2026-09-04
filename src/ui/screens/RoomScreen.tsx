@@ -1,50 +1,24 @@
-import { useEffect, useState } from 'react';
-import { useGameStore, gameStore } from '../../state/store';
+import { lazy, Suspense } from 'react';
+import { useGameStore } from '../../state/store';
 import { Join, Rejoining } from './Join';
 import { roomView } from './roomView';
 import { Lobby } from './Lobby';
-import { Game } from './Game';
-import { DashSplash } from '../components/DashSplash';
-import { splashVariant, type Splash } from '../splashVariant';
-import { RoundEndOverlay } from '../components/RoundEndOverlay';
-import { GameOverOverlay } from '../components/GameOverOverlay';
 
 /**
- * How long the dash splash holds the screen. The particles have to finish inside
- * it - see ui.css, where the slowest faller runs 3.4s - and it was 1600ms, which
- * cut the celebration off before most of it had crossed the screen.
+ * The board, loaded when a player actually reaches one.
+ *
+ * Everything above this line renders without framer-motion: `Join` and `Lobby`
+ * reach it through nothing, which is the whole reason the boundary sits HERE and
+ * not around `RoomScreen` itself. An invite link mounts `RoomScreen` immediately,
+ * so splitting at the route above would have deferred the library only until the
+ * exact moment it was already needed, and bought nothing on the one path this is
+ * meant to help.
  */
-const SPLASH_MS = 3600;
+const GameRoute = lazy(() => import('./GameRoute'));
 
 export function RoomScreen({ code }: { code: string }) {
   const joinPhase = useGameStore(s => s.joinPhase);
   const room = useGameStore(s => s.room);
-  const phase = room?.meta.phase;
-  const dashedBy = room?.round?.dashedBy ?? null;
-  // Frozen at the dash, deliberately. The host commits the round's totals within a
-  // few hundred ms of the phase turning, so a variant recomputed on every render
-  // can change glyph halfway through its own animation - tears turning to
-  // something worse as the new totals land. The splash is a snapshot of the moment
-  // it fired, and the sheet behind it carries the new numbers.
-  const [splash, setSplash] = useState<{ until: number; variant: Splash } | null>(null);
-
-  useEffect(() => {
-    if (phase !== 'roundEnd' || !dashedBy) return;
-    // Sampled from the store rather than read from render scope on purpose: this
-    // wants the totals as they stood AT THE DASH, and must not re-run when they
-    // change a moment later. Taking them as deps would do exactly that.
-    const at = gameStore.getState();
-    if (at.room) setSplash({ until: Date.now() + SPLASH_MS,
-      variant: splashVariant(at.room.players, dashedBy, at.uid, at.room.round) });
-  }, [phase, dashedBy]);
-  const [, force] = useState(0);
-  useEffect(() => {
-    const until = splash?.until ?? 0;
-    if (until > Date.now()) {
-      const t = setTimeout(() => force(x => x + 1), until - Date.now());
-      return () => clearTimeout(t);
-    }
-  }, [splash]);
 
   const view = roomView(joinPhase, room != null);
   if (view === 'form') return <Join code={code} />;
@@ -53,17 +27,15 @@ export function RoomScreen({ code }: { code: string }) {
   // now goes through a function, and it falls the safe way if it ever stops
   // being true.
   if (view === 'rejoining' || !room) return <Rejoining code={code} />;
-  if (phase === 'lobby') return <Lobby code={code} />;
+  if (room.meta.phase === 'lobby') return <Lobby code={code} />;
 
-  const splashing = (splash?.until ?? 0) > Date.now();
-  const dasherName = dashedBy ? room.players[dashedBy]?.name ?? '' : '';
+  // Seen only by a player whose first sight of a board is also their first sight
+  // of this chunk: a reload straight into a running round on a cold cache. Every
+  // other route here arrives with it already fetched, from the lobby they waited
+  // in or from a previous round.
   return (
-    <>
-      <Game />
-      {splashing && dasherName && splash &&
-        <DashSplash name={dasherName} splash={splash.variant} />}
-      {!splashing && phase === 'roundEnd' && <RoundEndOverlay />}
-      {!splashing && phase === 'gameOver' && <GameOverOverlay />}
-    </>
+    <Suspense fallback={<div className="screen stack"><p className="muted">Dealing…</p></div>}>
+      <GameRoute />
+    </Suspense>
   );
 }
