@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseDrop, nearestOf, ghostFix, GHOST_ANCHOR, throwOf, aimedAt, crossedBy,
+import { dropSpace, parseDrop, nearestOf, ghostFix, GHOST_ANCHOR, throwOf, aimedAt, crossedBy,
   edgeDistance, FLICK_MAX_AIM_DEG } from './useDrag';
 
 describe('parseDrop', () => {
@@ -312,5 +312,58 @@ describe('edgeDistance', () => {
   });
   it('measures diagonally off a corner', () => {
     expect(edgeDistance({ x: 123, y: 134 }, b)).toBeCloseTo(5);
+  });
+});
+
+describe('dropSpace', () => {
+  // A 3x3 board, laid out where a phone would put it.
+  const box = (index: number) => ({
+    index, w: 60, h: 80,
+    cx: 60 + (index % 3) * 100,
+    cy: 100 + Math.floor(index / 3) * 120,
+  });
+  const RELEASE = { x: 260, y: 340 };            // dead centre of the bottom-right square
+  // A short flick from that corner, aimed up and left at the top-left square:
+  // the bearing to it is (-200, -240), and a 30px flick along the same line.
+  const flick = { from: RELEASE, dx: -20, dy: -24, speed: 2 };
+
+  it('sends a flick to the square it was AIMED at, across a row it cannot use', () => {
+    // Reported from a table: a flick from the bottom corner failed whenever the
+    // squares down there were occupied by cards this one could not follow. The
+    // flick is short, so the finger leaves the glass still over the bottom row,
+    // and that square used to win outright - the aim was thrown away and the card
+    // came back for no reason the player could see. Only the top-left is legal.
+    expect(dropSpace({ space: 8, aim: flick }, [box(0)], RELEASE)).toBe(0);
+  });
+
+  it('still lets a square under the finger win when the card can go there', () => {
+    // The other half of the rule, and the reason it is not simply "always aim":
+    // somebody who put the card on a playable square chose that square, and it
+    // must not be overruled by how fast they happened to get there.
+    expect(dropSpace({ space: 8, aim: flick }, [box(8), box(0)], RELEASE)).toBe(8);
+  });
+
+  it('leaves a deliberate drop on an unusable square exactly as it was', () => {
+    // No throw, so there is nothing to fall back to and nothing to reinterpret.
+    // It goes to the square they placed it on, and is refused there, as before.
+    expect(dropSpace({ space: 8 }, [box(0)], RELEASE)).toBe(8);
+  });
+
+  it('answers nothing for a post, which the caller plays directly', () => {
+    expect(dropSpace({ post: 1 }, [box(0)], RELEASE)).toBeNull();
+  });
+
+  it('falls back to the release point when a thrown card aims at nothing legal', () => {
+    // Thrown at a square it cannot use, and the aim finds nothing either - the
+    // only legal square is behind the throw. The release point is over the board
+    // by definition here, so the nearest legal square is a fair second answer.
+    const backwards = { from: RELEASE, dx: 20, dy: 24, speed: 2 }; // away from the board
+    expect(dropSpace({ space: 8, aim: backwards }, [box(6)], RELEASE)).toBe(6);
+  });
+
+  it('is unchanged for a throw that chose no square at all', () => {
+    expect(dropSpace({ nearest: true, aim: flick, loose: true }, [box(0)], RELEASE)).toBe(0);
+    expect(dropSpace({ nearest: true, loose: false }, [box(0)], RELEASE)).toBeNull();
+    expect(dropSpace({ nearest: true, loose: true }, [box(0)], RELEASE)).toBe(0);
   });
 });

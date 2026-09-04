@@ -3,7 +3,10 @@ import type React from 'react'; // React.PointerEvent type only (new-JSX files d
 import type { Card, PlaySource } from '../game/types';
 
 export type DropTarget =
-  | { space: number }
+  // `aim` rides along on a square for one reason: the square under the finger is
+  // only a choice if the card can GO there, and this hook does not know the rules.
+  // See `dropSpace`, which is the half that decides.
+  | { space: number; aim?: Throw }
   | { post: number }
   // No particular square. Two independent signals, and the caller tries them in
   // order: `aim` is the line of a throw, present when the card was thrown rather
@@ -410,6 +413,37 @@ export function edgeDistance(p: Point, c: SpaceBox): number {
   return Math.hypot(dx, dy);
 }
 
+/**
+ * Which space a drop actually means, given what this card may legally reach.
+ *
+ * The rule the reported bug came down to: **a square under the finger wins only
+ * if the card can go there.** A flick is short and fast, so the finger leaves the
+ * screen barely past where it started - over the player's own end of the board.
+ * If the squares there are occupied by cards this one cannot follow, the release
+ * point sits on one of them, and taking that square as the player's choice threw
+ * away the only signal that said where they were actually aiming.
+ *
+ * A DELIBERATE drop keeps the old behaviour exactly: with no throw there is
+ * nothing to fall back to, so the square they placed it on is still the answer,
+ * and it is still refused if it cannot take the card. Only a THROWN card whose
+ * square cannot take it re-reads the aim.
+ *
+ * Pure: `legal` is the boxes of the spaces this card may land in, already
+ * measured, so the whole decision can be tested without a DOM.
+ */
+export function dropSpace(target: DropTarget, legal: SpaceBox[], at: Point): number | null {
+  if ('post' in target) return null; // not a square at all; the caller plays it directly
+  const byAim = (aim?: Throw) => (aim ? aimedAt(legal, aim) : null);
+  if ('space' in target) {
+    if (!target.aim || legal.some(b => b.index === target.space)) return target.space;
+    // Thrown, and it came down on a square that cannot take it. The release point
+    // is over the board by definition here, so the nearest legal square is a fair
+    // second answer when the aim itself finds nothing.
+    return byAim(target.aim) ?? nearestOf(legal, at.x, at.y);
+  }
+  return byAim(target.aim) ?? (target.loose ? nearestOf(legal, at.x, at.y) : null);
+}
+
 /** Which of these centre spaces is nearest the point, by where they are on screen. */
 export function nearestSpace(indices: number[], x: number, y: number): number | null {
   return nearestOf(spaceCentres(indices), x, y);
@@ -481,10 +515,18 @@ export function useDrag(
       if (ev.type === 'pointerup') {
         const target = parseDrop(document.elementFromPoint(ev.clientX, ev.clientY));
         const at = { x: ev.clientX, y: ev.clientY };
-        // An explicit pile under the finger wins: that is somebody placing a card
-        // on a square they chose, and it must not be overruled by how fast they
-        // happened to get there.
-        if (target && !('nearest' in target)) { onDrop(source, target, at); return; }
+        // A post under the finger is a placement and nothing else.
+        if (target && 'post' in target) { onDrop(source, target, at); return; }
+        // A square under the finger is a placement too - but it is only a CHOICE
+        // if the card can go there, and this hook does not know that. So the throw
+        // travels with it and `dropSpace` decides. Without this, a flick from the
+        // bottom corner across a full bottom row died on the square it happened to
+        // be released over: that square won unconditionally, the aim was thrown
+        // away, and the card came back for no reason the player could see.
+        if (target && 'space' in target) {
+          onDrop(source, { space: target.space, aim: thrown ?? undefined }, at);
+          return;
+        }
         // Did they let go somewhere that means "the middle"? The drop zone element
         // covers the board; the rest is everything above their own hand - the gaps
         // beside the grid, the opponent strip, the head - which is all board as far

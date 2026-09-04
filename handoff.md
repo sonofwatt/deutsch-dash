@@ -20,7 +20,7 @@ emulator against the NEW rules, and create, join, rejoin, deal, play, score and
 both race paths were all accepted. A phone still holding an older bundle was
 therefore never locked out by the release._
 
-_**469 tests** (406 unit and 24 in a real browser; 39 against the emulator, all
+_**475 tests** (412 unit and 24 in a real browser; 39 against the emulator, all
 green). This is the only place in the repo that quotes a count -
 it drifted three separate ways when it lived in four places, so keep it here and
 nowhere else. Both sides of the 2026-09-04 merge rewrote this line, which is the
@@ -880,9 +880,14 @@ a 30px flick place a card 400px away, which is the whole point of a flick.
 Three signals, tried in this order (`useDrag.ts`, then the `nearest` branch of
 `Game.tsx`):
 
-1. **An explicit pile under the finger wins**, at any speed. That is somebody
-   placing a card on a square they chose, and it must not be overruled by how
-   fast they got there.
+1. **A pile under the finger wins - IF the card can go there.** Placing a card on
+   a square you chose must not be overruled by how fast you got there, but that
+   reasoning only holds for a square the card can actually land on: you cannot be
+   choosing a square that will refuse it. A thrown card whose square cannot take
+   it falls through to the aim below. A card DROPPED there, with no throw to fall
+   back to, still goes to that square and is still refused, exactly as before.
+   `dropSpace` in `useDrag.ts` is the whole decision, and it is pure so it can be
+   tested without a DOM. **This was a reported bug** - see #65.
 2. **The LINE of the throw** (`throwOf` → `aimedAt`). A flick says a direction
    and nothing dependable about distance, so the card goes to the legal space
    nearest the line of the throw. Aim at nothing and it does nothing - that is
@@ -1103,6 +1108,42 @@ their own cards in the middle, and it was the smallest thing on the face.
 `select.field` carries `padding-right: 26px`. A browser draws a select's chevron
 at the inside edge of the padding box, so the same 14px on both sides put it
 almost on the border.
+
+### A flick died on the squares it flew over _(#65)_
+
+Reported from a table: a flick from the bottom corner fails when the bottom row
+is full of cards this one cannot follow, even though the intended target - the
+top-left square - is empty and legal.
+
+It was not the aiming. `aimedAt` only ever sees LEGAL squares, so the full ones
+were never candidates and none of its four rules were involved. The gesture died
+one step earlier, in the pointerup handler: an explicit square under the finger
+won **unconditionally**, and taking it threw the whole throw away. A flick is
+short and fast, so the finger leaves the glass barely past where it started -
+over the player's own end of the board. If the square there was occupied by a
+card this one could not follow, that square was read as the player's choice, the
+play was refused, and the card came back for no reason anybody could see.
+
+The rule is now: **a square under the finger wins only if the card can go there.**
+A deliberate drop is untouched - with no throw there is nothing to fall back to,
+so it still goes to the square it was placed on and is still refused there. Only a
+THROWN card whose square cannot take it re-reads the aim.
+
+The decision moved out of the hook into `dropSpace`, which is pure and takes the
+legal spaces already measured, so the whole thing is testable without a DOM. The
+hook stays what it was - a gesture reader that knows no rules - and passes the
+throw along on the square so the half that does know can reconsider.
+
+**Verified in a browser, not only in tests**, because the bug lived in the wiring
+between the two. Against the emulator with every square but the top-left rigged to
+refuse the card in hand, a flick released over a full bottom-row square lands on
+the top-left; with the old line restored it does not arrive at all. That harness
+is the one in "Driving the real app", plus one thing worth knowing: **the client
+OWNS its hand.** It keeps a local copy and only persists it, so writing
+`round/tableaus/$uid` from outside changes nothing on screen. Rig the BOARD around
+the card the client is actually holding instead. `round/spaces` is also absent for
+a normal round - `startRound` writes it only for an orderly board - so rigging has
+to create those nodes and take the size from `spaceCount`.
 
 ### Framer-motion arrives with the board, not with the app _(#64)_
 
@@ -2413,6 +2454,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `4b05de8` | The bolt that says who dashed, on the sheet that ends the game and on the scorepad's |
 | `4a10893` | A wood turn brings three across the turn-over, so the pile stops showing the same four cards for ever |
 | `05279d9` | Framer-motion off the entry path: a first load drops from 199 kB gzip to 140, and the animation code comes down with the board |
+| `PENDING` | A flick no longer dies on a square it flew over: the square under the finger wins only if the card can go there |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.

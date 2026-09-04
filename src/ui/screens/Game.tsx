@@ -11,7 +11,7 @@ import { TableauView } from '../components/TableauView';
 import { OpponentStrip } from '../components/OpponentStrip';
 import { ConnectionPill } from '../components/ConnectionPill';
 import { ThemeToggle } from '../components/ThemeToggle';
-import { aimedAt, nearestSpace, spaceCentres, useDrag, type DropTarget, type Point } from '../useDrag';
+import { dropSpace, spaceCentres, useDrag, type DropTarget, type Point } from '../useDrag';
 import { raceFlashes } from '../raceFlash';
 import { useOpenings } from '../openings';
 import { useWoodSide } from '../prefs';
@@ -136,26 +136,21 @@ export function Game() {
 
   const { drag, startDrag, pointer } = useDrag((source: PlaySource, target: DropTarget, at: Point) => {
     gameStore.setState({ selection: source }); // direct set - select() would TOGGLE an already-selected source off
-    if ('nearest' in target) {
-      // No particular square was chosen. The candidates are the spaces this card
-      // can LEGALLY land in, and that is what makes the gesture forgiving: aim at
-      // a space that is full, or at a pile this card cannot follow, and it goes to
-      // a playable one rather than coming back. Nothing is ever returned while
-      // there is somewhere for it to go.
-      const legal = round ? legalTargets(tableau!, source, round.spaces).spaces : [];
-      // Two signals, tried in order. The LINE of a throw comes first, because a
-      // flick says a direction and nothing dependable about distance - that is
-      // what lets a 30px flick reach a space 400px away. Where they let go comes
-      // second, and covers the throw that overshot: aim from a release point past
-      // the board points back down at it, so the aim finds nothing and the
-      // release - which is over the board, where they meant it - decides instead.
-      const best = (target.aim ? aimedAt(spaceCentres(legal), target.aim) : null)
-        ?? (target.loose ? nearestSpace(legal, at.x, at.y) : null);
-      if (best == null) { gameStore.setState({ selection: null }); return; }
-      void playTo({ space: best });
-      return;
-    }
-    void playTo(target);                       // playTo consumes the selection
+    if ('post' in target) { void playTo(target); return; } // playTo consumes the selection
+    // The candidates are the spaces this card can LEGALLY land in, and that is
+    // what makes the gesture forgiving: aim at a space that is full, or at a pile
+    // this card cannot follow, and it goes to a playable one rather than coming
+    // back. Nothing is ever returned while there is somewhere for it to go.
+    //
+    // `dropSpace` weighs the signals: the square under the finger if the card can
+    // go there, then the LINE of the throw - which comes before where they let go,
+    // because a flick says a direction and nothing dependable about distance, and
+    // that is what lets a 30px flick reach a space 400px away - and last the
+    // release point, which covers the throw that overshot the board.
+    const legal = round ? legalTargets(tableau!, source, round.spaces).spaces : [];
+    const best = dropSpace(target, spaceCentres(legal), at);
+    if (best == null) { gameStore.setState({ selection: null }); return; }
+    void playTo({ space: best });
   }, room.meta.flingOn ?? true);
 
   // The store drops our hand the moment the phase leaves 'playing' (store.ts, the
