@@ -2173,6 +2173,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `21aceac` | The code says dash too: keys, types, CSS, tests |
 | `aa4ec3e` | The emulator project and the borrowed game name follow |
 | `dc78867` → `e3c6676` | Security and performance audit: the ghost off the render path, memoised cards, defensive reads, one-field wood writes, self-hosted fonts, least-privilege CI |
+| `cecb628` → `0b29024` | The audit's analysis finished by hand after the limit: the verdict ledger, the seventh reader, and the four small gaps it found closed (late-play rollback, write-once createdAt, an absent host recovered, a CSPRNG room code) |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
