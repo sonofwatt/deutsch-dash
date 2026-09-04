@@ -11,21 +11,26 @@ export const WOOD_STEP = 3;
 export function flipWood(t: Tableau, step: number = WOOD_STEP): Tableau {
   const len = t.wood.length;
   if (len === 0) return t;
-  // The count carries ACROSS the turn-over instead of restarting at it. Reaching
-  // the end with one card left turns that card, puts the pile back face down and
-  // keeps going until the turn has brought three: a turn deals three cards, never
-  // "up to three". This is the physical action - you do not stop mid-turn because
-  // the pile ran out - and getting it wrong was not a cosmetic short deal.
+  const faceDown = len - t.woodIndex;
+  // The ordinary turn: three more off the top of the face-down pile.
+  if (faceDown >= step) return { ...t, woodIndex: t.woodIndex + step };
+
+  // The pile ran out part-way through a turn. A turn brings three cards, so the
+  // rest of it comes from the pile being turned over, and this is that move:
   //
-  // Restarting the count left the pile permanently in phase with itself. A
-  // ten-card pile went 3, 6, 9, 10, and then 3 again for ever: four of its ten
-  // cards could be the top, and the other six never could, however long anybody
-  // kept tapping. Carrying the count moves the phase on every lap, so when the
-  // pile size and the step share no factor the cycle reaches EVERY card. Twenty
-  // seven is the size a round deals, which does share one - that is why
-  // `sinkWoodTop` exists - but the pile stops being a multiple of three the
-  // moment a single card is played out of it.
-  return { ...t, woodIndex: ((t.woodIndex + step - 1) % len) + 1 };
+  //   turn the last one or two face up, put every card that was ALREADY face up
+  //   back under them face down, and finish the turn off the top of those.
+  //
+  // Rotating the array left by the old index is exactly that. The cards still
+  // face down keep their order at the front, the older ones follow them round,
+  // and the three cards of this turn end up as the new face-up prefix - which is
+  // what makes them all three visible on the pile, and what a hand of real cards
+  // does. `woodIndex` counts the face-up prefix, so it lands on the step itself.
+  //
+  // It reorders the pile, so a caller that persists the index ALONE would leave
+  // the stored hand describing different cards. See `flip` in `state/store.ts`.
+  const wood = [...t.wood.slice(t.woodIndex), ...t.wood.slice(0, t.woodIndex)];
+  return { ...t, wood, woodIndex: Math.min(step, len) };
 }
 
 /**
@@ -77,12 +82,24 @@ export function rotateWood(t: Tableau): Tableau {
  */
 export function woodCycleTops(t: Tableau, step: number = WOOD_STEP): Card[] {
   const out: Card[] = [];
-  if (t.wood.length === 0) return out;
-  const seen = new Set<number>();
+  const len = t.wood.length;
+  if (len === 0) return out;
+  // Stopped on a repeated TOP CARD, not on a repeated index. `flipWood` rotates
+  // the pile when it runs out, so the index comes back to the same number every
+  // lap with different cards under it, and the array itself can take two laps to
+  // return to where it started while the cards have already come round once. The
+  // card on top is the thing being asked about, so it is the thing to watch.
+  const seen = new Set<Card>();
   let cur: Tableau = t;
-  while (!seen.has(cur.woodIndex)) {
-    seen.add(cur.woodIndex);
-    if (cur.woodIndex > 0) out.push(cur.wood[cur.woodIndex - 1]);
+  // One turn per card is the most that can be needed; the bound is belt and
+  // braces so a future change to the turn cannot spin this for ever.
+  for (let n = 0; n <= len; n++) {
+    if (cur.woodIndex > 0) {
+      const top = cur.wood[cur.woodIndex - 1];
+      if (seen.has(top)) break;
+      seen.add(top);
+      out.push(top);
+    }
     cur = flipWood(cur, step);
   }
   return out;

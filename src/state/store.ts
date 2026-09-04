@@ -483,7 +483,10 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         if (p.stuckAt != null) return;
         const next = flipWood(t);
         setBotTableau(id, next);
-        void deps.persistWoodIndex(code, id, next.woodIndex);
+        // Same reason as the player's `flip`: a turn that takes the pile over
+        // reorders it, so the index alone would not describe the same cards.
+        if (next.wood !== t.wood) void deps.persistTableau(code, id, next);
+        else void deps.persistWoodIndex(code, id, next.woodIndex);
         flips.set(id, (flips.get(id) ?? 0) + 1);
         syncStuck(id, next);
         return;
@@ -897,9 +900,14 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         noteActivity();
         const next = flipWood(t, woodStep(get().room));
         set({ tableau: next, selection: null });
-        // The index alone: see persistWoodIndex for what the full write cost.
         const code = get().code;
-        if (code) void deps.persistWoodIndex(code, uid, next.woodIndex);
+        // The index alone on an ordinary turn: see persistWoodIndex for what the
+        // full write cost. But the turn that takes the pile over REORDERS it, and
+        // then the index describes different cards - a reload would come back to a
+        // hand holding the wrong three. Those turns write the pile with it, which
+        // is once per lap rather than once per tap.
+        if (code && next.wood !== t.wood) void persist(next);
+        else if (code) void deps.persistWoodIndex(code, uid, next.woodIndex);
         flips.set(uid, (flips.get(uid) ?? 0) + 1);
         syncStuck(uid, next); // one more flip may be the one that proves it
       },

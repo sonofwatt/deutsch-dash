@@ -1356,3 +1356,39 @@ describe('the resume path hands on the room it already read', () => {
     expect(deps.joinRoom).toHaveBeenCalledWith('ABCDEF', 'D', 'tulip', undefined);
   });
 });
+
+describe('a wood turn that takes the pile over', () => {
+  // The turn that runs out of face-down cards finishes itself off the cards that
+  // were already face up, which REORDERS the pile. The index alone no longer
+  // describes the same three cards, so the whole hand has to be written - once per
+  // lap, not once per tap. Getting this wrong is invisible until a reload, which
+  // is exactly the kind of bug that reaches a table rather than a test.
+  const wood = () => [c(1, 'red'), c(2, 'red'), c(3, 'red'), c(4, 'red'), c(5, 'red')];
+  const handAt = (woodIndex: number): Tableau => ({ ...seededTableau(), wood: wood(), woodIndex });
+
+  it('writes the pile as well as the index, because the order changed under it', () => {
+    const deps = fakeDeps();
+    const store = createGameStore(deps);
+    const t = handAt(3); // three face up, two face down: the next turn wraps
+    store.setState({ uid: 'me', code: 'ABCDEF', room: playingRoom(t), tableau: t });
+    store.getState().flip();
+
+    const after = store.getState().tableau!;
+    expect(after.wood.map(x => x.v)).toEqual([4, 5, 1, 2, 3]); // 4 and 5 turned, the rest under
+    expect(after.woodIndex).toBe(3);                            // and all three are showing
+    expect(deps.persistTableau).toHaveBeenCalled();
+    expect(deps.persistWoodIndex).not.toHaveBeenCalled();
+  });
+
+  it('still writes the index alone on an ordinary turn', () => {
+    const deps = fakeDeps();
+    const store = createGameStore(deps);
+    const t = handAt(0); // five face down: three come over and nothing moves
+    store.setState({ uid: 'me', code: 'ABCDEF', room: playingRoom(t), tableau: t });
+    store.getState().flip();
+
+    expect(store.getState().tableau!.wood.map(x => x.v)).toEqual([1, 2, 3, 4, 5]);
+    expect(deps.persistWoodIndex).toHaveBeenCalledWith('ABCDEF', 'me', 3);
+    expect(deps.persistTableau).not.toHaveBeenCalled();
+  });
+});

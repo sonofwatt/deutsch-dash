@@ -39,8 +39,11 @@ export function TableauView(props: {
   const faceDown = t.wood.length - t.woodIndex; // still to be turned over
   const faceUp = t.woodIndex;                   // already turned over, top is playable
   // The cards this turn brought over, oldest first, with the playable one last.
-  // Capped at WOOD_STEP because that is the most a turn can ever deal - a shorter
-  // last turn, or the host's single-card rescue, simply deals fewer.
+  // Capped at WOOD_STEP because that is the most a turn can ever deal. A turn that
+  // takes the pile over rotates it and lands the index back on three, so its three
+  // cards are the face-up prefix here like any other turn's - the last card of the
+  // pile and the two that followed it round. Fewer only when the pile is shorter
+  // than a turn, or under the host's single-card rescue.
   const dealt = t.wood.slice(Math.max(0, t.woodIndex - WOOD_STEP), t.woodIndex);
   // The same run without its top card: what the pile looks like with the card the
   // player is holding taken off it.

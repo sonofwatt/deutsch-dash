@@ -20,7 +20,7 @@ emulator against the NEW rules, and create, join, rejoin, deal, play, score and
 both race paths were all accepted. A phone still holding an older bundle was
 therefore never locked out by the release._
 
-_**475 tests** (412 unit and 24 in a real browser; 39 against the emulator, all
+_**477 tests** (414 unit and 24 in a real browser; 39 against the emulator, all
 green). This is the only place in the repo that quotes a count -
 it drifted three separate ways when it lived in four places, so keep it here and
 nowhere else. Both sides of the 2026-09-04 merge rewrote this line, which is the
@@ -1196,10 +1196,33 @@ and the short group was the smaller half of the problem.
 `flipWood` capped at the end and then restarted at `min(step, len)`, which left
 the pile permanently in phase with itself. A ten-card pile went 3, 6, 9, 10, and
 then 3 again for ever: **four of its ten cards could be the top and the other six
-never could**, however long anybody kept tapping. It now carries the count across
-the turn-over - `((woodIndex + step - 1) % len) + 1` - so the last card is turned,
-the pile goes back face down, and the turn finishes with as many as it takes to
-make three. Every turn deals three, and the phase moves on every lap.
+never could**, however long anybody kept tapping.
+
+**The turn now does what a hand of cards does.** When fewer than three are face
+down, it turns the last one or two, puts every card that was ALREADY face up back
+underneath them face down, and finishes the turn off the top of those. All three
+cards of that turn end up on the flipped pile, which is the half a player can see:
+a five-card pile turns `[1,2,3]`, then `[4,5,1]`, then `[2,3,4]`.
+
+**In the array that is a rotation**, and that is the whole implementation:
+`[...wood.slice(woodIndex), ...wood.slice(0, woodIndex)]` with the index landing
+back on the step. The cards still face down keep their order at the front, the
+older ones follow them round, and `woodIndex` goes on meaning "how many are face
+up", so the pile stays a prefix and everything that reads it - `reconcileTableau`,
+the peek, the counts, the deal animation - keeps working untouched.
+
+Two things fall out of the reorder and both are easy to get wrong:
+
+- **A turn that wraps must persist the whole hand, not the index.** `flip` writes
+  `persistWoodIndex` alone on an ordinary turn, which is the cheap write it was
+  built for, but after a rotation the index describes different cards and a reload
+  would come back holding the wrong three. Once per lap rather than once per tap.
+  The bot's flip has the same branch, and `store.test.ts` pins both.
+- **`woodCycleTops` cannot stop on a repeated index any more.** The index returns
+  to three every lap with different cards under it, and the array can take two
+  laps to come back to where it started while the CARDS have already come round
+  once. It stops on a repeated top card instead, which is the thing being asked
+  about.
 
 **The consequence is much larger than the short deal**, and it is the reason this
 was worth doing rather than tidying. When the pile length shares no factor with
@@ -1222,10 +1245,18 @@ saying, and are said where they live:
   `hasReachableMove` decides the question exactly; the counter only stops a player
   being labelled the instant they run dry.
 
-The UI needed nothing. `canRecycle` is `faceDown === 0`, which still happens
-exactly when a turn lands on the last card, and the tap that follows it still
-turns the pile over - it just deals a full three now instead of restarting a
-count. What has gone is the short deal that used to precede it.
+The UI needed nothing, which is the point of doing it as a rotation. `canRecycle`
+is `faceDown === 0`, still reached exactly when a turn lands on the last card, and
+`dealt` is still the face-up prefix capped at three. What has gone is the short
+deal, and the tap after it that dealt nothing at all.
+
+**Verified in the app, twice, because the first version was right and still looked
+wrong.** It carried the count across the turn-over correctly - every turn dealt
+three - but only the one or two cards from AFTER the wrap stayed face up, so the
+pile still looked like it had dealt one, and it was read as the same bug a second
+time. Driven against the emulator on a rigged five-card pile, the turns now show
+`[1,2,3]`, `[4,5,1]`, `[2,3,4]`, `[5,1,2]`, `[3,4,5]` - three every time - and the
+reordered pile survives a reload, which is what proves the write.
 
 ### A way out of being stuck, and a countdown between rounds _(#61, #62)_
 
@@ -1546,9 +1577,9 @@ It used to be one card flipping (`flipKey` on the top card). A turn brings three
 cards over, so it now looks like three: `dealt` is the last `WOOD_STEP` face-up
 cards, stacked in one grid cell and animated in 70ms apart. **Keyed by card**, so
 only the ones that actually just arrived animate - under the host's single-card
-rescue the cards already face up hold still and one card lands on them, and on the
-turn that takes the pile over, the face-up pile is replaced wholesale by the one or
-two cards that finished the turn.
+rescue the cards already face up hold still and one card lands on them, and the
+turn that takes the pile over replaces the face-up pile with its own three cards,
+all of which are new, so all three deal in.
 
 Dropping `flipKey` also removed the static-render artifact it caused: a headless
 shot no longer leaves the wood card frozen edge-on at `rotateY(90)`.
@@ -2455,6 +2486,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `4a10893` | A wood turn brings three across the turn-over, so the pile stops showing the same four cards for ever |
 | `05279d9` | Framer-motion off the entry path: a first load drops from 199 kB gzip to 140, and the animation code comes down with the board |
 | `a025086` | A flick no longer dies on a square it flew over: the square under the finger wins only if the card can go there |
+| `PENDING` | The turn that takes the wood pile over keeps all three of its cards on the flipped pile, and the pile is written with the index |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.

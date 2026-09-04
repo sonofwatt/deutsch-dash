@@ -5,21 +5,27 @@ import type { Card, Suit, Tableau } from './types';
 const c = (v: number, suit: Suit): Card => ({ v, suit, owner: 'me' });
 const woodTab = (wood: Card[], woodIndex = 0): Tableau =>
   ({ dash: [], post: [[], [], []], wood, woodIndex });
-const cards = (n: number) => Array.from({ length: n }, (_, i) => c((i % 10) + 1, 'red'));
+const cards = (n: number) => Array.from({ length: n }, (_, i) => c(i + 1, 'red'));
+/** The cards showing on the flipped pile: what a turn just brought over. */
+const showing = (t: Tableau) => t.wood.slice(Math.max(0, t.woodIndex - 3), t.woodIndex).map(x => x.v);
 
 describe('flipWood', () => {
-  it('brings three cards every turn, carrying the count across the turn-over', () => {
-    // Reported from a table: the pile counted out a short last group of 1 or 2,
-    // and the NEXT tap started again at the top. A turn deals three. With one card
-    // left, that card is turned, the pile goes back face down, and two more follow
-    // to finish the turn - so the top after that turn is the 2nd card, not the 7th.
+  it('brings three cards every turn, and all three stay on the flipped pile', () => {
+    // Reported from a table: the pile counted out a short group of 1 or 2 at the
+    // end and the NEXT tap started again at the top. A turn deals three. With one
+    // card left, that card is turned, every card ALREADY face up goes back under
+    // it, and two more come off the top of those to finish the turn - and all
+    // three of them are on the flipped pile afterwards, which is the half a player
+    // can actually see.
     const t = woodTab(cards(7));
     const f1 = flipWood(t);
-    expect(f1.woodIndex).toBe(3);
+    expect(showing(f1)).toEqual([1, 2, 3]);
     const f2 = flipWood(f1);
-    expect(f2.woodIndex).toBe(6);
+    expect(showing(f2)).toEqual([4, 5, 6]);
     const f3 = flipWood(f2);
-    expect(f3.woodIndex).toBe(2); // 7 turned, pile over, 1 and 2 turned: three cards
+    expect(showing(f3)).toEqual([7, 1, 2]); // the last one, then the pile over, then two
+    expect(f3.wood.map(x => x.v)).toEqual([7, 1, 2, 3, 4, 5, 6]); // the pile turned with it
+    expect(f3.woodIndex).toBe(3);           // three face up, the rest face down under them
   });
 
   it('never deals a short group, and never shows the same tops twice round', () => {
@@ -29,27 +35,26 @@ describe('flipWood', () => {
     let t = woodTab(cards(10));
     const tops: number[] = [];
     for (let n = 0; n < 10; n++) {
-      const before = t.woodIndex;
       t = flipWood(t);
-      const dealt = t.woodIndex > before ? t.woodIndex - before : t.woodIndex + 10 - before;
-      expect(dealt).toBe(3);
+      expect(showing(t)).toHaveLength(3);    // every turn, including the ones that wrap
       tops.push(t.wood[t.woodIndex - 1].v);
     }
     expect([...tops].sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-    expect(t.woodIndex).toBe(10); // ten taps of three on ten cards lands back at the end
+    // The turn that takes the pile over shows the last card and the two that
+    // followed it, which is the whole point of the change.
+    expect(tops.slice(0, 4)).toEqual([3, 6, 9, 2]);
   });
   it('turns the pile over after full traversal and starts again', () => {
     const t = woodTab(cards(7), 7);
     expect(flipWood(t).woodIndex).toBe(3);
   });
   it('handles piles smaller than 3 and empty piles', () => {
-    // Three cards off a two-card pile is card 1, card 2, then the pile over and
-    // card 1 again, so the turn ends on the first card. The next ends on the
-    // second, and a two-card pile alternates rather than sticking on one card,
-    // which is what capping used to do to it.
-    expect(flipWood(woodTab(cards(2))).woodIndex).toBe(1);
-    expect(flipWood(woodTab(cards(2), 1)).woodIndex).toBe(2);
-    expect(flipWood(woodTab(cards(2), 2)).woodIndex).toBe(1);
+    // A pile shorter than a turn cannot deal three: both cards go face up and
+    // there is nothing underneath to finish with, so it settles there. Degenerate
+    // and deliberate - `sinkWoodTop` is the way out of a pile this small.
+    expect(flipWood(woodTab(cards(2))).woodIndex).toBe(2);
+    expect(flipWood(woodTab(cards(2), 2)).woodIndex).toBe(2);
+    expect(flipWood(woodTab(cards(1))).woodIndex).toBe(1);
     expect(flipWood(woodTab([]))).toEqual(woodTab([]));
   });
   it('never mutates card order', () => {
