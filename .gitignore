@@ -23,7 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 
-# Session scratch (superpowers SDD working files) — never commit
+# Session scratch (superpowers SDD working files) - never commit
 .superpowers/
 
 firebase-debug.log
