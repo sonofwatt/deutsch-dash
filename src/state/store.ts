@@ -46,7 +46,7 @@ export const RACE_GRACE_MS = 1000;
 export interface Deps {
   ensureSignedIn(): Promise<string>;
   watchRoom(code: string, cb: (room: Room | null) => void): () => void;
-  joinRoom(code: string, name: string, badgeId: BadgeId): Promise<JoinResult>;
+  joinRoom(code: string, name: string, badgeId: BadgeId, known?: Room): Promise<JoinResult>;
   createRoom(name: string, badgeId: BadgeId): Promise<string>;
   setTargetScore(code: string, n: number): Promise<void>;
   setReady(code: string, uid: string, on: boolean): Promise<void>;
@@ -101,7 +101,12 @@ export interface GameStore {
   online: boolean;
   setOnline(v: boolean): void;
   hostRoom(name: string, badgeId: BadgeId): Promise<string>;
-  enterRoom(code: string, name: string, badgeId: BadgeId): Promise<JoinResult>;
+  /**
+   * `known` is a room the caller has already read, and only the resume path in
+   * `Join.tsx` may pass it: it is trusted rather than checked, so that the join
+   * does not download a room the caller is holding. See `joinRoom`.
+   */
+  enterRoom(code: string, name: string, badgeId: BadgeId, known?: Room): Promise<JoinResult>;
   leave(): void;
   select(source: PlaySource): void;
   playTo(target: { space: number } | { post: number }): Promise<void>;
@@ -733,12 +738,12 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         }
       },
 
-      async enterRoom(code, name, badgeId) {
+      async enterRoom(code, name, badgeId, known) {
         const attempt = ++joinAttempt;
         set({ joinPhase: 'joining', joinError: null });
         try {
           const uid = await deps.ensureSignedIn();
-          const res = await deps.joinRoom(code, name, badgeId);
+          const res = await deps.joinRoom(code, name, badgeId, known);
           if (stale(attempt)) {
             // joinRoom armed presence for THIS room on its way out, and presence is
             // last-writer-wins. If a newer join has already landed, put its room's

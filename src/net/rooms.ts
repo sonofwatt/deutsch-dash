@@ -139,10 +139,26 @@ export async function createRoom(name: string, badgeId: BadgeId): Promise<string
   return code;
 }
 
-export async function joinRoom(code: string, name: string, badgeId: BadgeId): Promise<JoinResult> {
+export async function joinRoom(
+  code: string, name: string, badgeId: BadgeId, known?: Room,
+): Promise<JoinResult> {
   const uid = await ensureSignedIn();
-  const snap = await get(roomRef(code));
-  const room = normalizeRoom(snap.val());
+  // `known` is a room the caller has ALREADY read, and passing it removes the
+  // second of the three identical downloads one entry used to cost: 47,373 bytes
+  // measured for a single entry. The SDK will not do this for you - `repoGetValue`
+  // caches only active queries and drops the sync point on its way out, so the
+  // peek and this get share nothing.
+  //
+  // It is TRUSTED, not verified. That is the entire saving, and it is why exactly
+  // one caller may pass it: the resume path in `Join.tsx`, which peeks to decide
+  // whether this device is already a member and is one await old by the time it
+  // gets here. The FORM path must not, and that is not a style preference. There
+  // the peek can be minutes old by the time somebody has typed a name and picked a
+  // badge, and the checks below would then turn a room that is simply `full`, or
+  // whose badge is taken, into a `race` - the player told the wrong thing about
+  // why they cannot get in. Nothing corrupts either way, because the rules and
+  // `increment(1)` enforce the cap for real.
+  const room = known ?? normalizeRoom((await get(roomRef(code))).val());
   if (!room) return { ok: false, reason: 'not-found' };
   const rejoining = uid in room.players;
   // Expiry is for newcomers. This is the one comparison of this device's clock

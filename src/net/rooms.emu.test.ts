@@ -839,3 +839,51 @@ emu('validation rules bound what a client may store (database.rules.json)', () =
     await assertSucceeds(round.child('dashedBy').set(OTHER));
   });
 });
+
+emu('the resume path threads the room it already read', () => {
+  it('rejoins on a room passed in, and leaves the player record as it stands', async () => {
+    // The saving this exists for: entry used to download the same room three
+    // times, 47,373 bytes measured, because `peekRoom` and `joinRoom` share no
+    // cache. `Join.tsx` peeks to decide whether this device is already a member,
+    // and hands that same object on rather than paying for it twice.
+    const code = await createRoom('Host', 'tulip');
+    const { db, ensureSignedIn } = await import('./firebase');
+    const uid = await ensureSignedIn();
+    const peeked = await peekRoom(code);
+    expect(peeked!.players[uid]).toBeTruthy(); // this is what puts Join.tsx on the resume path
+
+    const res = await joinRoom(code, 'Host', 'tulip', peeked!);
+    expect(res).toEqual({ ok: true, code });
+    // The rejoin branch touches `connected` and nothing else: a resume must not
+    // rewrite the name and badge the player already owns.
+    const mine = (await get(ref(db, `rooms/${code}/players/${uid}`))).val();
+    expect(mine.name).toBe('Host');
+    expect(mine.badgeId).toBe('tulip');
+  });
+
+  it('TRUSTS what it is handed, which is why only the resume path may hand it anything', async () => {
+    // The decisive proof that the second read is gone rather than merely cheaper:
+    // the same call against a code that does not exist answers differently
+    // depending only on whether a room came with it. Nothing else can explain
+    // that, because the code is the only thing the server could be asked about.
+    //
+    // It is also the cost of the trade, stated where somebody will find it. The
+    // room is believed without being checked, so a membership that has since gone
+    // away - a player the host removed between the peek and the join - is still
+    // believed for that window. The resume path's window is one await. The form
+    // path's is however long it takes to type a name and pick a badge, which is
+    // why it passes nothing and pays for its own read.
+    const { ensureSignedIn } = await import('./firebase');
+    const uid = await ensureSignedIn();
+    const absent = makeRoomCode();
+
+    expect(await joinRoom(absent, 'Ghost', 'star')).toEqual({ ok: false, reason: 'not-found' });
+
+    const asIfMember = normalizeRoom({
+      meta: { createdAt: Date.now(), hostId: uid, creatorId: uid, targetScore: 75, phase: 'lobby', roundNumber: 0 },
+      players: { [uid]: { name: 'Ghost', badgeId: 'star', joinedAt: 1, connected: true, stuckAt: null, awayAt: null, score: 0 } },
+      round: null,
+    })!;
+    expect(await joinRoom(absent, 'Ghost', 'star', asIfMember)).toEqual({ ok: true, code: absent });
+  });
+});

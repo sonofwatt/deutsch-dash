@@ -1327,3 +1327,32 @@ describe('a centre play that resolves late', () => {
     expect(store.getState().lastRejected).toBeNull();
   });
 });
+
+describe('the resume path hands on the room it already read', () => {
+  // Entry used to download the same room three times. `Join.tsx` peeks to decide
+  // whether this device is already a member, and that object is now threaded
+  // through to the join rather than paid for twice. This is the wiring in the
+  // middle, which is the part a refactor drops silently: the parameter is
+  // optional, so losing it costs a round trip and breaks nothing visible.
+  const peeked: Room = {
+    meta: { createdAt: 1, hostId: 'me', creatorId: 'me', targetScore: 75, phase: 'lobby', roundNumber: 0 },
+    players: { me: { name: 'D', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, awayAt: null, score: 0 } },
+    round: null,
+  };
+
+  it('forwards it, so the join does not read a room the screen is already holding', async () => {
+    const deps = fakeDeps();
+    const store = createGameStore(deps);
+    await store.getState().enterRoom('ABCDEF', 'D', 'tulip', peeked);
+    expect(deps.joinRoom).toHaveBeenCalledWith('ABCDEF', 'D', 'tulip', peeked);
+  });
+
+  it('forwards nothing from the form path, which must read the room for itself', async () => {
+    // Deliberate: by the time somebody has typed a name and picked a badge, the
+    // peek can be minutes old, and a stale one turns `full` into `race`.
+    const deps = fakeDeps();
+    const store = createGameStore(deps);
+    await store.getState().enterRoom('ABCDEF', 'D', 'tulip');
+    expect(deps.joinRoom).toHaveBeenCalledWith('ABCDEF', 'D', 'tulip', undefined);
+  });
+});

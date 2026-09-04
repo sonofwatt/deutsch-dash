@@ -48,7 +48,10 @@ export function Join({ code }: { code: string }) {
         const mine = room.players[uid];
         if (mine) {
           setResuming(true);
-          const res = await enterRoom(code, mine.name, mine.badgeId);
+          // The room peeked two lines up, threaded through so the join does not
+          // download it a second time. Safe here and ONLY here: membership was
+          // just established from this very object, and it is one await old.
+          const res = await enterRoom(code, mine.name, mine.badgeId, room);
           if (!cancelled && !res.ok) setResuming(false); // fall back to the form so the error shows
           return;
         }

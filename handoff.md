@@ -20,7 +20,7 @@ emulator against the NEW rules, and create, join, rejoin, deal, play, score and
 both race paths were all accepted. A phone still holding an older bundle was
 therefore never locked out by the release._
 
-_**462 tests** (401 unit and 24 in a real browser; 37 against the emulator, all
+_**466 tests** (403 unit and 24 in a real browser; 39 against the emulator, all
 green). This is the only place in the repo that quotes a count -
 it drifted three separate ways when it lived in four places, so keep it here and
 nowhere else. Both sides of the 2026-09-04 merge rewrote this line, which is the
@@ -2096,23 +2096,40 @@ the ledgered pointer-capture re-select check on mouse drags.
   100 ms a transatlantic hop would cost, so removing a round trip buys a third
   of what it would in Europe, and the BYTES on the entry path now cost more than
   the trips do. Re-read the entry and bundle bullets below with that in mind.
-- **Entry costs three serialized round trips on the resume path, which is how
-  this app is usually entered** (reload, phone lock, tab away to send the invite
-  and back). It was four. `peekRoom` reads the whole room, then `joinRoom` opens
-  with its own unconditional `get` of the same node, then the listener hashes an
-  empty cache and downloads it a third time: 47,373 bytes of identical payload
-  for one entry, and the SDK keeps nothing between the two gets, because
-  `repoGetValue` caches only active queries and drops the sync point on its way
-  out. The fourth was the rejoin branch's `connected: true` write, which is no
-  longer awaited (2026-09-04): `startPresence` makes the same write a line later
-  the moment `.info/connected` reports true, so awaiting it bought nothing.
-  **What is left is the duplicated `get`**: thread the room `Join.tsx` already
-  holds into `joinRoom` so the second one disappears. Scope it to the resume path
-  only. On the form path the peek can be minutes stale by the time the player
-  taps, and the pre-checks would then report `race` instead of `full` or
-  `badge-taken`. Nothing corrupts either way, because the rules and
-  `increment(1)` enforce the cap for real. On the domestic floor this is worth
-  more for the 47 kB than for the trip: a round trip here is about 30 ms.
+- **Entry costs two round trips on the resume path, which is how this app is
+  usually entered** (reload, phone lock, tab away to send the invite and back).
+  It was four. `peekRoom` read the whole room, `joinRoom` opened with its own
+  unconditional `get` of the same node, the listener hashed an empty cache and
+  downloaded it a third time, and the rejoin branch awaited a `connected: true`
+  write: 47,373 bytes of identical payload for one entry, and the SDK keeps
+  nothing between the two gets, because `repoGetValue` caches only active queries
+  and drops the sync point on its way out. Both cheap fixes landed on 2026-09-04.
+  The awaited write went first (`startPresence` makes the same write a line later
+  the moment `.info/connected` reports true), and then the duplicated `get`: the
+  room `Join.tsx` peeked is threaded into `joinRoom` as its optional fourth
+  argument. On the domestic floor that second one is worth more for the 47 kB
+  than for the trip, because a round trip here is about 30 ms.
+
+  **That argument is trusted, not checked, and only the resume path may pass
+  it.** Trusting it is the entire saving - a room that got verified would have
+  been a room that got downloaded. The cost is that a membership which has since
+  gone away is still believed for the length of the window, so the window is what
+  has to stay small: on the resume path it is one await, and `Join.tsx` has just
+  established membership from that very object. The form path passes nothing and
+  pays for its own read, because by the time somebody has typed a name and picked
+  a badge the peek can be minutes old, and a stale one turns a room that is
+  simply `full`, or whose badge is taken, into a `race` - the player told the
+  wrong thing about why they cannot get in. Nothing corrupts either way, because
+  the rules and `increment(1)` enforce the cap for real.
+  `rooms.emu.test.ts` pins the trust the blunt way, with the same call against a
+  code that does not exist answering differently depending only on whether a room
+  came with it, and `store.test.ts` pins the wiring in between, which is the part
+  a refactor drops silently: the argument is optional, so losing it costs a round
+  trip and breaks nothing visible.
+
+  **What is left is the listener's own download**, and it is not worth chasing.
+  It is the sync point the SDK establishes for the live subscription, not a
+  redundant read of something already held.
 - **`createRoom` is one atomic write as of 2026-09-04.** It was two sequential
   ones, held apart by a comment that outlived its rule: the `players/$uid`
   validate used to read `meta/phase`, and that cross-reference only worked
@@ -2300,6 +2317,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `b150224` → `31df523` | Where the multiplayer latency actually goes: a centre play is invisible to the player who made it for a round trip and silently drops their next one, entry costs four serialized round trips on the resume path, and the database is already in the right region because every player is Eastern |
 | `c73e341` → `0bdb136` | The last em dash swept out, and a test so none come back |
 | `75dec4b` | A centre play its own player can see, so the next one is judged on a board that has it; `createRoom` as one atomic write; the rejoin presence write no longer awaited; and no join form offered to somebody already in the room |
+| `PENDING` | The room the join screen already read, threaded into the join, so entry stops downloading it twice |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
