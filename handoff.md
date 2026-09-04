@@ -2454,7 +2454,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `4b05de8` | The bolt that says who dashed, on the sheet that ends the game and on the scorepad's |
 | `4a10893` | A wood turn brings three across the turn-over, so the pile stops showing the same four cards for ever |
 | `05279d9` | Framer-motion off the entry path: a first load drops from 199 kB gzip to 140, and the animation code comes down with the board |
-| `PENDING` | A flick no longer dies on a square it flew over: the square under the finger wins only if the card can go there |
+| `a025086` | A flick no longer dies on a square it flew over: the square under the finger wins only if the card can go there |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
