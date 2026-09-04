@@ -2077,10 +2077,6 @@ the ledgered pointer-capture re-select check on mouse drags.
   app (see "Two phones do not agree on the time"), it runs before the rejoin
   branch, and `createdAt` is writable by anyone with the code until a write-once
   validate ships. Fix pending; the audit doc's seventh-reader section has it.
-- The optimistic centre play rolls back to the hand as it was before the
-  transaction, not as it is, and persists the pre-await hand on a win. Fix
-  pending, same section; the store test that pins the old rollback changes with
-  it.
 - Long-session memory has never been measured. The store's maps are bounded by
   inspection; the heap after ten rounds of remounting the board is a number
   nobody has.

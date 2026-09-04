@@ -1210,3 +1210,94 @@ describe('leaving while a join is in flight', () => {
     expect(deps.stopPresence).not.toHaveBeenCalled();
   });
 });
+
+describe('a centre play that resolves late', () => {
+  // The transaction is a round trip, and the hand does not stand still for it.
+  // Everything after the await works from the hand as it is then.
+  const deferred = () => {
+    let resolve!: (v: PlayResult) => void;
+    const p = new Promise<PlayResult>(r => { resolve = r; });
+    return { p, resolve };
+  };
+
+  it('a lost race puts the card back into the hand as it is now, wood turns kept', async () => {
+    const d = deferred();
+    const deps = fakeDeps({ playToCenter: vi.fn(() => d.p) });
+    const store = createGameStore(deps);
+    const t = seededTableau();
+    const rigged: Tableau = { ...t, dash: [...t.dash.slice(0, -1), c(1, 'red')] };
+    store.setState({ uid: 'me', code: 'ABCDEF', room: playingRoom(rigged), tableau: rigged });
+    store.getState().select({ kind: 'dash' });
+    const play = store.getState().playTo({ space: 0 });
+    store.getState().flip();
+    store.getState().flip();
+    expect(store.getState().tableau?.woodIndex).toBe(6);
+    d.resolve({ committed: false, winner: 'ann' });
+    await play;
+    const after = store.getState().tableau!;
+    expect(after.woodIndex).toBe(6);            // the turns made in flight stand
+    expect(after.dash).toEqual(rigged.dash);    // the card is back
+    // The table sees the same hand this player does.
+    expect(deps.persistTableau).toHaveBeenLastCalledWith('ABCDEF', 'me', after);
+    expect(store.getState().lastRejected?.card).toEqual(c(1, 'red'));
+  });
+
+  it('a play that committed while another was in flight stays played when the other loses', async () => {
+    const d = deferred();
+    let n = 0;
+    const deps = fakeDeps({
+      playToCenter: vi.fn(() => (++n === 1 ? d.p : Promise.resolve({ committed: true, winner: null }))),
+    });
+    const store = createGameStore(deps);
+    const t = seededTableau();
+    const rigged: Tableau = { ...t, dash: [...t.dash.slice(0, -2), c(3, 'green'), c(1, 'red')] };
+    const room = playingRoom(rigged);
+    room.round!.spaces[1] = { suit: 'green', stack: [c(1, 'green', 'ann'), c(2, 'green', 'ann')], history: [] };
+    store.setState({ uid: 'me', code: 'ABCDEF', room, tableau: rigged });
+    store.getState().select({ kind: 'dash' });
+    const first = store.getState().playTo({ space: 0 });   // the red 1, pending
+    store.getState().select({ kind: 'dash' });
+    await store.getState().playTo({ space: 1 });           // the green 3, committed
+    d.resolve({ committed: false, winner: 'ann' });
+    await first;
+    const dash = store.getState().tableau!.dash;
+    expect(dash.some(x => x.suit === 'green' && x.v === 3)).toBe(false); // on the board, not in the hand
+    expect(dash.at(-1)).toEqual(c(1, 'red'));                            // the lost card is back
+  });
+
+  it('a win persists the hand as it is now, not as it was when the card left', async () => {
+    const d = deferred();
+    const deps = fakeDeps({ playToCenter: vi.fn(() => d.p) });
+    const store = createGameStore(deps);
+    const t = seededTableau();
+    const rigged: Tableau = { ...t, dash: [...t.dash.slice(0, -1), c(1, 'red')] };
+    store.setState({ uid: 'me', code: 'ABCDEF', room: playingRoom(rigged), tableau: rigged });
+    store.getState().select({ kind: 'dash' });
+    const play = store.getState().playTo({ space: 0 });
+    store.getState().flip();
+    d.resolve({ committed: true, winner: null });
+    await play;
+    expect(deps.persistTableau).toHaveBeenCalledTimes(1);
+    expect((deps.persistTableau as ReturnType<typeof vi.fn>).mock.calls[0]![2]).toMatchObject({ woodIndex: 3 });
+  });
+
+  it('a continuation from a round that has since ended is dropped', async () => {
+    const d = deferred();
+    const deps = fakeDeps({ playToCenter: vi.fn(() => d.p) });
+    const store = createGameStore(deps);
+    const t = seededTableau();
+    const rigged: Tableau = { ...t, dash: [...t.dash.slice(0, -1), c(1, 'red')] };
+    const room = playingRoom(rigged);
+    store.setState({ uid: 'me', code: 'ABCDEF', room, tableau: rigged });
+    store.getState().select({ kind: 'dash' });
+    const play = store.getState().playTo({ space: 0 });
+    // The phone slept; the next round has been dealt by the time this resolves.
+    const fresh = seededTableau();
+    store.setState({ room: { ...room, meta: { ...room.meta, roundNumber: 2 } }, tableau: fresh });
+    d.resolve({ committed: false, winner: 'ann' });
+    await play;
+    expect(store.getState().tableau).toBe(fresh);       // last round's card did not come back
+    expect(deps.persistTableau).not.toHaveBeenCalled(); // and last round's hand was not written
+    expect(store.getState().lastRejected).toBeNull();
+  });
+});

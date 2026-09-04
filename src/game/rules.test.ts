@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   faceGroup, postCountForPlayers, canPlayToCenter, canBuildOnPost,
-  refillPosts, sourceTop, takeCard, placeOnPost, hasLegalMove,
+  refillPosts, sourceTop, takeCard, putBack, placeOnPost, hasLegalMove,
   canPlayToSpace, spaceCountForPlayers, isStuck, MAX_SPACES,
   orderlyColumns, suitForSpace, hasReachableMove,
 } from './rules';
@@ -364,5 +364,59 @@ describe('post piles build DOWN and only down', () => {
     expect(placeOnPost(t, { kind: 'post', index: 1 }, 0)).toBeNull();
     // ...but the 8 of red can go down onto the 9 of green.
     expect(placeOnPost(t, { kind: 'post', index: 0 }, 1)).not.toBeNull();
+  });
+});
+
+describe('putBack', () => {
+  // The inverse of takeCard for a hand that has moved on: an optimistic centre
+  // play the transaction refused puts its card back into the hand as it is now.
+  const hand = (): Tableau => tab({
+    dash: [c(5, 'red'), c(1, 'red')],
+    post: [[c(9, 'blue')], [c(8, 'green')], [c(7, 'yellow')]],
+    wood: [c(2, 'blue'), c(3, 'blue'), c(4, 'blue'), c(6, 'blue'), c(7, 'blue'), c(8, 'blue')],
+    woodIndex: 3,
+  });
+
+  it('a dash card goes back on top of the dash', () => {
+    const t = hand();
+    const { next, card } = takeCard(t, { kind: 'dash' })!;
+    expect(putBack(next, { kind: 'dash' }, card, -1)).toEqual(t);
+  });
+
+  it('a wood card goes back where it sat, and the turned group grows to hold it', () => {
+    const t = hand();
+    const { next, card } = takeCard(t, { kind: 'wood' })!; // the 4 of blue, index 2
+    expect(putBack(next, { kind: 'wood' }, card, t.woodIndex - 1)).toEqual(t);
+  });
+
+  it('a wood card goes back where it sat even after the wood turned in flight', () => {
+    const t = hand();
+    const { next, card } = takeCard(t, { kind: 'wood' })!;
+    const turned = { ...next, woodIndex: 5 }; // two more turned meanwhile, over the shorter pile
+    const back = putBack(turned, { kind: 'wood' }, card, t.woodIndex - 1);
+    expect(back.wood).toEqual(t.wood);
+    expect(back.woodIndex).toBe(6); // the card sits inside the turned group, so the group grew
+    expect(sourceTop(back, { kind: 'wood' })).toEqual(c(8, 'blue'));
+  });
+
+  it('a wood card that sat beyond the turned group goes back face down', () => {
+    const t = hand();
+    const { next, card } = takeCard(t, { kind: 'wood' })!;
+    const wrapped = { ...next, woodIndex: 1 }; // the pile went round and started again
+    const back = putBack(wrapped, { kind: 'wood' }, card, t.woodIndex - 1);
+    expect(back.wood).toEqual(t.wood);
+    expect(back.woodIndex).toBe(1);
+  });
+
+  it('a post card goes back onto the dash, and an empty post refills from there', () => {
+    const t = hand();
+    const { next, card } = takeCard(t, { kind: 'post', index: 1 })!; // post 1 refilled with the red 1
+    expect(next.post[1]).toEqual([c(1, 'red')]);
+    const back = putBack(next, { kind: 'post', index: 1 }, card, -1);
+    expect(back.dash).toEqual([c(5, 'red'), c(8, 'green')]);
+    expect(back.post).toEqual(next.post);
+    const bare = putBack({ ...next, dash: [], post: [[c(9, 'blue')], [], [c(7, 'yellow')]] }, { kind: 'post', index: 1 }, card, -1);
+    expect(bare.dash).toEqual([]);
+    expect(bare.post[1]).toEqual([c(8, 'green')]);
   });
 });

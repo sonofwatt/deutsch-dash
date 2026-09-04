@@ -2,7 +2,7 @@ import { createStore, type StoreApi } from 'zustand/vanilla';
 import { useStore } from 'zustand';
 import type { BadgeId } from '../game/badges';
 import { cardId, type Card, type CenterSpace, type PlayerInfo, type PlaySource, type Room, type Tableau } from '../game/types';
-import { canBuildOnPost, canPlayToSpace, isStuck, placeOnPost, sourceTop, takeCard } from '../game/rules';
+import { canBuildOnPost, canPlayToSpace, isStuck, placeOnPost, sourceTop, takeCard, putBack } from '../game/rules';
 import { flipWood, rotateWood, sinkWoodTop, WOOD_STEP } from '../game/wood';
 import { reconcileTableau } from '../game/center';
 import { buildDeck, deal, shuffle } from '../game/deck';
@@ -825,19 +825,36 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         }
         const taken = takeCard(tableau, selection);
         if (!taken) return;
+        const round = room?.meta.roundNumber;
         set({ tableau: taken.next }); // optimistic
         const res = await deps.playToCenter(code, target.space, card);
-        if (get().code !== code) return; // session changed mid-flight (leave/rejoin) - drop the stale continuation
+        // Everything from here reads the store again rather than the values
+        // captured above. The round trip is a few hundred milliseconds on a phone
+        // and minutes after a sleep, and the hand may have turned wood or played
+        // another card meanwhile; rolling back to the captured hand undid all of
+        // that on screen while the table kept it, and persisting the captured
+        // hand on a win wrote it over whatever had happened since.
+        const cur = get();
+        if (cur.code !== code) return; // session changed mid-flight (leave/rejoin) - drop the stale continuation
+        // A round that ended in flight: the hand on screen is the new deal, and
+        // neither putting last round's card into it nor writing last round's hand
+        // over it is right. If the card did land on the new board, the next
+        // snapshot's reconcile takes it out of the hand.
+        if (!cur.tableau || cur.room?.meta.roundNumber !== round) return;
         if (!res.committed) {
-          set({ tableau, lastRejected: { card, at: Date.now(), space: target.space } }); // rollback
+          // Rollback into the hand as it is now, and write it, so the table sees
+          // the same hand this player does.
+          const restored = putBack(cur.tableau, selection, card, tableau.woodIndex - 1);
+          set({ tableau: restored, lastRejected: { card, at: Date.now(), space: target.space } });
+          void persist(restored);
           void deps.reportRace(code, target.space, uid, res.winner).catch(() => {});
           return;
         }
-        void persist(taken.next);
+        void persist(cur.tableau);
         flips.set(uid, 0);
-        if (get().room?.players[uid]?.stuckAt != null) void deps.clearStuck(code, uid);
+        if (cur.room?.players[uid]?.stuckAt != null) void deps.clearStuck(code, uid);
         endRescue();
-        if (taken.next.dash.length === 0) void deps.announceDash(code, uid);
+        if (cur.tableau.dash.length === 0) void deps.announceDash(code, uid);
       },
 
       /**

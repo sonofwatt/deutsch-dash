@@ -132,6 +132,28 @@ export function takeCard(t: Tableau, source: PlaySource): { next: Tableau; card:
   return { next: refillPosts(next), card };
 }
 
+/**
+ * The inverse of takeCard, for a hand that may have moved on since the card left
+ * it. An optimistic centre play that the transaction then refuses has to put its
+ * card back into the hand as it is NOW, not the hand as it was: the round trip is
+ * a few hundred milliseconds on a phone, and every wood turn and every other play
+ * made inside it would otherwise be undone on screen while the table keeps them.
+ * A dash card goes back on the dash. A wood card goes back where it sat, and
+ * stays inside the turned group if that is where it was. A post card goes back
+ * onto the dash rather than onto a post that was refilled behind it, because the
+ * dash is the one pile with no building rule; the refill then runs again in case
+ * that post is still empty.
+ */
+export function putBack(t: Tableau, source: PlaySource, card: Card, woodAt: number): Tableau {
+  if (source.kind === 'wood') {
+    const at = Math.max(0, Math.min(woodAt, t.wood.length));
+    const wood = [...t.wood];
+    wood.splice(at, 0, card);
+    return { ...t, wood, woodIndex: at <= t.woodIndex ? t.woodIndex + 1 : t.woodIndex };
+  }
+  return refillPosts({ ...t, dash: [...t.dash, card] });
+}
+
 export function placeOnPost(t: Tableau, source: PlaySource, postIndex: number): Tableau | null {
   if (source.kind === 'post' && source.index === postIndex) return null;
   const card = sourceTop(t, source);
