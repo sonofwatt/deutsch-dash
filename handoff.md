@@ -2066,22 +2066,23 @@ the ledgered pointer-capture re-select check on mouse drags.
   Two things to watch at a table: a refused play will now flash onto the pile and
   be pulled off rather than never appearing, and on a `datastale` retry a
   contested space can flicker twice.
-- **The database is in us-central1, and that is a fixed floor under every other
-  latency fix.** `databaseURL` is `holland-hustle-default-rtdb.firebaseio.com`,
-  and only us-central1 instances are served on the legacy `.firebaseio.com`
-  domain; a regional one reads `<name>.<region>.firebasedatabase.app`. For a
-  European player that is roughly 90 to 110 ms of round trip before any code
-  runs, computed from geography and not measured, because the sandbox cannot
-  reach the host. One round trip per centre play is already optimal: a play
-  cannot reach another player faster than actor to server to other player. An
-  instance's location is fixed at creation, so moving it means a second instance
-  in `europe-west1`, which needs the Blaze plan since Spark allows exactly one
-  per project, or else a whole new project. Nothing durable has to migrate,
-  because rooms carry a 24-hour TTL and every identity is anonymous, but rooms
-  in flight at the cutover strand as `not-found`, and North American players get
-  materially worse: San Francisco goes from about 32 ms to about 124 ms. Nobody
-  has verified where the players actually are. The evidence is the app's name, a
-  latin-ext font subset and an EU privacy comment, not analytics.
+- **The database is in us-central1, and that is the right place for it. Do not
+  move it.** `databaseURL` is `holland-hustle-default-rtdb.firebaseio.com`, and
+  only us-central1 instances are served on the legacy `.firebaseio.com` domain;
+  a regional one reads `<name>.<region>.firebasedatabase.app`. The owner
+  confirmed on 2026-09-04 that every player is in US Eastern, which settles a
+  question an earlier latency pass had to leave open. Eastern to Iowa is roughly
+  30 ms of round trip, near enough optimal, and one round trip per centre play
+  is already the floor: a play cannot reach another player faster than actor to
+  server to other player. Moving the instance to `europe-west1`, which an
+  earlier draft of this file suggested while the player base was unknown, would
+  roughly triple that for everybody. The name of the game is not evidence about
+  where it is played.
+  The number matters beyond this bullet, because everything else on the latency
+  list is priced against it. A round trip here is worth about 30 ms, not the
+  100 ms a transatlantic hop would cost, so removing a round trip buys a third
+  of what it would in Europe, and the BYTES on the entry path now cost more than
+  the trips do. Re-read the entry and bundle bullets below with that in mind.
 - **Entry costs four serialized round trips on the resume path, which is how
   this app is usually entered** (reload, phone lock, tab away to send the invite
   and back). `peekRoom` reads the whole room, then `joinRoom` opens with its own
@@ -2113,9 +2114,11 @@ the ledgered pointer-capture re-select check on mouse drags.
   the ordering to remove it is a trap. Inside `round/tableaus/$uid` the field is
   redundant and `database.rules.json` proves it, validating the owner against
   the path key. Dropping it would roughly halve a 21.7 kB eight-player deal.
-  This is bandwidth, not latency: that deal is about 35 ms of host uplink
-  against the 90 to 110 ms floor, it costs no extra round trip, and the frame
-  split at 16 kB is not a latency mechanism. The trap is that the rules
+  This is bandwidth, not latency, but note it is no longer dwarfed by the
+  network: that deal is about 35 ms of host uplink against a round trip of about
+  30 ms, so on the domestic floor the bytes and the trip cost about the same. It
+  still costs no extra round trip, and the frame split at 16 kB is not a latency
+  mechanism. The trap is that the rules
   currently REQUIRE `owner`, so a client shipped ahead of a rules deploy has its
   entire atomic deal refused and the whole table gets no round, which is exactly
   the failure this file already records from the first iPhone playtest. A
@@ -2131,7 +2134,7 @@ the ledgered pointer-capture re-select check on mouse drags.
   while `round` still holds the previous round's board, which reads as valid and
   fires the new-round branch against the wrong spaces. And do not optimise
   `normalizeRoom`: measured at 0.0148 ms against `snap.val()`'s 0.109 ms, call
-  it 0.5 to 1 ms on a phone against 90 to 110 ms of network. If per-snapshot
+  it 0.5 to 1 ms on a phone against about 30 ms of network. If per-snapshot
   work ever needs cutting, the order is the render, then `snap.val()`, then
   `normalizeRoom` last.
 - The remaining network items the audit found and left are in
