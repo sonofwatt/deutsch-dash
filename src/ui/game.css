@@ -466,9 +466,39 @@
   0%   { transform: rotateX(90deg); }
   100% { transform: rotateX(0deg); }
 }
-/* The cards still arrive and still land in order; they just stop turning. */
+/* The wood column: the draw pile above, the flipped pile below, 4px between them.
+   That gap is load-bearing - `wood-collect` below travels the height of a pile
+   plus this gap - so change the two together. */
+.wood-col { display: flex; flex-direction: column; gap: 4px; }
+
+/* The pile going back under. When a turn runs out of face-down cards it finishes
+   itself off the ones already face up, which puts them back beneath the draw
+   pile - a real move, and until now an invisible one: the flipped pile just held
+   different cards a frame later. This is that move, drawn as the outline of the
+   pile it was, travelling up to the draw slot and fading into it.
+
+   It sits inside the flipped pile's own stack, so `--pile-step` is in scope and
+   the distance is expressed in the same terms the layout is: its own height, plus
+   the three steps of peek the stack reserves, plus the column gap. */
+.wood-collect { position: absolute; top: 0; left: 0; width: var(--card-w);
+  aspect-ratio: 2.5 / 3.5; border-radius: var(--radius); background: var(--pile-fill);
+  border: 2px solid var(--pile-line); pointer-events: none;
+  animation: wood-collect var(--collect-ms, 180ms) cubic-bezier(.4, 0, .2, 1) both; }
+@keyframes wood-collect {
+  0%   { transform: translateY(0); opacity: .9; }
+  100% { transform: translateY(calc(-100% - 3 * var(--pile-step) - 4px)); opacity: 0; }
+}
+/* And the turn's three cards wait for it to land, so the turn reads as collect
+   then deal rather than both at once. `--d` is the 0/200/400ms stagger above. */
+.wood-deal.collecting > * { animation-delay: calc(var(--d, 0ms) + var(--collect-ms, 180ms)); }
+
+/* The cards still arrive and still land in order; they just stop turning. And the
+   pile going back is not drawn at all rather than sitting there as a still
+   outline for the length of a move nobody asked to see. */
 @media (prefers-reduced-motion: reduce) {
   [data-platform] .wood-deal > * { animation-name: none; }
+  [data-platform] .wood-deal.collecting > * { animation-delay: 0ms; }
+  [data-platform] .wood-collect { animation-name: none; display: none; }
 }
 
 /* The way back in for a player a forced start left behind. It sits in the track

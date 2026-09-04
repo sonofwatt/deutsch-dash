@@ -89,6 +89,14 @@ export interface GameStore {
   tableau: Tableau | null;
   selection: PlaySource | null;
   lastRejected: { card: Card; at: number; space: number } | null;
+  /**
+   * When the wood pile last turned over, or null if it has not this session. A
+   * nonce for the board's collect animation, not a fact about the game: it is
+   * never persisted and never read back. `flip` is the only writer, because it is
+   * the only place that can tell a turn-over from a sunk card - the face-down
+   * count does not reliably change across one.
+   */
+  woodCollectedAt: number | null;
   joinPhase: 'idle' | 'joining' | 'in-room';
   joinError: string | null;
   // Hands of the AI players this client is driving. Only ever populated on the
@@ -709,7 +717,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
     return {
       uid: null, code: null, room: null, tableau: null, selection: null,
       lastRejected: null, joinPhase: 'idle', joinError: null, online: true,
-      botTableaus: {}, actionError: null,
+      botTableaus: {}, actionError: null, woodCollectedAt: null,
 
       setOnline(v) {
         set({ online: v });
@@ -908,6 +916,12 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         // is once per lap rather than once per tap.
         if (code && next.wood !== t.wood) void persist(next);
         else if (code) void deps.persistWoodIndex(code, uid, next.woodIndex);
+        // The board animates the pile going back under, and cannot work out on
+        // its own that it happened: the face-down count does not reliably change
+        // across a turn-over (a five-card pile reads 2 before and 2 after), and
+        // the pile being reordered looks the same as a card being sunk out of it.
+        // This is the one place that knows for certain, so it says so.
+        if (next.wood !== t.wood) set({ woodCollectedAt: Date.now() });
         flips.set(uid, (flips.get(uid) ?? 0) + 1);
         syncStuck(uid, next); // one more flip may be the one that proves it
       },

@@ -1,9 +1,18 @@
 import type React from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CardBack, CardView } from './CardView';
 import { PileStack, depthLayers } from './PileStack';
 import type { BadgeId } from '../../game/badges';
 import type { WoodSide } from '../prefs';
 import { WOOD_STEP } from '../../game/wood';
+
+/**
+ * How long the flipped pile takes to travel back onto the draw pile, and how long
+ * the three cards of that turn wait before they deal in on top of it. Defined
+ * once, here, and handed to the stylesheet as `--collect-ms` so the animation and
+ * the timer that clears it cannot drift apart.
+ */
+const COLLECT_MS = 180;
 import { cardId, type Card, type PlaySource, type Tableau } from '../../game/types';
 
 export function TableauView(props: {
@@ -29,6 +38,14 @@ export function TableauView(props: {
   onSinkWood?: () => void;
   /** Optional: which end the wood pile sits at. Defaults to the right thumb. */
   woodSide?: WoodSide;
+  /**
+   * When the wood pile last turned over, from the store. A nonce: every new value
+   * plays the collect once. It comes from `flip` rather than being worked out
+   * here, because it cannot be worked out here - the face-down count does not
+   * reliably change across a turn-over (a five-card pile reads 2 both sides of
+   * one), and a reordered pile looks exactly like a sunk card from the outside.
+   */
+  collectedAt?: number | null;
 }) {
   const { t, badgeId } = props;
   const woodTop = t.woodIndex > 0 ? t.wood[t.woodIndex - 1] : null;
@@ -59,6 +76,25 @@ export function TableauView(props: {
   // card was in the way, and a ↻ in the slot was still one more thing on a board
   // that has enough on it. The slot going solid is the cue.
   const canRecycle = faceDown === 0 && t.wood.length > 0;
+
+  // The turn that takes the pile over puts every card that was already face up
+  // back under the draw pile, and that move used to be invisible: the flipped
+  // pile simply held different cards a frame later. `collecting` runs the outline
+  // of the old pile up to the draw slot and holds the new three edge-on until it
+  // lands, so the turn reads as collect-then-deal rather than as a jump.
+  //
+  // Driven by `collectedAt` from the store rather than by anything visible here:
+  // see the prop.
+  const [collecting, setCollecting] = useState(false);
+  const seen = useRef(props.collectedAt ?? null);
+  useEffect(() => {
+    const at = props.collectedAt ?? null;
+    if (at === null || at === seen.current) return; // nothing new; a remount does not replay it
+    seen.current = at;
+    setCollecting(true);
+    const id = setTimeout(() => setCollecting(false), COLLECT_MS);
+    return () => clearTimeout(id);
+  }, [props.collectedAt]);
 
   // Wood is the pile a player touches most - every flip of three is another tap -
   // so it sits under a thumb, and which thumb is a preference (see prefs.ts).
@@ -118,7 +154,7 @@ export function TableauView(props: {
 
   const woodGroup = (
       <div key="wood">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div className="wood-col" style={{ '--collect-ms': `${COLLECT_MS}ms` } as React.CSSProperties}>
           <PileStack layers={depthLayers(faceDown)}>
             {faceDown > 0
               ? <div onClick={props.onFlip}><CardBack badgeId={badgeId} /></div>
@@ -126,11 +162,16 @@ export function TableauView(props: {
                   onClick={props.onFlip} title={canRecycle ? 'Recycle wood' : undefined} />}
           </PileStack>
           <PileStack layers={Math.min(2, faceUp - 1)}>
+            {/* The pile that has just gone back under, on its way to the draw
+                slot. Inside this stack on purpose: `--pile-step` is defined here,
+                and the distance to travel is this card's own height plus the peek
+                and the column gap, so the geometry stays in one place. */}
+            {collecting && <div className="wood-collect" aria-hidden="true" />}
             {/* No recycle button on the face-up card. It sat on top of the card the
                 thumb reaches for, covering .card-badge entirely at every card size,
                 and the empty draw slot beside it already carries the ↻. */}
             {woodTop && !draggingWood ? (
-              <div className="wood-deal"
+              <div className={`wood-deal${collecting ? ' collecting' : ''}`}
                 onClick={() => props.onSelect({ kind: 'wood' })}
                 onPointerDown={e => props.startDrag(e, woodTop, { kind: 'wood' })}>
                 {/* A turn brings three cards over, so it should look like three

@@ -126,6 +126,7 @@ export function Game() {
 
   // Unconditional and above every early return, like every other hook on this
   // screen - sitting out makes those returns reachable mid-round.
+  const woodCollectedAt = useGameStore(s => s.woodCollectedAt);
   const stuckAt = me?.stuckAt ?? null;
   useEffect(() => {
     if (stuckAt == null) return;
@@ -309,7 +310,7 @@ export function Game() {
           animate={lastRejected ? { x: [0, -8, 8, -5, 5, 0] } : { x: 0 }}
           transition={{ duration: 0.35 }}>
           <TableauView t={hand} badgeId={me.badgeId} selection={selection} woodSide={woodSide}
-            dragging={drag?.source ?? null}
+            dragging={drag?.source ?? null} collectedAt={woodCollectedAt}
             stuck={me.stuckAt != null}
             onSinkWood={stuckAwhile ? sinkWood : undefined}
             postHighlight={targets.posts} onSelect={select} onFlip={flip}

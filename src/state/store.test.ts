@@ -1380,6 +1380,29 @@ describe('a wood turn that takes the pile over', () => {
     expect(deps.persistWoodIndex).not.toHaveBeenCalled();
   });
 
+  it('marks the moment for the board, and only for a turn that wrapped', () => {
+    // The board cannot work this out for itself, which is why the store says it:
+    // the face-down count does not reliably change across a turn-over (this very
+    // pile reads two face down on both sides of one), and a reordered pile looks
+    // exactly like a card sunk out of it.
+    const deps = fakeDeps();
+    const store = createGameStore(deps);
+    const t = handAt(3);
+    store.setState({ uid: 'me', code: 'ABCDEF', room: playingRoom(t), tableau: t });
+    expect(store.getState().tableau!.wood.length - store.getState().tableau!.woodIndex).toBe(2);
+    store.getState().flip();
+    const marked = store.getState().woodCollectedAt;
+    expect(marked).not.toBeNull();
+    // and the count really is the same either side, which is the trap being avoided
+    expect(store.getState().tableau!.wood.length - store.getState().tableau!.woodIndex).toBe(2);
+
+    // An ordinary turn leaves it alone, so the animation does not replay.
+    const t2 = handAt(0);
+    store.setState({ tableau: t2, room: playingRoom(t2) });
+    store.getState().flip();
+    expect(store.getState().woodCollectedAt).toBe(marked);
+  });
+
   it('still writes the index alone on an ordinary turn', () => {
     const deps = fakeDeps();
     const store = createGameStore(deps);

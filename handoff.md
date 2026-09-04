@@ -20,7 +20,7 @@ emulator against the NEW rules, and create, join, rejoin, deal, play, score and
 both race paths were all accepted. A phone still holding an older bundle was
 therefore never locked out by the release._
 
-_**477 tests** (414 unit and 24 in a real browser; 39 against the emulator, all
+_**478 tests** (415 unit and 24 in a real browser; 39 against the emulator, all
 green). This is the only place in the repo that quotes a count -
 it drifted three separate ways when it lived in four places, so keep it here and
 nowhere else. Both sides of the 2026-09-04 merge rewrote this line, which is the
@@ -1186,6 +1186,40 @@ read what `index.html` preloads and what the entry chunk statically imports. A
 browser run confirmed the rest end to end: the home screen and the lobby fetch no
 board chunk at all, starting a game fetches `GameRoute` and `MotionShell` on
 demand, the board renders, and the console stays clean.
+
+### The pile going back under is a move you can see _(#66)_
+
+The turn that takes the pile over puts every card already face up back beneath the
+draw pile. That is a real move and it was invisible: the flipped pile simply held
+different cards a frame later. It now takes 180ms - the outline of the pile it was
+travels up onto the draw slot and fades into it, and the three cards of that turn
+wait edge-on until it lands, so the turn reads as collect, then deal.
+
+**The trigger comes from the store, and it has to.** `TableauView` cannot work out
+that a turn-over happened from what it is given, and the obvious signal is wrong:
+the face-down count does not reliably change across one. A five-card pile reads
+TWO face down on both sides of its turn-over, which is exactly the pile the table
+was playing when this was built - the first attempt watched that count, and the
+animation never fired once. Reordering is not a giveaway either, because a card
+sunk out of the pile looks identical from outside. `flip` is the one place that
+knows for certain, so it stamps `woodCollectedAt`, and the board plays the move
+once per new value. It is a nonce for an animation, never persisted, never read
+back, and `store.test.ts` pins that an ordinary turn does not stamp it.
+
+Two details worth keeping:
+
+- **The geometry lives in one place.** The travelling outline is rendered INSIDE
+  the flipped pile's own `PileStack`, so `--pile-step` is in scope, and the
+  distance is written in the terms the layout already uses: its own height, plus
+  the three steps of peek the stack reserves, plus the column gap. That 4px gap is
+  now shared between `.wood-col` and the keyframe, so the two move together.
+- **The duration is defined once**, as `COLLECT_MS` in `TableauView`, handed to
+  the stylesheet as `--collect-ms`. The timer that clears the animation and the
+  animation itself cannot drift apart, and the deal's stagger is pushed back by
+  the same variable.
+
+Reduced motion switches both halves off, with the phone guard the whole file
+requires, and `motionOverride.test.ts` covers the new keyframe alongside the rest.
 
 ### A wood turn brings three, across the turn-over _(#63)_
 
@@ -2487,6 +2521,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `05279d9` | Framer-motion off the entry path: a first load drops from 199 kB gzip to 140, and the animation code comes down with the board |
 | `a025086` | A flick no longer dies on a square it flew over: the square under the finger wins only if the card can go there |
 | `206765e` | The turn that takes the wood pile over keeps all three of its cards on the flipped pile, and the pile is written with the index |
+| `PENDING` | The pile going back under the draw pile is a move you can watch, rather than a jump between frames |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
