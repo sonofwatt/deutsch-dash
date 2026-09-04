@@ -10,10 +10,15 @@ suite. A commit sitting unpushed has already invalidated one playtest - what
 people are playing is whatever last reached Pages - so check `git status -sb`
 before trusting what a table reports._
 
-_**The audit commits of 2026-09-03 changed `database.rules.json`** (type, enum
-and range bounds on every field a client writes). Until `npx firebase deploy
---only database` has been run, the live database is on the older rules, which
-is exactly the trap "Editing `database.rules.json` is half the job" describes._
+_**The audit's `database.rules.json` was deployed on 2026-09-04** (type, enum and
+range bounds on every field a client writes), so the live database and this file
+agree again. It went out AFTER the client that ships with it, which is the safe
+order: the merge was checked against the rules still live at the time, and every
+path a player takes passed under them. The reverse was checked too, because it is
+the one this section cannot warn you about: the PRE-merge client was run on the
+emulator against the NEW rules, and create, join, rejoin, deal, play, score and
+both race paths were all accepted. A phone still holding an older bundle was
+therefore never locked out by the release._
 
 _**462 tests** (401 unit and 24 in a real browser; 37 against the emulator, all
 green). This is the only place in the repo that quotes a count -
