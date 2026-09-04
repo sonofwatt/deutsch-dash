@@ -8,22 +8,48 @@ const woodTab = (wood: Card[], woodIndex = 0): Tableau =>
 const cards = (n: number) => Array.from({ length: n }, (_, i) => c((i % 10) + 1, 'red'));
 
 describe('flipWood', () => {
-  it('advances by 3, capping at the end (partial last flip)', () => {
+  it('brings three cards every turn, carrying the count across the turn-over', () => {
+    // Reported from a table: the pile counted out a short last group of 1 or 2,
+    // and the NEXT tap started again at the top. A turn deals three. With one card
+    // left, that card is turned, the pile goes back face down, and two more follow
+    // to finish the turn - so the top after that turn is the 2nd card, not the 7th.
     const t = woodTab(cards(7));
     const f1 = flipWood(t);
     expect(f1.woodIndex).toBe(3);
     const f2 = flipWood(f1);
     expect(f2.woodIndex).toBe(6);
     const f3 = flipWood(f2);
-    expect(f3.woodIndex).toBe(7); // partial group of 1
+    expect(f3.woodIndex).toBe(2); // 7 turned, pile over, 1 and 2 turned: three cards
+  });
+
+  it('never deals a short group, and never shows the same tops twice round', () => {
+    // The ten-card case from the report, tapped all the way round. Ten and three
+    // share no factor, so every card gets a turn on top and the cycle is ten taps
+    // long. It used to be four: the 3rd, 6th, 9th and 10th, for ever.
+    let t = woodTab(cards(10));
+    const tops: number[] = [];
+    for (let n = 0; n < 10; n++) {
+      const before = t.woodIndex;
+      t = flipWood(t);
+      const dealt = t.woodIndex > before ? t.woodIndex - before : t.woodIndex + 10 - before;
+      expect(dealt).toBe(3);
+      tops.push(t.wood[t.woodIndex - 1].v);
+    }
+    expect([...tops].sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    expect(t.woodIndex).toBe(10); // ten taps of three on ten cards lands back at the end
   });
   it('turns the pile over after full traversal and starts again', () => {
     const t = woodTab(cards(7), 7);
     expect(flipWood(t).woodIndex).toBe(3);
   });
   it('handles piles smaller than 3 and empty piles', () => {
-    expect(flipWood(woodTab(cards(2))).woodIndex).toBe(2);
-    expect(flipWood(woodTab(cards(2), 2)).woodIndex).toBe(2); // turn over -> min(3, 2)
+    // Three cards off a two-card pile is card 1, card 2, then the pile over and
+    // card 1 again, so the turn ends on the first card. The next ends on the
+    // second, and a two-card pile alternates rather than sticking on one card,
+    // which is what capping used to do to it.
+    expect(flipWood(woodTab(cards(2))).woodIndex).toBe(1);
+    expect(flipWood(woodTab(cards(2), 1)).woodIndex).toBe(2);
+    expect(flipWood(woodTab(cards(2), 2)).woodIndex).toBe(1);
     expect(flipWood(woodTab([]))).toEqual(woodTab([]));
   });
   it('never mutates card order', () => {
@@ -66,9 +92,11 @@ describe('woodCycleTops', () => {
     expect(woodCycleTops(woodTab(cards(9), 6)).map(x => x.v)).toEqual([6, 9, 3]);
   });
 
-  it('picks up the short last turn', () => {
-    // Seven cards: 3, 6, then 7 rather than 9. The tail card IS reachable.
-    expect(woodCycleTops(woodTab(cards(7))).map(x => x.v)).toEqual([3, 6, 7]);
+  it('reaches every card when the pile length shares no factor with three', () => {
+    // Seven cards, three a turn: the phase moves on every lap, so the cycle runs
+    // seven turns and every card takes a turn on top. This is the case the old
+    // capped flip could not produce - it reached 3, 6, 7 and stopped there.
+    expect(woodCycleTops(woodTab(cards(7))).map(x => x.v)).toEqual([3, 6, 2, 5, 1, 4, 7]);
   });
 
   it('terminates on an empty or single-card pile', () => {
@@ -91,11 +119,12 @@ describe('sinkWoodTop', () => {
     const t = woodTab(cards(9));
     expect(woodCycleTops(t).map(x => x.v)).toEqual([3, 6, 9]);
     const after = sinkWoodTop(flipWood(t));    // turn over 1,2,3 then sink the 3
-    // Six of the nine now, not three. Nine cards at three a turn divides evenly
-    // and the cycle closes after one lap; sinking a card leaves the pile the same
-    // length but the INDEX one step off, so the laps no longer land on the same
-    // cards and the cycle runs twice as far before it repeats.
-    expect(woodCycleTops(after).map(x => x.v)).toEqual([2, 6, 9, 3, 4, 7]);
+    // A different three, not the same three. Nine divides by three, so no amount
+    // of turning moves the phase: the cycle closes after one lap wherever it
+    // starts. Sinking a card is the only thing that moves which lap it is on, and
+    // that is the whole of what the rescue buys on a pile this shape. At the 27 a
+    // round deals it moves nine cards rather than one.
+    expect(woodCycleTops(after).map(x => x.v)).toEqual([2, 6, 9]);
   });
 
   it('does nothing with nothing turned over, or a pile of one', () => {

@@ -20,7 +20,7 @@ emulator against the NEW rules, and create, join, rejoin, deal, play, score and
 both race paths were all accepted. A phone still holding an older bundle was
 therefore never locked out by the release._
 
-_**468 tests** (405 unit and 24 in a real browser; 39 against the emulator, all
+_**469 tests** (406 unit and 24 in a real browser; 39 against the emulator, all
 green). This is the only place in the repo that quotes a count -
 it drifted three separate ways when it lived in four places, so keep it here and
 nowhere else. Both sides of the 2026-09-04 merge rewrote this line, which is the
@@ -431,17 +431,23 @@ render, and it sets state.
   Both of those were real bugs; both are pinned by tests now.
 - **`ENABLE_STUCK_BUTTON` is `false`** and the whole stuck path still runs
   underneath. Being stuck is *detected* by `isStuck` + `syncStuck`, not declared.
-- **Stuck is judged on what the wood can REACH, not on what is face up.** Turning
-  three at a time only ever exposes every third card, and which third depends on
-  where the index happens to sit - so a hand can be full of playable cards none of
-  which can be reached. `woodCycleTops` walks the cycle from where the pile
+- **Stuck is judged on what the wood can REACH, not on what is face up.** A turn
+  of three exposes only every third card when the pile length is a multiple of
+  three - which is how a round is dealt, at 27 - and which third depends on where
+  the index sits, so a hand can be full of playable cards none of which can be
+  reached. At any other length the cycle reaches all of them. `woodCycleTops` walks the cycle from where the pile
   actually stands and `hasReachableMove` asks the question that matters. A move
   three turns down is a move this player has, and telling them they have none was
   simply wrong. `hasLegalMove` still answers "right now, with what is face up" and
   is what highlighting and the bots use; do not swap one for the other.
 - Below that, `isStuck` still needs either zero wood or
-  `flipsSinceProgress >= ceil(wood.length / step)` - a full cycle without progress.
-  **The step is 1 while the host's rescue is on**, so that bar moves with it.
+  `flipsSinceProgress >= ceil(wood.length / step)` - a handful of fruitless turns.
+  That stopped being a full cycle when the turn started carrying its count across
+  the turn-over (a ten-card pile now takes ten turns to come round, not four), and
+  it does not need to be one: `hasReachableMove` has already answered the question
+  exactly by walking the cycle, and this only stops a player being labelled the
+  instant they run dry. **The step is 1 while the host's rescue is on**, so that
+  bar moves with it.
 - That flip counter is a closure-scoped `Map` in `createGameStore`, never
   persisted - **it resets to zero on any page reload**.
 - Tableau order is Dash | posts | wood. Wood sits under the right thumb because
@@ -1098,6 +1104,46 @@ their own cards in the middle, and it was the smallest thing on the face.
 at the inside edge of the padding box, so the same 14px on both sides put it
 almost on the border.
 
+### A wood turn brings three, across the turn-over _(#63)_
+
+Reported from a table: at the end of the pile the game counted out a short group
+of one or two, and the next tap started again from the top. It did exactly that,
+and the short group was the smaller half of the problem.
+
+`flipWood` capped at the end and then restarted at `min(step, len)`, which left
+the pile permanently in phase with itself. A ten-card pile went 3, 6, 9, 10, and
+then 3 again for ever: **four of its ten cards could be the top and the other six
+never could**, however long anybody kept tapping. It now carries the count across
+the turn-over - `((woodIndex + step - 1) % len) + 1` - so the last card is turned,
+the pile goes back face down, and the turn finishes with as many as it takes to
+make three. Every turn deals three, and the phase moves on every lap.
+
+**The consequence is much larger than the short deal**, and it is the reason this
+was worth doing rather than tidying. When the pile length shares no factor with
+three the cycle now reaches EVERY card, where it used to reach a fixed handful.
+A round deals 27 wood cards, which is a multiple of three and so still reaches
+only nine of them - but the pile stops being a multiple of three the moment one
+card is played out of it, and from then on the whole pile is live.
+
+Being stuck therefore becomes rare, which is correct rather than convenient:
+`isStuck` asks `hasReachableMove`, which walks the actual cycle, so it followed
+the rule change on its own with nothing to update. Two things around it did need
+saying, and are said where they live:
+
+- `sinkWoodTop` matters less than it did, and only on a pile that is a multiple
+  of three. On any other length the cycle already reaches everything, so there is
+  nothing to rescue. It is still the only thing that moves the phase on a pile
+  that cannot move it by turning, which is the shape a round starts in.
+- **`isStuck`'s `ceil(wood.length / step)` bar is no longer a full cycle** - ten
+  cards take ten turns to come round now, not four - and does not need to be.
+  `hasReachableMove` decides the question exactly; the counter only stops a player
+  being labelled the instant they run dry.
+
+The UI needed nothing. `canRecycle` is `faceDown === 0`, which still happens
+exactly when a turn lands on the last card, and the tap that follows it still
+turns the pile over - it just deals a full three now instead of restarting a
+count. What has gone is the short deal that used to precede it.
+
 ### A way out of being stuck, and a countdown between rounds _(#61, #62)_
 
 **`sinkWoodTop` sends the face-up wood card to the very bottom of the pile**, and
@@ -1416,9 +1462,10 @@ attention** - which is why none of the knobs is "plays worse cards".
 It used to be one card flipping (`flipKey` on the top card). A turn brings three
 cards over, so it now looks like three: `dealt` is the last `WOOD_STEP` face-up
 cards, stacked in one grid cell and animated in 70ms apart. **Keyed by card**, so
-only the ones that actually just arrived animate - after a short last turn, or a
-single-card turn under the host's rescue, the cards already face up hold still and
-one card lands on them.
+only the ones that actually just arrived animate - under the host's single-card
+rescue the cards already face up hold still and one card lands on them, and on the
+turn that takes the pile over, the face-up pile is replaced wholesale by the one or
+two cards that finished the turn.
 
 Dropping `flipKey` also removed the static-render artifact it caused: a headless
 shot no longer leaves the wood card frozen edge-on at `rotateY(90)`.
@@ -2319,6 +2366,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `75dec4b` | A centre play its own player can see, so the next one is judged on a board that has it; `createRoom` as one atomic write; the rejoin presence write no longer awaited; and no join form offered to somebody already in the room |
 | `e4b029d` | The room the join screen already read, threaded into the join, so entry stops downloading it twice |
 | `4b05de8` | The bolt that says who dashed, on the sheet that ends the game and on the scorepad's |
+| `PENDING` | A wood turn brings three across the turn-over, so the pile stops showing the same four cards for ever |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.

@@ -177,10 +177,14 @@ export function placeOnPost(t: Tableau, source: PlaySource, postIndex: number): 
  *  - No wood at all. flipWood is a no-op at zero cards and a player's own tops
  *    cannot change without a play, so nothing they do alone will help. Only
  *    another player's centre play can free them.
- *  - They have turned over the whole pile since their last successful play
- *    (a flip advances 3, so ceil(wood/3) flips is one full traversal) and still
- *    have nothing. Only a rotation, which changes which third of the pile is
- *    reachable, can help.
+ *  - They have turned the pile over `ceil(wood/3)` times since their last
+ *    successful play and still have nothing. That number is NOT the length of the
+ *    cycle any more - since a turn carries its count across the turn-over, a
+ *    ten-card pile takes ten turns to come round rather than four - and it does
+ *    not need to be. `hasReachableMove` above has already decided the question
+ *    exactly, by walking the whole cycle; this is only the bar that stops a player
+ *    being labelled the instant they run dry, so a generous handful of fruitless
+ *    turns is the whole of what it has to be. Only a rotation can help by then.
  */
 export function isStuck(
   t: Tableau, spaces: CenterSpace[], flipsSinceProgress: number, step: number = WOOD_STEP,
@@ -198,9 +202,11 @@ export function isStuck(
  * them? `hasLegalMove` answers "right now, with what is face up"; this answers
  * "at any point in the cycle, without anybody else doing anything".
  *
- * The gap between the two is the whole point: at three cards a turn only every
- * third card is ever exposed, so a hand can be full of moves none of which can be
- * reached. That gap is also what the host's single-card rescue closes.
+ * The gap between the two is the whole point: when the pile length is a multiple
+ * of three - which is how a round is dealt, at 27 - a turn of three only ever
+ * exposes every third card, so a hand can be full of moves none of which can be
+ * reached. Any other length reaches all of them, since the turn carries its count
+ * across the turn-over. The host's single-card rescue closes the gap outright.
  */
 export function hasReachableMove(
   t: Tableau, spaces: CenterSpace[], step: number = WOOD_STEP,
