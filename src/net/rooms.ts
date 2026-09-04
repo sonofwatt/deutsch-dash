@@ -119,14 +119,22 @@ export async function createRoom(name: string, badgeId: BadgeId): Promise<string
     createdAt: serverTimestamp(), hostId: uid, creatorId: uid, targetScore: 75, phase: 'lobby', roundNumber: 0,
     playerCount: 1,
   };
-  // Two sequential writes, not one atomic set(): the players/$uid .validate
-  // rule reads meta/phase to gate new joins, and (verified empirically
-  // against the emulator - see the report) that cross-reference is only
-  // reliable when meta is data ALREADY COMMITTED, not part of the SAME
-  // write as the player being validated. Safe to split here (unlike
-  // joinRoom) because nobody else can be racing a code nobody has seen yet.
-  await set(ref(db, `rooms/${code}/meta`), meta);
-  await update(roomRef(code), { [`players/${uid}`]: playerRecord(name, badgeId), [`badges/${badgeId}`]: uid });
+  // One atomic multi-path write. This was two sequential ones, held apart by a
+  // comment that outlived its rule: the players/$uid .validate used to read
+  // meta/phase to gate joins, and that cross-reference only worked against data
+  // already committed. Nothing reads meta/phase from the rules any more - it has
+  // its own validate and nothing else - because the lobby-only gate went when
+  // spectators were admitted mid-round. The merge is legal because `root` is
+  // evaluated against the PRE-write tree, where this room has no players yet:
+  // that is the branch hostId and creatorId's validate take (`!players.exists()`),
+  // and badges only ever checks the writer's own uid. Worth doing for the round
+  // trip, and worth more because a create can no longer be interrupted between
+  // the two and leave a meta behind with no players in it.
+  await update(roomRef(code), {
+    meta,
+    [`players/${uid}`]: playerRecord(name, badgeId),
+    [`badges/${badgeId}`]: uid,
+  });
   startPresence(code, uid);
   return code;
 }
@@ -183,7 +191,12 @@ export async function joinRoom(code: string, name: string, badgeId: BadgeId): Pr
       return { ok: false, reason: 'race' };
     }
   } else {
-    await update(ref(db, `rooms/${code}/players/${uid}`), { connected: true });
+    // Not awaited, on purpose. `startPresence` on the next line writes exactly
+    // this value again the moment `.info/connected` reports true, so awaiting it
+    // only serialized another round trip onto the resume path - which is how this
+    // app is usually entered, by a reload, a phone waking, or a tab coming back
+    // from sending the invite. A failure costs nothing for the same reason.
+    void update(ref(db, `rooms/${code}/players/${uid}`), { connected: true }).catch(() => {});
   }
   startPresence(code, uid);
   return { ok: true, code };

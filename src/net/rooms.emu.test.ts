@@ -242,25 +242,28 @@ emu('server-side player cap and badge uniqueness (database.rules.json)', () => {
     expect(realUid).toBeTruthy();
   });
 
-  it('createRoom still succeeds end-to-end under the new validate rule, and claims the badge', async () => {
-    // Guards the "cross-reference the same write" trap: the players/$uid
-    // .validate rule reads meta/phase to gate new joins, and that read is
-    // only reliable when meta is data already committed by a PRIOR write -
-    // not data being written in the SAME operation as the player (verified
-    // empirically; see the report). createRoom() writes meta first, then
-    // players/badges, specifically so this reference is safe. This
-    // replicates that exact two-step shape directly against the rules
-    // engine, since (per the note above this describe block) the regular
-    // client SDK can't be used to prove rule compliance here.
+  it('createRoom succeeds as ONE atomic write, and claims the badge', async () => {
+    // This used to be two sequential writes, and this test used to assert that
+    // shape, because the players/$uid .validate read meta/phase and that
+    // cross-reference only worked against already-committed data. No rule reads
+    // meta/phase any more, so the write is now one multi-path update, and this is
+    // what proves that against the rules engine rather than by reading them:
+    // hostId and creatorId validate against `root`, which is the PRE-write tree,
+    // where this room has no players at all, and that is the branch of their
+    // condition that has to carry a create. If a future rule reads across the
+    // write again, this goes red before a player ever meets a room that cannot be
+    // made. (The regular client SDK cannot prove rule compliance here; see the
+    // note above this describe block.)
     const code = 'CREATENEW';
     const db = hostCtx.database();
-    await assertSucceeds(db.ref(`rooms/${code}/meta`).set({
-      createdAt: Date.now(), hostId: HOST, targetScore: 75, phase: 'lobby', roundNumber: 0, playerCount: 1,
-    }));
     await assertSucceeds(db.ref(`rooms/${code}`).update({
+      meta: { createdAt: Date.now(), hostId: HOST, creatorId: HOST, targetScore: 75, phase: 'lobby', roundNumber: 0, playerCount: 1 },
       [`players/${HOST}`]: { name: 'Host', badgeId: 'clownfish', joinedAt: 1, connected: true, stuckAt: null, awayAt: null, score: 0, ready: true },
       'badges/clownfish': HOST,
     }));
+    // and the whole room is there, rather than a meta with nobody in it
+    expect((await db.ref(`rooms/${code}/meta/hostId`).get()).val()).toBe(HOST);
+    expect((await db.ref(`rooms/${code}/badges/clownfish`).get()).val()).toBe(HOST);
 
     // Functional regression: the real createRoom() (regular SDK) still
     // produces this same shape end-to-end.

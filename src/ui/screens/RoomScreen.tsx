@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useGameStore, gameStore } from '../../state/store';
-import { Join } from './Join';
+import { Join, Rejoining } from './Join';
+import { roomView } from './roomView';
 import { Lobby } from './Lobby';
 import { Game } from './Game';
 import { DashSplash } from '../components/DashSplash';
@@ -45,7 +46,13 @@ export function RoomScreen({ code }: { code: string }) {
     }
   }, [splash]);
 
-  if (joinPhase !== 'in-room' || !room) return <Join code={code} />;
+  const view = roomView(joinPhase, room != null);
+  if (view === 'form') return <Join code={code} />;
+  // `room` is non-null whenever the view is 'room', by construction. The second
+  // half of this condition is what tells the COMPILER that, since the decision
+  // now goes through a function, and it falls the safe way if it ever stops
+  // being true.
+  if (view === 'rejoining' || !room) return <Rejoining code={code} />;
   if (phase === 'lobby') return <Lobby code={code} />;
 
   const splashing = (splash?.until ?? 0) > Date.now();

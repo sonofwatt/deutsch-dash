@@ -15,7 +15,7 @@ and range bounds on every field a client writes). Until `npx firebase deploy
 --only database` has been run, the live database is on the older rules, which
 is exactly the trap "Editing `database.rules.json` is half the job" describes._
 
-_**454 tests** (394 unit and 24 in a real browser; 36 against the emulator, all
+_**459 tests** (398 unit and 24 in a real browser; 37 against the emulator, all
 green). This is the only place in the repo that quotes a count -
 it drifted three separate ways when it lived in four places, so keep it here and
 nowhere else._
@@ -2050,22 +2050,20 @@ the ledgered pointer-capture re-select check on mouse drags.
   measured at 8.5 kB minified, not worth a loading state. Firebase is 229 kB of
   the vendor chunk and cannot leave the home screen without dismantling the
   module-scope store singleton.
-- **A centre play is invisible to the player who made it for one whole round
-  trip, and it silently drops their next play.** `playToCenter`
-  (`src/net/plays.ts`) passes `{ applyLocally: false }` to `runTransaction`.
-  The SDK files that write as hidden, so it raises no local event. The hand
-  updates optimistically (`src/state/store.ts`, `playTo`), but the centre pile is
-  rendered straight off server state, so for one round trip the card is in
-  neither place. Measured on the wire against the emulator: with the option, the
-  room event fires after the server answers; without it, one millisecond before
-  the put frame goes out. The worse half is not the animation. `playTo` gates the
-  next play on `room.round.spaces[target.space]`, which is stale for that same
-  round trip, so playing a red 3 and then a red 4 onto the same space drops the
-  second one with no card and no scowl. Dropping the option is a one-line fix and
-  the rollback path (`putBack`, `lastRejected`) already exists and already runs.
-  Two things to watch at a table: a refused play will now flash onto the pile and
-  be pulled off rather than never appearing, and on a `datastale` retry a
-  contested space can flicker twice.
+- **A centre play used to be invisible to the player who made it for a whole
+  round trip, and silently dropped their next one. Fixed on 2026-09-04.**
+  `playToCenter` passed `{ applyLocally: false }`, so the write raised no local
+  event and the centre pile, which renders straight off server state, did not
+  have the card while the hand no longer did. The expensive half was never the
+  animation: `playTo` gates the next play on `room.round.spaces[space]`, stale
+  for the same window, so a red 3 followed by a red 4 onto one space lost the
+  second with no card and no scowl, and flinging made that routine. The option is
+  gone, the reasoning is in the comment above `runTransaction` in
+  `src/net/plays.ts`, and `plays.emu.test.ts` pins it: the listener must hold the
+  card while the transaction is still in flight. **Two things to watch at a
+  table**, both new and neither covered by a test: a refused play now flashes
+  onto the pile and is pulled off rather than never appearing, and on a
+  `datastale` retry a contested space can flicker twice.
 - **The database is in us-central1, and that is the right place for it. Do not
   move it.** `databaseURL` is `holland-hustle-default-rtdb.firebaseio.com`, and
   only us-central1 instances are served on the legacy `.firebaseio.com` domain;
@@ -2083,33 +2081,47 @@ the ledgered pointer-capture re-select check on mouse drags.
   100 ms a transatlantic hop would cost, so removing a round trip buys a third
   of what it would in Europe, and the BYTES on the entry path now cost more than
   the trips do. Re-read the entry and bundle bullets below with that in mind.
-- **Entry costs four serialized round trips on the resume path, which is how
+- **Entry costs three serialized round trips on the resume path, which is how
   this app is usually entered** (reload, phone lock, tab away to send the invite
-  and back). `peekRoom` reads the whole room, then `joinRoom` opens with its own
-  unconditional `get` of the same node, then the listener hashes an empty cache
-  and downloads it a third time. Measured at 47,373 bytes of identical payload
-  for one entry. The SDK keeps nothing between the two gets: `repoGetValue`
-  caches only active queries and drops the sync point on its way out. Two cheap
-  fixes, in order: thread the room `Join.tsx` already holds into `joinRoom` so
-  the second get disappears, and stop awaiting the rejoin branch's
-  `connected: true` write, which `startPresence` makes again two lines later
-  anyway. Scope the first to the resume path only: on the form path the peek can
-  be minutes stale by the time the player taps, and the pre-checks would then
-  report `race` instead of `full` or `badge-taken`. Nothing corrupts either way,
-  because the rules and `increment(1)` enforce the cap for real.
-- **`createRoom`'s two sequential writes are held together by a comment that
-  outlived its rule.** It splits `set(meta)` from `update(players + badges)`
-  because the `players/$uid` validate used to read `meta/phase`. It does not any
-  more: `phase` appears once in `database.rules.json`, as its own validate, and
-  the lobby-only gate went when spectators were admitted mid-game. One atomic
-  multi-path update is rules-legal, because `root` is evaluated against the
-  pre-write tree, and it makes a create that cannot leave meta with no players.
-- **After a successful join the player sees the join form again**, live button
-  and all, for one listen round trip: `RoomScreen` gates on `joinPhase` and
-  `room` together, `watch()` sets `joinPhase` synchronously, and `room` stays
-  null until the first snapshot. A second tap re-runs `enterRoom` and churns the
-  presence writer through the stale-attempt branch. Render the `Rejoining...`
-  placeholder `Join` already has.
+  and back). It was four. `peekRoom` reads the whole room, then `joinRoom` opens
+  with its own unconditional `get` of the same node, then the listener hashes an
+  empty cache and downloads it a third time: 47,373 bytes of identical payload
+  for one entry, and the SDK keeps nothing between the two gets, because
+  `repoGetValue` caches only active queries and drops the sync point on its way
+  out. The fourth was the rejoin branch's `connected: true` write, which is no
+  longer awaited (2026-09-04): `startPresence` makes the same write a line later
+  the moment `.info/connected` reports true, so awaiting it bought nothing.
+  **What is left is the duplicated `get`**: thread the room `Join.tsx` already
+  holds into `joinRoom` so the second one disappears. Scope it to the resume path
+  only. On the form path the peek can be minutes stale by the time the player
+  taps, and the pre-checks would then report `race` instead of `full` or
+  `badge-taken`. Nothing corrupts either way, because the rules and
+  `increment(1)` enforce the cap for real. On the domestic floor this is worth
+  more for the 47 kB than for the trip: a round trip here is about 30 ms.
+- **`createRoom` is one atomic write as of 2026-09-04.** It was two sequential
+  ones, held apart by a comment that outlived its rule: the `players/$uid`
+  validate used to read `meta/phase`, and that cross-reference only worked
+  against already-committed data. Nothing reads `meta/phase` from the rules now.
+  The merge is legal because `root` is the PRE-write tree, where the room has no
+  players yet, which is the branch `hostId` and `creatorId`'s validate take, and
+  badges only checks the writer's own uid. Proved against the rules engine in
+  `rooms.emu.test.ts` ("ONE atomic write"), **and separately against the rules
+  that are live today**, because this branch's rules file has not been deployed
+  and a create that only passed under the new one would have broken every new
+  room until it was. It buys a round trip, and it means a create can no longer be
+  interrupted between the two writes and leave a meta behind with no players.
+- **The join form no longer comes back after a successful join.** For one listen
+  round trip `joinPhase` is `in-room` while `room` is still null, and
+  `RoomScreen` tested the two together, so it re-rendered the live form, button
+  and all, to somebody who had already joined; a second tap re-ran `enterRoom` and
+  churned the presence writer through the stale-attempt branch. It now shows the
+  `Rejoining` placeholder, which moved out of `Join.tsx` into a component both
+  screens share. The decision is `roomView` in `src/ui/screens/roomView.ts`, pure
+  and tested, and it is a separate function for a reason worth knowing: zustand
+  hands server rendering the INITIAL state, so a `renderToStaticMarkup` of
+  `RoomScreen` shows the store as it was at import no matter what a test sets.
+  A store-backed screen cannot be render-tested here; pull the decision out and
+  test that instead.
 - **Every card in a hand stores a 28-character owner id it does not need**, but
   the ordering to remove it is a trap. Inside `round/tableaus/$uid` the field is
   redundant and `database.rules.json` proves it, validating the owner against
@@ -2271,6 +2283,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `dc78867` → `e3c6676` | Security and performance audit: the ghost off the render path, memoised cards, defensive reads, one-field wood writes, self-hosted fonts, least-privilege CI |
 | `cecb628` → `0b29024` | The audit's analysis finished by hand after the limit: the verdict ledger, the seventh reader, and the four small gaps it found closed (late-play rollback, write-once createdAt, an absent host recovered, a CSPRNG room code) |
 | `b150224` → `31df523` | Where the multiplayer latency actually goes: a centre play is invisible to the player who made it for a round trip and silently drops their next one, entry costs four serialized round trips on the resume path, and the database is already in the right region because every player is Eastern |
+| `PENDING` | A centre play its own player can see, so the next one is judged on a board that has it; `createRoom` as one atomic write; the rejoin presence write no longer awaited; and no join form offered to somebody already in the room |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.

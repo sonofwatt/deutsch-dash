@@ -79,16 +79,7 @@ export function Join({ code }: { code: string }) {
     setAttempt(a => a + 1);
   }
 
-  if (resuming) {
-    return (
-      <div className="screen stack">
-        <h1 className="title">Rejoining…</h1>
-        <div className="code-pill">{code}</div>
-        <p className="muted">Putting you back in the room.</p>
-        <a className="muted keep-back" href="#/">Home</a>
-      </div>
-    );
-  }
+  if (resuming) return <Rejoining code={code} />;
 
   if (resumeFailed) {
     return (
@@ -119,6 +110,25 @@ export function Join({ code }: { code: string }) {
       </button>
       {/* An invite link is often the only way into this app, and a stale one used
           to be a dead end: no room to join, and nothing on screen going anywhere. */}
+      <a className="muted keep-back" href="#/">Home</a>
+    </div>
+  );
+}
+
+/**
+ * Shown while this player is on their way into a room they are already in. Two
+ * screens hold it: `Join` itself while it resumes a stored membership, and
+ * `RoomScreen` for the listen round trip between `joinPhase` turning `in-room`
+ * and the first snapshot arriving. That second window used to render the form
+ * above instead, live button and all, and a second tap on it re-ran `enterRoom`
+ * and churned the presence writer through the stale-attempt branch.
+ */
+export function Rejoining({ code }: { code: string }) {
+  return (
+    <div className="screen stack">
+      <h1 className="title">Rejoining…</h1>
+      <div className="code-pill">{code}</div>
+      <p className="muted">Putting you back in the room.</p>
       <a className="muted keep-back" href="#/">Home</a>
     </div>
   );

@@ -115,9 +115,17 @@ export async function startRound(code: string, room: Room, rng?: Rng): Promise<v
 export interface PlayResult { committed: boolean; winner: string | null }
 
 export async function playToCenter(code: string, spaceIndex: number, card: Card): Promise<PlayResult> {
-  const result = await runTransaction(
-    r(code, `round/spaces/${spaceIndex}`), centerPlayTxn(card), { applyLocally: false },
-  );
+  // `applyLocally` is left at its default of true, on purpose, and the option
+  // that used to turn it off is not coming back. Hidden writes raise no local
+  // event, and the centre pile renders straight off server state, so the card
+  // was in neither the hand nor the pile for a whole round trip. The visible
+  // half of that was a gap in the animation; the expensive half was that
+  // `playTo` gates the next play on `room.round.spaces[space]`, which stayed
+  // stale for the same window, so a red 3 followed by a red 4 onto one space
+  // dropped the second with no card and no scowl. Flinging made that routine.
+  // The rollback path below already existed and already ran, so a refused play
+  // now flashes onto the pile and is pulled off rather than never appearing.
+  const result = await runTransaction(r(code, `round/spaces/${spaceIndex}`), centerPlayTxn(card));
   if (result.committed) {
     set(r(code, 'round/stuckRounds'), 0).catch(() => {}); // best-effort reset; a lost reset only delays the stall counter
     return { committed: true, winner: null };
