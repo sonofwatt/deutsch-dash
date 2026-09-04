@@ -667,14 +667,19 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         // connected player stands in after HOST_AWAY_MS. A creator reclaim above
         // resolves this quickly when the creator returns; this covers the case
         // where they don't.
-        const hostP = room.players[room.meta.hostId];
-        if (hostP && !hostP.connected) {
+        // A host record that is absent counts as away. Anyone holding the code
+        // can delete meta/hostId or the host's record (a validate never runs on
+        // a delete), and a room whose host is nobody would otherwise wait for
+        // ever: the creator reclaims only while present, and this timer used to
+        // need a record to read `connected` from.
+        const hostP: PlayerInfo | undefined = room.players[room.meta.hostId];
+        if (!hostP?.connected) {
           hostTimer ??= setTimeout(() => {
             hostTimer = null;
             const cur = get().room;
             if (!cur) return;
-            const curHost = cur.players[cur.meta.hostId];
-            if (curHost && !curHost.connected && pickNextHost(cur.players) === me) {
+            const curHost: PlayerInfo | undefined = cur.players[cur.meta.hostId];
+            if (!curHost?.connected && pickNextHost(cur.players) === me) {
               void deps.claimHost(get().code!, me);
             }
           }, HOST_AWAY_MS);

@@ -136,8 +136,15 @@ export async function joinRoom(code: string, name: string, badgeId: BadgeId): Pr
   const snap = await get(roomRef(code));
   const room = normalizeRoom(snap.val());
   if (!room) return { ok: false, reason: 'not-found' };
-  if (Date.now() - room.meta.createdAt > ROOM_TTL_MS) return { ok: false, reason: 'expired' };
   const rejoining = uid in room.players;
+  // Expiry is for newcomers. This is the one comparison of this device's clock
+  // with the server's left in the app (the handoff says why awayAt and the
+  // countdown avoid it), and it used to run first, so it gated every reload and
+  // every resume after a phone slept: a member whose clock was a day ahead, or
+  // whose room had a forged createdAt, was told their own room had expired. The
+  // rules make createdAt write-once, so the forgery is gone; the skew remains
+  // for a newcomer, and only for one whose clock is a whole day out.
+  if (!rejoining && Date.now() - room.meta.createdAt > ROOM_TTL_MS) return { ok: false, reason: 'expired' };
   if (!rejoining) {
     // A game in progress is no longer a closed door. Somebody arriving mid-round
     // is admitted as a spectator: they get a player record and no tableau, watch

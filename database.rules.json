@@ -17,7 +17,7 @@
             ".validate": "newData.isString() && (root.child('rooms').child($code).child('players').child(newData.val()).exists() || !root.child('rooms').child($code).child('players').exists()) && !root.child('rooms').child($code).child('players').child(newData.val()).child('isBot').exists()"
           },
           "createdAt": {
-            ".validate": "newData.isNumber()"
+            ".validate": "newData.isNumber() && !data.exists()"
           },
           "phase": {
             ".validate": "newData.val().matches(/^(lobby|playing|roundEnd|gameOver)$/)"

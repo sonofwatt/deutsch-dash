@@ -1,6 +1,6 @@
 /// <reference types="node" />
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createRoom, joinRoom, normalizeRoom, peekRoom, setIdentity, MAX_PLAYERS } from './rooms';
+import { createRoom, joinRoom, normalizeRoom, peekRoom, setIdentity, MAX_PLAYERS, ROOM_TTL_MS } from './rooms';
 import { startRound } from './plays';
 import { makeRoomCode } from './roomCodes';
 import {
@@ -40,6 +40,39 @@ emu('rooms against emulator', () => {
     // same anonymous uid rejoining its own room is always ok
     const rejoin = await joinRoom(code, 'Dav', 'tulip');
     expect(rejoin).toEqual({ ok: true, code });
+  });
+
+  it('an expired room turns a newcomer away and still lets a member back in', async () => {
+    // Only time can age a room now that createdAt is write-once, so the aged
+    // room is seeded with the rules off, in the namespace the app's own db uses.
+    // Expiry used to run before the rejoin check, so it gated every reload and
+    // every resume after a phone slept, against this device's clock.
+    const { ensureSignedIn } = await import('./firebase');
+    const me = await ensureSignedIn();
+    // rules-unit-testing addresses the namespace named by its projectId, with no
+    // suffix, so this is the app's demo-dash-default-rtdb and not demo-dash.
+    const aged = await initializeTestEnvironment({
+      projectId: 'demo-dash-default-rtdb', database: { host: '127.0.0.1', port: 9000 },
+    });
+    try {
+      const code = makeRoomCode();
+      await aged.withSecurityRulesDisabled(async ctx => {
+        await set(ref(ctx.database(), `rooms/${code}`), {
+          meta: { createdAt: Date.now() - ROOM_TTL_MS - 60_000, hostId: 'old-host', creatorId: 'old-host',
+                  targetScore: 75, phase: 'lobby', roundNumber: 0, playerCount: 1 },
+          players: { 'old-host': { name: 'Old', badgeId: 'tulip', joinedAt: 1, connected: false, score: 0 } },
+          badges: { tulip: 'old-host' },
+        });
+      });
+      expect(await joinRoom(code, 'New', 'star')).toEqual({ ok: false, reason: 'expired' });
+      await aged.withSecurityRulesDisabled(async ctx => {
+        await set(ref(ctx.database(), `rooms/${code}/players/${me}`),
+          { name: 'Me', badgeId: 'star', joinedAt: 1, connected: false, score: 0 });
+      });
+      expect(await joinRoom(code, 'Me', 'star')).toEqual({ ok: true, code });
+    } finally {
+      await aged.cleanup();
+    }
   });
 });
 
@@ -660,6 +693,17 @@ emu('validation rules bound what a client may store (database.rules.json)', () =
     await assertFails(mine.set(7));
     await assertSucceeds(mine.set('kite')); // retired, still drawable: a room may still hold one
     await assertFails(otherCtx.database().ref(`rooms/${code}/badges/zzz-not-a-badge`).set(OTHER));
+  });
+
+  it('createdAt is written once, by the room\'s first write, and never again', async () => {
+    // One write of 0 by anyone holding the code used to make every join and every
+    // rejoin say the room had expired for as long as it stood. room() above is
+    // the proof that a fresh room's createdAt is accepted.
+    const code = 'VALBORN';
+    await room(code);
+    await assertFails(otherCtx.database().ref(`rooms/${code}/meta/createdAt`).set(0));
+    await assertFails(hostCtx.database().ref(`rooms/${code}/meta/createdAt`).set(Date.now()));
+    await assertFails(otherCtx.database().ref(`rooms/${code}/meta/createdAt`).set('yesterday'));
   });
 
   it('a name is a string of at most 32 characters, and the numbers are numbers', async () => {

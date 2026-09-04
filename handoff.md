@@ -15,7 +15,7 @@ and range bounds on every field a client writes). Until `npx firebase deploy
 --only database` has been run, the live database is on the older rules, which
 is exactly the trap "Editing `database.rules.json` is half the job" describes._
 
-_**441 tests** (383 unit and 24 in a real browser; 34 against the emulator, all
+_**454 tests** (394 unit and 24 in a real browser; 36 against the emulator, all
 green). This is the only place in the repo that quotes a count -
 it drifted three separate ways when it lived in four places, so keep it here and
 nowhere else._
@@ -2068,15 +2068,17 @@ the ledgered pointer-capture re-select check on mouse drags.
   both tick the countdown. Self-inflicted, and the spec's multi-tab playtest is
   where it shows. A per-tab presence child or a `BroadcastChannel` leader
   election is the fix when wanted.
-- A stranger holding the code can still delete `meta/hostId`: a validate never
-  runs on a delete. The creator's client reclaims on its next snapshot; with the
-  creator gone the stand-in watchdog does nothing, because it keys on a host
-  record that is disconnected rather than absent. The structural tier closes the
-  write and a watchdog change closes the consequence (audit doc, seventh reader).
+- A stranger holding the code can still delete `meta/hostId` or the host's
+  record: a validate never runs on a delete. The consequence is handled: the
+  stand-in watchdog now treats an absent host like a disconnected one, so the
+  room recovers a host even with the creator gone. The write itself waits on the
+  structural tier (audit doc, seventh reader).
 - `joinRoom`'s expiry check is the one cross-device clock comparison left in the
-  app (see "Two phones do not agree on the time"), it runs before the rejoin
-  branch, and `createdAt` is writable by anyone with the code until a write-once
-  validate ships. Fix pending; the audit doc's seventh-reader section has it.
+  app (see "Two phones do not agree on the time"). It now runs AFTER the rejoin
+  branch, so a member is never told their own room expired, and `createdAt` is
+  write-once in the rules (not live until deployed). The skew still turns a
+  newcomer away whose clock is a whole day out; that would need a server-side
+  comparison.
 - Long-session memory has never been measured. The store's maps are bounded by
   inspection; the heap after ten rounds of remounting the board is a number
   nobody has.

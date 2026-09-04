@@ -647,6 +647,32 @@ describe('stale-session guards', () => {
     }
   });
 
+  it('claims host after HOST_AWAY_MS when the host record is gone, or hostId is', async () => {
+    // A stranger holding the code can delete either (a validate never runs on a
+    // delete). The creator reclaims only while present; without this the room
+    // would have no host for ever.
+    for (const gone of ['record', 'hostId'] as const) {
+      let cb: ((room: Room | null) => void) | undefined;
+      const deps = fakeDeps({
+        watchRoom: vi.fn((_code: string, f: (room: Room | null) => void) => { cb = f; return () => {}; }),
+      });
+      const store = createGameStore(deps);
+      await store.getState().enterRoom('AAAAAA', 'D', 'tulip');
+      vi.useFakeTimers();
+      try {
+        const room = mkRoom();
+        if (gone === 'record') delete room.players.h;
+        else room.meta.hostId = undefined as unknown as string;
+        cb!(room);
+        vi.advanceTimersByTime(HOST_AWAY_MS + 1);
+        expect(deps.claimHost).toHaveBeenCalledWith('AAAAAA', 'me');
+      } finally {
+        vi.useRealTimers();
+        store.getState().leave();
+      }
+    }
+  });
+
   it('claims host after HOST_AWAY_MS when the host is disconnected in the lobby (previously impossible)', async () => {
     let cb: ((room: Room | null) => void) | undefined;
     const deps = fakeDeps({
