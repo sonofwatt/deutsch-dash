@@ -10,7 +10,7 @@ suite. A commit sitting unpushed has already invalidated one playtest - what
 people are playing is whatever last reached Pages - so check `git status -sb`
 before trusting what a table reports._
 
-_**385 tests green** (361 unit + 24 emulator). This is the only place in the repo
+_**388 tests green** (364 unit + 24 emulator). This is the only place in the repo
 that quotes a count - it drifted three separate ways when it lived in four
 places, so keep it here and nowhere else._
 
@@ -41,7 +41,13 @@ anonymous auth. No server of our own.
 
 **No em dashes.** Not here, not in code comments, not in commit messages, not in
 anything the app prints. See `CLAUDE.md`; 268 of them were swept out of this repo
-on 2026-08-31 and none should come back.
+on 2026-08-31 and none should come back. **`src/noEmDash.test.ts` is what makes
+sure of it**, grepping every tracked file on each `npm test`, because a rule this
+absolute was until now enforced only by whoever happened to look. The sweep
+itself proves the point: it missed one, in `.gitignore`, committed months before
+the rule existed and therefore never in anyone's diff, and it survived until a
+hand grep turned it up in `c73e341`. The guard takes its file list from
+`git ls-files`, so a new file is covered the moment it is staged.
 
 This file is the **why**. The README is the player-facing half - setup, the
 security model, the host options and the house rules - so a change to what a
@@ -2087,6 +2093,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `404cafd` | A desktop animates whatever the OS says; Dash everywhere on screen |
 | `21aceac` | The code says dash too: keys, types, CSS, tests |
 | `aa4ec3e` | The emulator project and the borrowed game name follow |
+| `c73e341` → `PENDING` | The last em dash swept out, and a test so none come back |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
