@@ -20,7 +20,7 @@ emulator against the NEW rules, and create, join, rejoin, deal, play, score and
 both race paths were all accepted. A phone still holding an older bundle was
 therefore never locked out by the release._
 
-_**466 tests** (403 unit and 24 in a real browser; 39 against the emulator, all
+_**468 tests** (405 unit and 24 in a real browser; 39 against the emulator, all
 green). This is the only place in the repo that quotes a count -
 it drifted three separate ways when it lived in four places, so keep it here and
 nowhere else. Both sides of the 2026-09-04 merge rewrote this line, which is the
@@ -2318,6 +2318,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `c73e341` → `0bdb136` | The last em dash swept out, and a test so none come back |
 | `75dec4b` | A centre play its own player can see, so the next one is judged on a board that has it; `createRoom` as one atomic write; the rejoin presence write no longer awaited; and no join form offered to somebody already in the room |
 | `e4b029d` | The room the join screen already read, threaded into the join, so entry stops downloading it twice |
+| `PENDING` | The bolt that says who dashed, on the sheet that ends the game and on the scorepad's |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.

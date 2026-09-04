@@ -26,7 +26,10 @@ export function GameOverOverlay() {
         <p className="muted" style={{ margin: 0, fontSize: 13 }}>
           Final round · played to {room.meta.targetScore} points
         </p>
-        <ScoreList players={room.players} scores={scores} />
+        {/* `dashedBy` matters as much here as on the round-end sheet, and was
+            missing: the round that ends a game is still a round somebody dashed,
+            and this is the only sheet anybody sees for it. */}
+        <ScoreList players={room.players} scores={scores} dashedBy={room.round?.dashedBy} />
         <Commentary remarks={remarksForRoom(room, true)} />
         {actionError && <p className="error" style={{ margin: 0 }}>{actionError}</p>}
         {host

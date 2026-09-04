@@ -525,6 +525,22 @@ describe('ScoreList', () => {
     expect(html.indexOf('Bo')).toBeLessThan(html.indexOf('Ann'));
     expect(html).not.toContain('moved-');
   });
+
+  it('marks the round\'s dasher with a bolt, and marks nobody without one', () => {
+    // The bolt is the only thing on the sheet that says who ended the round. The
+    // game-over overlay rendered the second of these: the final round's scores,
+    // and no dasher at all, on the one sheet anybody sees for that round.
+    const sheet = (dashedBy: string | null) => renderToStaticMarkup(createElement(ScoreList, {
+      players: { ann: p('Ann', 20), bo: p('Bo', 25) },
+      scores: { ann: { centerCount: 9, dashLeft: 0, delta: 12 },
+                bo: { centerCount: 2, dashLeft: 4, delta: -2 } },
+      dashedBy,
+    }));
+    const marked = sheet('ann');
+    expect(marked).toContain('Dashed this round');
+    expect(marked.split('\u26a1').length - 1).toBe(1); // one bolt, on one row
+    expect(sheet(null)).not.toContain('Dashed this round');
+  });
 });
 
 describe('raceFlashes', () => {

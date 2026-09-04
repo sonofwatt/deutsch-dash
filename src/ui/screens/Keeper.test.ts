@@ -37,6 +37,19 @@ describe('Keeper', () => {
     expect(html).toContain('Ada');
   });
 
+  it('marks who dashed on the sheet, derived from whose Dash finished empty', () => {
+    // The scorepad stores no `dashedBy`: a round knows its dasher only as the one
+    // player whose Dash pile came out empty, which is what `dasherOf` reads.
+    const html = withSaved({
+      targetScore: 25, snark: false,
+      players: [{ id: 'tulip', name: 'Ada', badgeId: 'tulip' },
+                { id: 'star', name: 'Bo', badgeId: 'star' }],
+      rounds: [{ ms: 61_000, scores: { tulip: { centerCount: 9, dashLeft: 0, delta: 9 },
+                                       star: { centerCount: 2, dashLeft: 5, delta: -8 } } }],
+    });
+    expect(html).toContain('Dashed this round');
+  });
+
   it('sends a table that was set but never played back to setup', () => {
     // Otherwise reopening lands on a scoreboard of zeroes with nothing to fix.
     const html = withSaved({

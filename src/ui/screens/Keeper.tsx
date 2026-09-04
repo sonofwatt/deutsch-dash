@@ -268,7 +268,10 @@ export function Keeper() {
       <h1 className="title">
         {winner ? `🏆 ${players[winner]?.name} wins!` : `After round ${game.rounds.length}`}
       </h1>
-      <ScoreList players={players} scores={last?.scores ?? null} />
+      {/* Derived rather than stored: a scorepad round knows who dashed only by
+          whose Dash pile finished empty, which is what `dasherOf` reads. */}
+      <ScoreList players={players} scores={last?.scores ?? null}
+                 dashedBy={last ? dasherOf(last.scores) : null} />
       {remarks.length > 0 && <Commentary remarks={remarks} />}
       {winner
         ? <button className="btn btn-primary" onClick={() => {
