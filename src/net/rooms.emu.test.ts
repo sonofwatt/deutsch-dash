@@ -688,6 +688,64 @@ emu('validation rules bound what a client may store (database.rules.json)', () =
     }));
   }
 
+  it('a room can be deleted whole by its creator, and by nobody else while it is fresh', async () => {
+    // Rooms had no delete grant at all, so nothing could ever remove one and every
+    // room ever created rested in the database for good.
+    const code = 'DELMINE';
+    await room(code);
+    await assertFails(otherCtx.database().ref(`rooms/${code}`).set(null));   // not theirs, not old
+    await assertSucceeds(hostCtx.database().ref(`rooms/${code}`).set(null)); // the creator's own
+    expect((await hostCtx.database().ref(`rooms/${code}`).get()).exists()).toBe(false);
+  });
+
+  it('and by anyone once it is a day old, which is the expiry a join already refuses on', async () => {
+    const code = 'DELOLD';
+    await room(code);
+    // createdAt is write-once, so the age is set by writing the room with an old
+    // one rather than by editing it afterwards.
+    await hostCtx.database().ref(`rooms/${code}`).set(null);
+    const day = 24 * 60 * 60 * 1000;
+    await assertSucceeds(hostCtx.database().ref(`rooms/${code}/meta`).set({
+      createdAt: Date.now() - day - 60_000, hostId: HOST, creatorId: HOST,
+      targetScore: 75, phase: 'lobby', roundNumber: 0, playerCount: 1,
+    }));
+    await assertSucceeds(otherCtx.database().ref(`rooms/${code}`).set(null));
+  });
+
+  it('CANARY: the delete grant cannot be used to WRITE anything', async () => {
+    // The grant sits on the room node, and a `.write` there would ordinarily
+    // cascade to every child - which would hand a stranger the whole room. It does
+    // not, because the condition requires the write to leave nothing behind:
+    // `!newData.exists()` is false for any write that stores a value. If that
+    // clause is ever dropped or loosened, these go red rather than the rules
+    // quietly opening up.
+    //
+    // Every path below is one this player is refused TODAY, which is what makes
+    // the test mean something: if the ancestor grant leaked, they would all open
+    // at once. `meta` is deliberately not among them - it carries its own
+    // `.write` for any authed client and leans on its validates, so it would pass
+    // with or without this grant and would prove nothing either way.
+    const code = 'DELCANARY';
+    await room(code);
+    const theirs = otherCtx.database();
+    await assertFails(theirs.ref(`rooms/${code}/players/${HOST}/score`).set(999));
+    await assertFails(theirs.ref(`rooms/${code}/players/${HOST}/name`).set('not me'));
+    await assertFails(theirs.ref(`rooms/${code}/round/tableaus/${HOST}`).set({ dash: [] }));
+    await assertFails(theirs.ref(`rooms/${code}/stats`).set({ anything: 1 }));
+    // and the room is still standing, with the host's record as it was
+    expect((await theirs.ref(`rooms/${code}/players/${HOST}/score`).get()).val()).toBe(0);
+  });
+
+  it('a delete of a CHILD is still judged by that child\'s own rules', async () => {
+    // The grant is for whole rooms. Clearing a child is a different question, and
+    // one the child's own grant answers: a player may clear their own record, and
+    // may not clear somebody else's.
+    const code = 'DELCHILD';
+    await room(code);
+    await assertFails(otherCtx.database().ref(`rooms/${code}/players/${HOST}`).set(null));
+    await assertSucceeds(otherCtx.database().ref(`rooms/${code}/players/${OTHER}`).set(null));
+  });
+
   it('a badge that does not exist is refused on a player record, and a retired one is not', async () => {
     const code = 'VALBADGE';
     await room(code);
@@ -822,6 +880,37 @@ emu('validation rules bound what a client may store (database.rules.json)', () =
       dash: [card(1, 'red', OTHER)], post: [[card(2, 'blue', OTHER)], [], []],
       wood: [card(3, 'green', OTHER), card(4, 'yellow', OTHER)], woodIndex: 2,
     }));
+  });
+
+  it('a hand may store a card WITHOUT an owner, and still not claim somebody else', async () => {
+    // `owner` inside round/tableaus/$uid is the path key repeated on every card,
+    // and these rules validate it against that key rather than trusting it - so it
+    // proves nothing and costs about half an eight-player deal. It is now optional
+    // here, which is the deploy that has to land before any client stops sending
+    // it. A card that DOES carry one is still held to the path it sits under.
+    const code = 'VALNOOWNER';
+    await room(code);
+    const mine = otherCtx.database().ref(`rooms/${code}/round/tableaus/${OTHER}`);
+    await assertSucceeds(mine.set({
+      dash: [{ v: 1, suit: 'red' }], post: [[{ v: 2, suit: 'blue' }], [], []],
+      wood: [{ v: 3, suit: 'green' }], woodIndex: 1,
+    }));
+    await assertFails(mine.set({ dash: [card(1, 'red', HOST)], woodIndex: 0 }));
+    await assertSucceeds(mine.set({ dash: [card(1, 'red', OTHER)], woodIndex: 0 }));
+    // and the value bounds still apply to a card with no owner on it
+    await assertFails(mine.set({ dash: [{ v: 11, suit: 'red' }], woodIndex: 0 }));
+    await assertFails(mine.set({ dash: [{ v: 1, suit: 'octarine' }], woodIndex: 0 }));
+  });
+
+  it('a card in the CENTRE still has to carry its owner', async () => {
+    // The other half of the same rule, and the reason it is not simply dropped
+    // everywhere: a card on the board has left the hand that dealt it, and the
+    // badge on it, the race flashes and the rivalry tallies all read the owner.
+    const code = 'VALCENTREOWNER';
+    await room(code);
+    const space = otherCtx.database().ref(`rooms/${code}/round/spaces/0/stack/0`);
+    await assertFails(space.set({ v: 1, suit: 'red' }));
+    await assertSucceeds(space.set(card(1, 'red', OTHER)));
   });
 
   it('a race record and a duel tally keep their shape', async () => {

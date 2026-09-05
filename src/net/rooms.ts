@@ -2,6 +2,7 @@ import {
   get, increment, onDisconnect, onValue, ref, serverTimestamp, set, update,
 } from 'firebase/database';
 import { db, ensureSignedIn } from './firebase';
+import { dueForSweep, forgetOwnRoom, readOwnRooms, rememberOwnRoom } from './ownRooms';
 import { makeRoomCode } from './roomCodes';
 import type { BadgeId } from '../game/badges';
 import { botId, type BotLevel } from '../game/bot';
@@ -91,7 +92,12 @@ export function normalizeRoom(raw: unknown): Room | null {
       spaces: normalizeSpaces(
         rr.spaces, spaceCount ?? spaceCountForPlayers(playerCount, orderly), orderly),
       tableaus: Object.fromEntries(
-        Object.entries(tableaus).map(([uid, t]) => [uid, normalizeTableau(t, postCount ?? postCountForPlayers(playerCount))]),
+        // The uid is handed down so a card stored without an owner takes the owner of
+        // the pile it is in - see asCards. The path key is the authority on whose
+        // card it is, and the rules validate against it, so the field is redundant
+        // inside a tableau and is on its way out of what gets written.
+        Object.entries(tableaus).map(([uid, t]) =>
+          [uid, normalizeTableau(t, postCount ?? postCountForPlayers(playerCount), uid)]),
       ),
       dashedBy: typeof rr.dashedBy === 'string' ? rr.dashedBy : null,
       scores: record(rr.scores),
@@ -136,7 +142,45 @@ export async function createRoom(name: string, badgeId: BadgeId): Promise<string
     [`badges/${badgeId}`]: uid,
   });
   startPresence(code, uid);
+  // Remembered so it can be cleaned up a day from now: see `sweepOwnRooms`.
+  // After the write, so a room that was never created is never remembered.
+  rememberOwnRoom(code);
   return code;
+}
+
+/**
+ * Delete a whole room. Granted by `rooms/$code`'s `.write`, which is the only
+ * grant on that node and admits nothing except a delete: its condition requires
+ * `!newData.exists()`, so it cannot be used to write a value anywhere underneath.
+ * The creator may do it at any time; anyone may once the room is a day old.
+ */
+export function deleteRoom(code: string): Promise<void> {
+  return set(roomRef(code), null);
+}
+
+/**
+ * Clean up after this device, best effort, on the way past the home screen.
+ *
+ * Rooms were never deletable before this, so nothing ever removed one: a finished
+ * eight-player game rests at about 27.8 kB and simply stayed. Only rooms this
+ * device created and only once they are past `ROOM_TTL_MS`, which is the point
+ * the rule admits the delete from anybody - so this asks for nothing it could be
+ * refused for being too early, and a room somebody is still playing in is never
+ * touched however it was created.
+ *
+ * Failures are swallowed and the room is kept on the list: offline is the common
+ * one, and the next visit will try again. A room already gone answers fine.
+ */
+export async function sweepOwnRooms(now: number = Date.now()): Promise<void> {
+  const due = dueForSweep(readOwnRooms(), now, ROOM_TTL_MS);
+  if (due.length === 0) return;
+  await ensureSignedIn();
+  for (const code of due) {
+    try {
+      await deleteRoom(code);
+      forgetOwnRoom(code);
+    } catch { /* refused or offline: it stays on the list for next time */ }
+  }
 }
 
 export async function joinRoom(

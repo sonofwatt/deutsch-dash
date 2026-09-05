@@ -23,7 +23,7 @@
  */
 const MAJOR = 1;
 /** Rounds of feature work since the Deutsch Dash rename (`1529330`). */
-const FEATURE_BATCHES = 38;
+const FEATURE_BATCHES = 39;
 /** Tweaks, lone fixes and documentation passes over the same stretch. */
 const SMALL_CHANGES = 50;
 

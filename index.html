@@ -9,6 +9,10 @@
     <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png" />
     <!-- iOS ignores SVG touch icons, so add-to-home-screen needs a real PNG -->
     <link rel="apple-touch-icon" sizes="180x180" href="./icon-180.png" />
+    <!-- Add-to-home-screen used to give a nameless shortcut in a browser tab. Every
+         path inside the manifest is relative to the manifest itself, which is what
+         makes it work under the Pages subpath and at the root alike. -->
+    <link rel="manifest" href="./manifest.webmanifest" />
     <!-- Outfit, served from here rather than from Google. One fewer third party
          on every page load (a font request discloses the player's IP address,
          which in the EU is personal data), one fewer render-blocking request

@@ -147,6 +147,24 @@ describe('a pile is read defensively', () => {
   });
   it('reads a pile that is not an object as empty', () => {
     expect(normalizeTableau('nope', 3)).toEqual({ dash: [], post: [[], [], []], wood: [], woodIndex: 0 });
+  });
+
+  it('takes the owner from the pile it is in, for a card stored without one', () => {
+    // `owner` is on its way out of what a tableau stores: inside round/tableaus/$uid
+    // it is the path key repeated on every card, which is about half the size of an
+    // eight-player deal. Reading it back has to work either way for as long as any
+    // room still holds cards written the old way.
+    const stored = { dash: [{ v: 4, suit: 'red' }], wood: [{ v: 9, suit: 'blue', owner: 'me' }] };
+    const t = normalizeTableau(stored, 3, 'me');
+    expect(t.dash).toEqual([{ v: 4, suit: 'red', owner: 'me' }]);   // filled in
+    expect(t.wood).toEqual([{ v: 9, suit: 'blue', owner: 'me' }]);  // and left alone when present
+  });
+
+  it('drops a card with no owner when no pile owner is given, which is a centre space', () => {
+    // A centre space keeps its owners: the card has left the hand that dealt it,
+    // and the badge on it, the race flashes and the rivalry tallies all read it.
+    expect(normalizeTableau({ dash: [{ v: 4, suit: 'red' }] }, 3).dash).toEqual([]);
+    expect(normalizeSpace({ stack: [{ v: 4, suit: 'red' }] }).stack).toEqual([]);
     expect(normalizeSpace('nope')).toEqual({ stack: [], history: [] });
   });
 });

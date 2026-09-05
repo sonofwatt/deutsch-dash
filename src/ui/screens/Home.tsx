@@ -1,13 +1,19 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useGameStore } from '../../state/store';
 import { BadgePicker } from '../components/BadgePicker';
 import { JOIN_REASONS } from '../joinReasons';
 import { APP_VERSION } from '../../version';
 import { readSavedBadge } from '../prefs';
-import { MAX_NAME_LENGTH } from '../../net/rooms';
+import { MAX_NAME_LENGTH, sweepOwnRooms } from '../../net/rooms';
 import type { BadgeId } from '../../game/badges';
 
 export function Home() {
+  // Clean up after this device on the way past: rooms this phone created that are
+  // now past the day the rules let anyone delete them. Nothing else ever removes a
+  // room, and until this existed every room ever created simply stayed. Fire and
+  // forget - it is housekeeping, and nothing on this screen waits for it.
+  useEffect(() => { void sweepOwnRooms(); }, []);
+
   const hostRoom = useGameStore(s => s.hostRoom);
   const enterRoom = useGameStore(s => s.enterRoom);
   const joinPhase = useGameStore(s => s.joinPhase);

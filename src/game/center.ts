@@ -17,9 +17,31 @@ export function isCard(x: unknown): x is Card {
     && typeof c.suit === 'string' && typeof c.owner === 'string';
 }
 
-function asCards(raw: unknown): Card[] {
+/**
+ * A card as a tableau pile STORES one. `owner` is optional there and only there:
+ * inside `round/tableaus/$uid` it is the path key repeated on every card, and the
+ * rules validate it against that key rather than trusting it, so storing it buys
+ * nothing and costs 28 characters a card - about half an eight-player deal.
+ *
+ * A centre space is different and keeps its owners: a card on the board has left
+ * the hand that dealt it, and the badge on it, the race flashes and the rivalry
+ * tallies all read it. `isCard` above stays strict for exactly that.
+ */
+function isCardBody(x: unknown): x is { v: number; suit: string; owner?: unknown } {
+  if (!x || typeof x !== 'object') return false;
+  const c = x as { v?: unknown; suit?: unknown };
+  return typeof c.v === 'number' && Number.isFinite(c.v) && typeof c.suit === 'string';
+}
+
+/**
+ * `owner` given: a pile inside somebody's tableau, and any card missing an owner
+ * takes theirs. Omitted: read strictly, which is what a centre space wants.
+ */
+function asCards(raw: unknown, owner?: string): Card[] {
   const list = Array.isArray(raw) ? raw : raw && typeof raw === 'object' ? Object.values(raw) : [];
-  return list.filter(isCard);
+  if (owner === undefined) return list.filter(isCard);
+  return list.filter(isCardBody)
+    .map(c => (typeof c.owner === 'string' ? c : { ...c, owner }) as Card);
 }
 
 export function normalizeSpace(raw: unknown): CenterSpace {
@@ -27,7 +49,7 @@ export function normalizeSpace(raw: unknown): CenterSpace {
   // A run that filtered down to nothing was never a run: the finished-pile rails
   // read the first card of each for its colour.
   const history = r.history && typeof r.history === 'object'
-    ? (Array.isArray(r.history) ? r.history : Object.values(r.history)).map(asCards).filter(run => run.length > 0)
+    ? (Array.isArray(r.history) ? r.history : Object.values(r.history)).map(run => asCards(run)).filter(run => run.length > 0)  // no owner: a centre run is read strictly
     : [];
   const space: CenterSpace = { stack: asCards(r.stack), history };
   // Set only when it exists, never as `suit: undefined`: centerPlayTxn spreads
@@ -54,16 +76,16 @@ export function orderlySpaces(count: number): CenterSpace[] {
   return Array.from({ length: count }, (_, i) => ({ stack: [], history: [], suit: suitForSpace(i, count) }));
 }
 
-export function normalizeTableau(raw: unknown, postCount: number): Tableau {
+export function normalizeTableau(raw: unknown, postCount: number, owner?: string): Tableau {
   const r = (raw && typeof raw === 'object' ? raw : {}) as { dash?: unknown; post?: unknown; wood?: unknown; woodIndex?: unknown };
   const rawPost = (r.post && typeof r.post === 'object' ? r.post : {}) as Record<number, unknown>;
-  const wood = asCards(r.wood);
+  const wood = asCards(r.wood, owner);
   // Held inside the pile: an index past the end reads a card that is not there.
   const woodIndex = typeof r.woodIndex === 'number' && Number.isInteger(r.woodIndex)
     ? Math.min(Math.max(r.woodIndex, 0), wood.length) : 0;
   return {
-    dash: asCards(r.dash),
-    post: Array.from({ length: postCount }, (_, i) => asCards(rawPost[i])),
+    dash: asCards(r.dash, owner),
+    post: Array.from({ length: postCount }, (_, i) => asCards(rawPost[i], owner)),
     wood,
     woodIndex,
   };

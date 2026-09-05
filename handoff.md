@@ -10,17 +10,17 @@ suite. A commit sitting unpushed has already invalidated one playtest - what
 people are playing is whatever last reached Pages - so check `git status -sb`
 before trusting what a table reports._
 
-_**The audit's `database.rules.json` was deployed on 2026-09-04** (type, enum and
-range bounds on every field a client writes), so the live database and this file
-agree again. It went out AFTER the client that ships with it, which is the safe
-order: the merge was checked against the rules still live at the time, and every
-path a player takes passed under them. The reverse was checked too, because it is
-the one this section cannot warn you about: the PRE-merge client was run on the
-emulator against the NEW rules, and create, join, rejoin, deal, play, score and
-both race paths were all accepted. A phone still holding an older bundle was
-therefore never locked out by the release._
+_**`database.rules.json` is AHEAD of the live database again as of 2026-09-05,
+and `npx firebase deploy --only database` is owed.** Two changes wait in it: a
+delete grant on `rooms/$code`, and `owner` made optional on the cards inside a
+tableau. Both only ADD or RELAX, so nothing already deployed can break on them and
+nothing is urgent - the room sweep simply does nothing until they land, and the
+client writes `owner` either way. The audit's own bounds went out on 2026-09-04
+and ARE live. When a rules change RESTRICTS rather than relaxes, check both
+directions first: the new client against the rules still live, and the previous
+client against the new rules, which is the half this file's warning cannot cover._
 
-_**478 tests** (415 unit and 24 in a real browser; 39 against the emulator, all
+_**492 tests** (423 unit and 24 in a real browser; 45 against the emulator, all
 green). This is the only place in the repo that quotes a count -
 it drifted three separate ways when it lived in four places, so keep it here and
 nowhere else. Both sides of the 2026-09-04 merge rewrote this line, which is the
@@ -1187,6 +1187,46 @@ browser run confirmed the rest end to end: the home screen and the lobby fetch n
 board chunk at all, starting a game fetches `GameRoute` and `MotionShell` on
 demand, the board renders, and the console stays clean.
 
+### A room can be deleted, and a device tidies up after itself _(#67)_
+
+Nothing could remove a room. There was no `.write` on `rooms/$code` at all, so
+every room ever created rested in the database for good: a finished eight-player
+game is about 27.8 kB, and the free tier holds roughly 38,000 of them before
+storage binds - the download quota binds long before that, so this was never
+urgent, but there was no sweep of any kind.
+
+`rooms/$code` now carries one grant, and it admits **nothing but a delete**. The
+condition requires `!newData.exists()`, which is false for any write that leaves a
+value behind, so it cannot be used to reach a child - and that matters more than
+it sounds, because a `.write` on the room node would otherwise cascade to every
+node under it and hand a stranger the whole room. `rooms.emu.test.ts` has a canary
+on exactly that, and it is written against paths this player is refused TODAY, so
+it would go red the moment the clause was loosened. `meta` is deliberately not
+among those paths: it carries its own open `.write` and leans on its validates, so
+it would pass either way and prove nothing.
+
+The creator may clear their own room at any time; anyone may once it is a day old,
+the same `ROOM_TTL_MS` a join already refuses on. `createRoom` remembers the code
+in `bz.ownRooms`, and the home screen sweeps the expired ones on the way past,
+best effort. **The sweep only ever asks about rooms past that day**, never about
+the creator's fresh ones, so a room somebody is still playing in is never touched
+however it was created.
+
+One deliberate clock exception: the remembered `at` is this device's clock, while
+the rule compares the server's `createdAt`. That is allowed here, unlike anywhere
+else in this file, because it gates nothing a player sees - a fast clock asks
+early and is refused, a slow one asks late, and an expired room is deletable by
+anybody, so the next device past collects it.
+
+**Also from the audit, in the same pass:** a web app manifest, so add-to-home
+gives a named standalone app rather than a nameless shortcut - every path inside
+it is relative, which is what makes it work under the Pages subpath and at the
+root alike, and `manifest.test.ts` pins that. And the fireworks comment that
+claimed every spark animates on transform and opacity alone was simply wrong: the
+twinkle runs `filter: brightness`. The claim is corrected in both places it was
+made rather than the code changed, because the twinkle cannot move to opacity
+without fighting the flight's own fade on that property.
+
 ### The pile going back under is a move you can see _(#66)_
 
 The turn that takes the pile over puts every card already face up back beneath the
@@ -1408,9 +1448,13 @@ that did not happen. Same reasoning as `basement` in the commentary.
 ### The dasher gets fireworks _(#58)_
 
 **Fifteen shells at forty-six sparks each**, about 690 elements - ten times the
-first cut. It is affordable because it exists for 3.6 seconds and every spark
-animates on transform and opacity alone, so the whole thing composites and nothing
-reflows. **Worth re-measuring on a low-end phone before it grows again.** Each
+first cut. It is affordable because it exists for 3.6 seconds and nothing reflows:
+a spark's FLIGHT is transform and opacity. The twinkle alongside it is
+`filter: brightness`, which is paint rather than composite - the one property here
+that is not free. It stays because it cannot move to opacity without fighting the
+flight's own fade on that property, and it is the first thing to look at if the
+splash ever costs. This paragraph claimed transform and opacity alone until
+2026-09-05; the audit caught it. **Worth re-measuring on a low-end phone before it grows again.** Each
 shell also fires a one-element ignition bloom, which is most of why it reads as
 going OFF rather than as dots appearing, and every sixth spark is small and white
 against the coloured ones - which is what turns a burst into a glittery one. The
@@ -2352,22 +2396,28 @@ the ledgered pointer-capture re-select check on mouse drags.
   `RoomScreen` shows the store as it was at import no matter what a test sets.
   A store-backed screen cannot be render-tested here; pull the decision out and
   test that instead.
-- **Every card in a hand stores a 28-character owner id it does not need**, but
-  the ordering to remove it is a trap. Inside `round/tableaus/$uid` the field is
-  redundant and `database.rules.json` proves it, validating the owner against
-  the path key. Dropping it would roughly halve a 21.7 kB eight-player deal.
-  This is bandwidth, not latency, but note it is no longer dwarfed by the
-  network: that deal is about 35 ms of host uplink against a round trip of about
-  30 ms, so on the domestic floor the bytes and the trip cost about the same. It
-  still costs no extra round trip, and the frame split at 16 kB is not a latency
-  mechanism. The trap is that the rules
-  currently REQUIRE `owner`, so a client shipped ahead of a rules deploy has its
-  entire atomic deal refused and the whole table gets no round, which is exactly
-  the failure this file already records from the first iPhone playtest. A
-  client on a cached older bundle renders every dealt hand empty, because
-  `isCard` wants a string owner. The rules deploy, the `normalizeTableau`
-  fallback and re-attaching owner on the play path all have to land before any
-  writer stops sending it. Not for a latency pass.
+- **Every card in a hand stores a 28-character owner id it does not need. HALF
+  DONE, and the rest is a two-release change - read this before finishing it.**
+  Inside `round/tableaus/$uid` the field is redundant and the rules prove it, by
+  validating the owner against the path key. Dropping it roughly halves a 21.7 kB
+  eight-player deal, which is no longer dwarfed by the network: that deal is about
+  35 ms of host uplink against a round trip of about 30 ms.
+
+  **Release one landed on 2026-09-05.** The rules make `owner` optional on the
+  three tableau piles - and still REQUIRE it in a centre space, where the badge on
+  the card, the race flashes and the rivalry tallies all read it - and
+  `normalizeTableau` now takes the uid of the pile it is reading and fills in any
+  card that arrives without one. The client still WRITES the field. Both halves
+  are pinned, at the emulator and in `center.test.ts`.
+
+  **Release two is stopping the writer, and it must not follow immediately.** A
+  client on a cached older bundle renders every dealt hand EMPTY, because its
+  `isCard` wants a string owner - and `startRound` writes every player's tableau,
+  so a single host on a new bundle empties the hand of everyone still on an old
+  one. That is the failure this file already records from the first iPhone
+  playtest. Ship it once every device has reloaded, which in a playtest means
+  asking and waiting rather than assuming, and only after the rules above are
+  deployed.
 - **Two things that are already right, so nobody spends a week on them.** Do not
   narrow the room listener: `startRound` is one multi-path update at the room
   root, and a whole-room listener gets it as one consistent callback, where four
@@ -2522,6 +2572,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `a025086` | A flick no longer dies on a square it flew over: the square under the finger wins only if the card can go there |
 | `206765e` | The turn that takes the wood pile over keeps all three of its cards on the flipped pile, and the pile is written with the index |
 | `53fc06e` | The pile going back under the draw pile is a move you can watch, rather than a jump between frames |
+| `PENDING` | Rooms can be deleted and a device sweeps its own; a web app manifest; and the owner id made optional on a stored card, half of a two-release change |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.

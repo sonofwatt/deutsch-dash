@@ -14,9 +14,12 @@ const FALLERS = 26;
  * Where the fireworks go off, as a percentage across and down. Fifteen shells at
  * forty-six sparks each is about 690 elements - ten times the first cut, which is
  * what was asked for and is a real amount of DOM. It is affordable because it
- * exists for 3.6 seconds and every spark animates on transform and opacity alone,
- * so the whole thing composites; nothing here reflows. Worth re-measuring on a
- * low-end phone before it grows again.
+ * exists for 3.6 seconds and nothing here reflows: the spark's FLIGHT is transform
+ * and opacity. The twinkle running alongside it is `filter: brightness`, which is
+ * paint rather than composite - the one property in the splash that is not free,
+ * and it stays because it cannot move to opacity without fighting the flight's own
+ * fade on that property. Worth re-measuring on a low-end phone before it grows
+ * again, and the twinkle is the first thing to look at if it ever costs.
  */
 const SHELLS = [
   { x: 22, y: 30, hue: 42, delay: 0 },    { x: 76, y: 22, hue: 320, delay: 180 },

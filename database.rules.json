@@ -5,6 +5,7 @@
     "rooms": {
       "$code": {
         ".read": "auth != null",
+        ".write": "auth != null && !newData.exists() && (data.child('meta/creatorId').val() === auth.uid || data.child('meta/createdAt').val() + 86400000 < now)",
         "meta": {
           ".write": "auth != null",
           "hostId": {
@@ -169,7 +170,7 @@
               ".write": "auth != null && (auth.uid === $uid || root.child('rooms').child($code).child('meta').child('hostId').val() === auth.uid)",
               "dash": {
                 "$i": {
-                  ".validate": "$i.matches(/^([0-9]|[1-3][0-9])$/) && newData.hasChildren(['v', 'suit', 'owner']) && newData.child('owner').val() === $uid",
+                  ".validate": "$i.matches(/^([0-9]|[1-3][0-9])$/) && newData.hasChildren(['v', 'suit']) && (!newData.hasChild('owner') || newData.child('owner').val() === $uid)",
                   "v": {
                     ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 10"
                   },
@@ -183,7 +184,7 @@
               },
               "wood": {
                 "$i": {
-                  ".validate": "$i.matches(/^([0-9]|[1-3][0-9])$/) && newData.hasChildren(['v', 'suit', 'owner']) && newData.child('owner').val() === $uid",
+                  ".validate": "$i.matches(/^([0-9]|[1-3][0-9])$/) && newData.hasChildren(['v', 'suit']) && (!newData.hasChild('owner') || newData.child('owner').val() === $uid)",
                   "v": {
                     ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 10"
                   },
@@ -199,7 +200,7 @@
                 "$p": {
                   ".validate": "$p.matches(/^[0-4]$/)",
                   "$i": {
-                    ".validate": "$i.matches(/^([0-9]|[1-3][0-9])$/) && newData.hasChildren(['v', 'suit', 'owner']) && newData.child('owner').val() === $uid",
+                    ".validate": "$i.matches(/^([0-9]|[1-3][0-9])$/) && newData.hasChildren(['v', 'suit']) && (!newData.hasChild('owner') || newData.child('owner').val() === $uid)",
                     "v": {
                       ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 10"
                     },
