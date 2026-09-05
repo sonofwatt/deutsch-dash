@@ -10,15 +10,14 @@ suite. A commit sitting unpushed has already invalidated one playtest - what
 people are playing is whatever last reached Pages - so check `git status -sb`
 before trusting what a table reports._
 
-_**`database.rules.json` is AHEAD of the live database again as of 2026-09-05,
-and `npx firebase deploy --only database` is owed.** Two changes wait in it: a
-delete grant on `rooms/$code`, and `owner` made optional on the cards inside a
-tableau. Both only ADD or RELAX, so nothing already deployed can break on them and
-nothing is urgent - the room sweep simply does nothing until they land, and the
-client writes `owner` either way. The audit's own bounds went out on 2026-09-04
-and ARE live. When a rules change RESTRICTS rather than relaxes, check both
-directions first: the new client against the rules still live, and the previous
-client against the new rules, which is the half this file's warning cannot cover._
+_**`database.rules.json` and the live database agree.** Last deployed 2026-09-05,
+with the delete grant on `rooms/$code` and `owner` made optional on the cards
+inside a tableau; the audit's bounds went out the day before. Both of those only
+ADD or RELAX, so no client already in a hand could break on them, which is why
+they were safe to release without waiting for anything. When a change RESTRICTS
+instead, check both directions before releasing: the new client against the rules
+still live, and the PREVIOUS client against the new rules, which is the half this
+file's own warning cannot cover._
 
 _**492 tests** (423 unit and 24 in a real browser; 45 against the emulator, all
 green). This is the only place in the repo that quotes a count -
