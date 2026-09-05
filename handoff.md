@@ -2042,6 +2042,72 @@ it counts.
 
 ## Still open
 
+### Next up, from the audit _(2026-09-03, `docs/audit-2026-09-03.md`)_
+
+What the audit left, after the 2026-09-04 and 2026-09-05 passes closed the rest.
+Ordered by what is worth doing, with the thing that BLOCKS each one named,
+because every one of the first three is blocked on something other than effort.
+
+1. **Stop writing `owner` on a stored card.** Release two of a two-release change;
+   release one is live and the rules already permit it. Halves a 21.7 kB
+   eight-player deal. **Blocked on every device having reloaded**, not on code: a
+   phone holding a cached older bundle renders every dealt hand EMPTY, and
+   `startRound` writes every player's tableau, so one host on a new bundle empties
+   the hands of a whole table still on an old one. Ask, wait, then ship. The full
+   note is in "Known gaps" below.
+2. **The structural tier of validation** (`docs/database.rules.proposed.json`,
+   written and passing on the emulator, never shipped). What is live bounds every
+   leaf's type and range; this bounds the SIZE of a write and binds a new player
+   record to the `playerCount` bump. Without it a 16 MB write is legal - 64 of
+   them fill the free tier - and a stranger can push `playerCount` to 8 in one
+   write and close a room, whose newcomers are then told they lost a race.
+   **Blocked on two probes against a throwaway project**: whether an ancestor's
+   `.validate` refuses a targeted delete of a child, and whether `newData.parent()`
+   sees the other paths of the same multi-path write. Both were confirmed on the
+   emulator only and are not documented for production. If the second behaves
+   differently there, the file refuses EVERY legitimate join. Probe, then the
+   file, its tests and a deploy - and note `joinRoom` should learn to tell a
+   counter rejection from a badge one and say "full" rather than "race".
+3. **A Content-Security-Policy** (`index.html`, as a meta tag). No injection sink
+   today, so this is depth rather than a hole. **Blocked on a manual check with
+   `forceLongPolling()`**: the database's long-poll fallback is JSONP, so
+   `script-src` and `frame-src` have to allow `https://*.firebaseio.com` or the
+   game silently dies on networks that block WebSockets - and a meta policy has no
+   report-only mode to find that out safely. The policy itself is drafted in the
+   audit's working notes.
+
+Three more the audit recorded that are not code changes, and are open because
+nobody has decided about them rather than because they are hard:
+
+- **One uid, two tabs.** Auth persistence is shared across same-origin tabs, so a
+  host who opens the invite link in a second tab is one uid in two clients.
+  Closing either writes `connected: false` for a player who is still there and the
+  survivor never re-asserts, because it only writes on a connection transition.
+  From then on the countdown will not run for them and the stuck check skips them,
+  and if they are the creator the stand-in watchdog and the creator reclaim take
+  turns every thirty seconds. Self-inflicted, and the manual test plan is a
+  multi-tab playtest, so it WILL be met. The fix is a per-tab presence child or a
+  leader election over `BroadcastChannel`.
+- **Long-session memory was never measured.** The maps in the store are bounded
+  and cleared per round, but nothing has a number for the heap after ten rounds of
+  remounting 75 cards and 690 firework elements. The layout suite already has the
+  browser wiring a heap reading needs.
+- **The board is pointer-only.** No keyboard route, no focusable pile, no
+  announcement when the board changes, while the chrome around it is labelled
+  throughout. It stands out beside the care taken over reduced motion. The cheap
+  first step is a button role and Enter or Space on the tap path that already
+  exists.
+
+**Deliberately declined, so nobody re-opens them:** the per-play `stuckRounds`
+reset (40 bytes a play, and guarding it would end a stalled round a rotation
+early), writing only the changed piles on a play (half the wood fix's saving for
+much more code), pinning CI actions to SHAs without Dependabot (it would freeze
+actions the workflow tracks by major on purpose), the eight dev-only advisories
+through `firebase-tools` (none reachable from the bundle; re-check on each bump),
+the two preconnect hints (priced against a European floor that turned out to be
+domestic), and the listener's own initial download on entry (the SDK's sync point
+for the live subscription, not a redundant read).
+
 ### Deferred: move a run of cards between post piles _(#4)_
 
 Not being built for now. The spec stands if it comes back.
