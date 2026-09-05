@@ -2572,7 +2572,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `a025086` | A flick no longer dies on a square it flew over: the square under the finger wins only if the card can go there |
 | `206765e` | The turn that takes the wood pile over keeps all three of its cards on the flipped pile, and the pile is written with the index |
 | `53fc06e` | The pile going back under the draw pile is a move you can watch, rather than a jump between frames |
-| `PENDING` | Rooms can be deleted and a device sweeps its own; a web app manifest; and the owner id made optional on a stored card, half of a two-release change |
+| `c1ef6e5` | Rooms can be deleted and a device sweeps its own; a web app manifest; and the owner id made optional on a stored card, half of a two-release change |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
