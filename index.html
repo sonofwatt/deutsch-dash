@@ -5,7 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#f4f2ec" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#171613" media="(prefers-color-scheme: dark)" />
-    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <!-- TWO DRAWINGS, and the small one is what a tab gets. The full icon loses
+         at 16px: three cards, three speed lines and a diamond inside 16 pixels
+         come out as a dark square with an orange speck. `favicon.svg` is one
+         card and one diamond, and the two PNGs beside it are for a browser that
+         will not take an SVG here. The full drawing stays where it is shown
+         large: the 512 below, the touch icon, and the manifest. -->
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="./favicon-16.png" />
     <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png" />
     <!-- iOS ignores SVG touch icons, so add-to-home-screen needs a real PNG -->
     <link rel="apple-touch-icon" sizes="180x180" href="./icon-180.png" />

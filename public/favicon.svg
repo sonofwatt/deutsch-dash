@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" width="512" height="512">
+  <!-- The 16px cut of the icon, and the reason it exists: at a tab's real size
+       the full drawing's three cards, three speed lines and the diamond collapse
+       into a dark square with an orange speck. One card and one diamond survive
+       being 16 pixels wide. Same tile, same white, same orange, so the two read
+       as one icon at the sizes where both appear.
+       Full bleed for the same reason `icon.svg` is: see the note there. -->
+  <rect id="tile" width="300" height="300" rx="68" fill="#15233F"/>
+  <g transform="rotate(9 150 150)">
+    <rect x="75" y="50" width="150" height="200" rx="18" fill="#FFFFFF"/>
+    <path d="M150 106L194 150L150 194L106 150Z" fill="#F0642F"/>
+  </g>
+</svg>

@@ -19,7 +19,7 @@ instead, check both directions before releasing: the new client against the rule
 still live, and the PREVIOUS client against the new rules, which is the half this
 file's own warning cannot cover._
 
-_**495 tests** (426 unit and 24 in a real browser; 45 against the emulator, all
+_**499 tests** (430 unit and 24 in a real browser; 45 against the emulator, all
 green). This is the only place in the repo that quotes a count -
 it drifted three separate ways when it lived in four places, so keep it here and
 nowhere else. Both sides of the 2026-09-04 merge rewrote this line, which is the
@@ -1063,7 +1063,7 @@ space it can follow rigged into place:
 | the same 70px at 400ms - a reposition, not a throw | nothing |
 | slow drag let go over the opponent strip | lands (signal 3) |
 
-### The icon, and the two PNGs rendered from it
+### The icon, the small cut of it, and the PNGs rendered from both
 
 The tab and home-screen icon is a fanned stack of three cards with an orange
 diamond and three speed lines, on a navy tile. It replaced the two cards and a
@@ -1087,13 +1087,24 @@ problem again, one layer down. The script it replaced never read the SVG at all 
 it rebuilt the same shapes by hand in PIL and loaded a font by absolute Windows
 path, so it ran on one machine and nothing held the two drawings together.
 
-**The PNGs are committed, so the SVG can outrun them.** Editing the SVG and
-pushing puts a new favicon beside two old touch icons on the same page. The
-script records the SVG's hash in `scripts/icon.sha256` and `icon.test.ts` fails
-when the file has moved on since, which is the reminder to run the script. Both
-guards were proved by breaking them rather than assumed: a recoloured speed line
-fails the hash, and an inset tile fails the hash and the full-bleed check
-together.
+**There are TWO drawings, and the tab gets the small one.** The full icon at a
+tab's real 16px is a dark square with an orange speck: three cards, three speed
+lines and a diamond cannot survive being that small, and the `1` it replaced
+could. `public/favicon.svg` is the same tile, white and orange with one card and
+one diamond, rendered to `favicon-32.png` and `favicon-16.png`. It is what
+`index.html` and the bench link as `rel="icon"`, and the full drawing is left
+where it is shown large: the 512 fallback, the touch icon and the manifest. The
+full SVG must NOT go back into a `rel="icon"` link beside it - a browser picks
+one out of that list, both are unsized SVG candidates, and it is entitled to
+prefer the wrong one. `icon.test.ts` fails if it reappears there.
+
+**The PNGs are committed, so an SVG can outrun them.** Editing one and pushing
+puts a new favicon beside old PNGs of it on the same page. The script records
+both SVGs' hashes in `scripts/icon.sha256` and `icon.test.ts` fails when either
+file has moved on since, which is the reminder to run the script. Every guard
+here was proved by breaking it rather than assumed: a recoloured speed line fails
+the hash, an inset tile fails the hash and the full-bleed check together, and the
+full SVG added back to the tab links fails the link check.
 
 ### Three things a playtest asked to be louder or clearer _(#60)_
 
@@ -2671,6 +2682,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `53fc06e` | The pile going back under the draw pile is a move you can watch, rather than a jump between frames |
 | `c1ef6e5` | Rooms can be deleted and a device sweeps its own; a web app manifest; and the owner id made optional on a stored card, half of a two-release change |
 | `0feb7b3` | A new icon, full bleed, and a script that renders its PNGs from the SVG instead of redrawing them |
+| `PENDING` | A second, simpler drawing of the icon for the tab, where the full one is a speck |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
