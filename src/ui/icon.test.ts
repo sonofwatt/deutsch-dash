@@ -67,6 +67,16 @@ describe('the app icons', () => {
     expect(svgs[file]).toMatch(/<rect id="tile"/);
   });
 
+  it('reaches the home screen through BASE_URL, not off the root', () => {
+    // Same failure the manifest test pins, one file over: the app is served from
+    // / in dev and /deutsch-dash/ on Pages, so "/icon.svg" would draw in dev and
+    // 404 in production. Vite does not rewrite a path built inside a component,
+    // which is why this is BASE_URL and not a leading slash.
+    const home = readFileSync('src/ui/screens/Home.tsx', 'utf8');
+    expect(home).toMatch(/src=\{`\$\{import\.meta\.env\.BASE_URL\}icon\.svg`\}/);
+    expect(home).not.toMatch(/src="\/icon\.svg"/);
+  });
+
   it('puts the SMALL drawing in the tab, and the full one only where it is big', () => {
     const html = readFileSync('index.html', 'utf8');
     const icons = [...html.matchAll(/<link rel="icon"[^>]*href="\.\/([\w.-]+)"/g)].map(m => m[1]);

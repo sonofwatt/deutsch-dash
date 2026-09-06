@@ -20,6 +20,13 @@
 .toggle { width: 44px; height: 28px; accent-color: var(--accent); }
 .toggle:disabled { opacity: .4; }
 .title { font-weight: 800; font-size: 28px; margin: 0; }
+/* The home screen's icon and name on one line. No border-radius here: the SVG
+   rounds its own corners at 22.7% of its width, and a second radius on top of
+   that flattens them into something that is not the icon any more. The row stops
+   short of the fixed .corner-btns island at the top right, which is why the logo
+   is 44px and not larger. */
+.title-row { display: flex; align-items: center; gap: 10px; }
+.logo { width: 44px; height: 44px; flex: 0 0 auto; }
 .muted { color: var(--ink-soft); }
 .player-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }

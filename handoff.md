@@ -19,7 +19,7 @@ instead, check both directions before releasing: the new client against the rule
 still live, and the PREVIOUS client against the new rules, which is the half this
 file's own warning cannot cover._
 
-_**499 tests** (430 unit and 24 in a real browser; 45 against the emulator, all
+_**500 tests** (431 unit and 24 in a real browser; 45 against the emulator, all
 green). This is the only place in the repo that quotes a count -
 it drifted three separate ways when it lived in four places, so keep it here and
 nowhere else. Both sides of the 2026-09-04 merge rewrote this line, which is the
@@ -1063,7 +1063,7 @@ space it can follow rigged into place:
 | the same 70px at 400ms - a reposition, not a throw | nothing |
 | slow drag let go over the opponent strip | lands (signal 3) |
 
-### The icon, the small cut of it, and the PNGs rendered from both
+### The icon: two drawings, the PNGs, and the one on the home screen
 
 The tab and home-screen icon is a fanned stack of three cards with an orange
 diamond and three speed lines, on a navy tile. It replaced the two cards and a
@@ -1097,6 +1097,18 @@ where it is shown large: the 512 fallback, the touch icon and the manifest. The
 full SVG must NOT go back into a `rel="icon"` link beside it - a browser picks
 one out of that list, both are unsized SVG candidates, and it is entitled to
 prefer the wrong one. `icon.test.ts` fails if it reappears there.
+
+**The full drawing is also on the home screen**, 44px, left of the title, since
+2026-09-06. It is the only place in the app itself that shows the icon, and it
+takes the FULL one rather than the tab cut: at 44px there is room for all of it,
+and the small cut exists for 16px and nothing else. The `img` carries an empty
+`alt` because the `h1` beside it already says the name, and a screen reader
+reading it twice is worse than not describing the picture at all. Its `src` is
+built from `import.meta.env.BASE_URL`, which is the manifest's trap one file over:
+`/icon.svg` would draw in dev and 404 under the Pages subpath, and Vite does not
+rewrite a path assembled inside a component. `icon.test.ts` pins that too. No
+`border-radius` in `.logo`: the SVG already rounds itself at 22.7% of its width
+and a second radius flattens the corners into something that is not the icon.
 
 **The PNGs are committed, so an SVG can outrun them.** Editing one and pushing
 puts a new favicon beside old PNGs of it on the same page. The script records
@@ -2683,6 +2695,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `c1ef6e5` | Rooms can be deleted and a device sweeps its own; a web app manifest; and the owner id made optional on a stored card, half of a two-release change |
 | `0feb7b3` | A new icon, full bleed, and a script that renders its PNGs from the SVG instead of redrawing them |
 | `ef9aa6b` | A second, simpler drawing of the icon for the tab, where the full one is a speck |
+| `PENDING` | The icon on the home screen, beside the title |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.

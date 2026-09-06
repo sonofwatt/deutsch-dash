@@ -49,7 +49,15 @@ export function Home() {
 
   return (
     <div className="screen stack">
-      <h1 className="title">Deutsch Dash</h1>
+      {/* The icon, beside the name it belongs to. It carries an empty alt on
+          purpose: the h1 next to it already says "Deutsch Dash", and a screen
+          reader announcing the name twice is worse than not announcing the
+          picture. BASE_URL because it is served out of public/ and the app runs
+          under /deutsch-dash/ on Pages and at / in dev. */}
+      <div className="title-row">
+        <img className="logo" src={`${import.meta.env.BASE_URL}icon.svg`} alt="" width={44} height={44} />
+        <h1 className="title">Deutsch Dash</h1>
+      </div>
       <p className="muted">Fast-paced multiplayer card racing. Create a room, text the link, play.</p>
       <input className="field" placeholder="Your name" maxLength={14}
         value={name} onChange={e => setName(e.target.value)} />
