@@ -2670,7 +2670,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `206765e` | The turn that takes the wood pile over keeps all three of its cards on the flipped pile, and the pile is written with the index |
 | `53fc06e` | The pile going back under the draw pile is a move you can watch, rather than a jump between frames |
 | `c1ef6e5` | Rooms can be deleted and a device sweeps its own; a web app manifest; and the owner id made optional on a stored card, half of a two-release change |
-| `PENDING` | A new icon, full bleed, and a script that renders its PNGs from the SVG instead of redrawing them |
+| `0feb7b3` | A new icon, full bleed, and a script that renders its PNGs from the SVG instead of redrawing them |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
