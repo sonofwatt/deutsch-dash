@@ -2695,7 +2695,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `c1ef6e5` | Rooms can be deleted and a device sweeps its own; a web app manifest; and the owner id made optional on a stored card, half of a two-release change |
 | `0feb7b3` | A new icon, full bleed, and a script that renders its PNGs from the SVG instead of redrawing them |
 | `ef9aa6b` | A second, simpler drawing of the icon for the tab, where the full one is a speck |
-| `PENDING` | The icon on the home screen, beside the title |
+| `ad471e9` | The icon on the home screen, beside the title |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
