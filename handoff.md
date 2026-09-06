@@ -5,7 +5,7 @@ should cost a flag and not a rebuild.
 
 # Project Handoff - Deutsch Dash
 
-_Last updated: 2026-09-04. Working tree clean, CI green including the emulator
+_Last updated: 2026-09-06. Working tree clean, CI green including the emulator
 suite. A commit sitting unpushed has already invalidated one playtest - what
 people are playing is whatever last reached Pages - so check `git status -sb`
 before trusting what a table reports._
@@ -19,7 +19,7 @@ instead, check both directions before releasing: the new client against the rule
 still live, and the PREVIOUS client against the new rules, which is the half this
 file's own warning cannot cover._
 
-_**492 tests** (423 unit and 24 in a real browser; 45 against the emulator, all
+_**495 tests** (426 unit and 24 in a real browser; 45 against the emulator, all
 green). This is the only place in the repo that quotes a count -
 it drifted three separate ways when it lived in four places, so keep it here and
 nowhere else. Both sides of the 2026-09-04 merge rewrote this line, which is the
@@ -1062,6 +1062,38 @@ space it can follow rigged into place:
 | 70px flick aimed 90° away | nothing |
 | the same 70px at 400ms - a reposition, not a throw | nothing |
 | slow drag let go over the opponent strip | lands (signal 3) |
+
+### The icon, and the two PNGs rendered from it
+
+The tab and home-screen icon is a fanned stack of three cards with an orange
+diamond and three speed lines, on a navy tile. It replaced the two cards and a
+white `1` on 2026-09-06, from a drawing the table supplied.
+
+**It is FULL BLEED, and that is the load-bearing part.** The drawing arrived on a
+380 canvas with the tile inset at 40,40, which looks right in a browser tab and
+wrong on a phone: iOS composites a transparent touch icon onto black and rounds
+the corners itself, so an inset tile comes back small, inside a black square,
+with its corners rounded twice. The tile now fills the viewBox and the phone
+masks whatever it likes. The manifest asks for `purpose: "any"`, so nothing crops
+it; under a circular mask a corner of the back card would go, which is the reason
+not to claim `maskable` without redrawing for it.
+
+**The PNGs are rendered from the SVG, not drawn a second time.** `npm run icons`
+runs `scripts/make-icons.mjs`, which rasterises `public/icon.svg` in the Chromium
+the layout suite already installs and writes `icon-512.png` and `icon-180.png`.
+It paints the rounded corners back in with the fill it reads off the `#tile`
+rect, so the PNG is an opaque square: transparent corners are the same iOS
+problem again, one layer down. The script it replaced never read the SVG at all -
+it rebuilt the same shapes by hand in PIL and loaded a font by absolute Windows
+path, so it ran on one machine and nothing held the two drawings together.
+
+**The PNGs are committed, so the SVG can outrun them.** Editing the SVG and
+pushing puts a new favicon beside two old touch icons on the same page. The
+script records the SVG's hash in `scripts/icon.sha256` and `icon.test.ts` fails
+when the file has moved on since, which is the reminder to run the script. Both
+guards were proved by breaking them rather than assumed: a recoloured speed line
+fails the hash, and an inset tile fails the hash and the full-bleed check
+together.
 
 ### Three things a playtest asked to be louder or clearer _(#60)_
 
@@ -2638,6 +2670,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `206765e` | The turn that takes the wood pile over keeps all three of its cards on the flipped pile, and the pile is written with the index |
 | `53fc06e` | The pile going back under the draw pile is a move you can watch, rather than a jump between frames |
 | `c1ef6e5` | Rooms can be deleted and a device sweeps its own; a web app manifest; and the owner id made optional on a stored card, half of a two-release change |
+| `PENDING` | A new icon, full bleed, and a script that renders its PNGs from the SVG instead of redrawing them |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
