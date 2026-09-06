@@ -10,6 +10,18 @@ suite. A commit sitting unpushed has already invalidated one playtest - what
 people are playing is whatever last reached Pages - so check `git status -sb`
 before trusting what a table reports._
 
+_**What is live on Pages is `e23448f`, v1.4.61**, deployed 2026-09-06, and the
+icon work is all of it: the new icon full bleed, the 16px cut of it in the tab,
+and the full drawing 44px on the home screen beside the title. Checked rather
+than read off a green tick - every icon file on Pages hashes the same as its copy
+in `public/`, the served HTML links `favicon.svg` and no longer `icon.svg`, the
+home screen's own footer reads v1.4.61, and the logo's `img` reports a 512x512
+natural size, which is the proof that the `BASE_URL` path resolved under the
+subpath. **Your own browser will disagree about the favicon for a while.** Chrome
+caches those separately from the page and a plain reload usually will not move
+it, so a tab still showing the old drawing is not evidence of a bad deploy: hash
+the file on Pages instead._
+
 _**`database.rules.json` and the live database agree.** Last deployed 2026-09-05,
 with the delete grant on `rooms/$code` and `owner` made optional on the cards
 inside a tableau; the audit's bounds went out the day before. Both of those only
