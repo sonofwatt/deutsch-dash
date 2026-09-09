@@ -2732,7 +2732,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `0feb7b3` | A new icon, full bleed, and a script that renders its PNGs from the SVG instead of redrawing them |
 | `ef9aa6b` | A second, simpler drawing of the icon for the tab, where the full one is a speck |
 | `ad471e9` | The icon on the home screen, beside the title |
-| `PENDING` | A dash rains emoji; the fireworks moved behind the sheet that says who won |
+| `eaac4a3` | A dash rains emoji; the fireworks moved behind the sheet that says who won |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
