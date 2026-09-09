@@ -140,8 +140,12 @@
   padding: 8px 14px; }
 .overlay { position: fixed; inset: 0; background: rgb(0 0 0 / .45); display: grid;
   place-items: center; z-index: 100; padding: 16px; }
+/* Positioned, so that the fireworks the game-over overlay puts behind it stay
+   behind it: an unpositioned sheet loses to any positioned sibling with a
+   z-index, whatever the source order says. */
 .sheet { background: var(--bg); border-radius: 16px; padding: 20px; width: min(440px, 100%);
-  max-height: 85dvh; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+  max-height: 85dvh; overflow-y: auto; display: flex; flex-direction: column; gap: 12px;
+  position: relative; z-index: 1; }
 /* badge · name · -dash · +center · = · round · total. The name track must be
    minmax(0, 1fr), not 1fr: a 14-character name against six other columns on a
    360px phone otherwise overflows the sheet into a horizontal scrollbar instead
@@ -263,9 +267,12 @@
   pointer-events: none; }
 /* Above the weather. The name is the one piece of information the splash carries
    and it was being rained on: .splash-fx is absolute and was painting over it. */
-.dash-say { position: relative; z-index: 3; }
-.splash-fx { z-index: 2; }
-.fireworks { position: absolute; inset: 0; z-index: 1; }
+.dash-say { position: relative; z-index: 2; }
+.splash-fx { z-index: 1; }
+/* The fireworks are the game-over overlay's now, not the splash's, and they go
+   BEHIND the sheet: 0 under the sheet's 1. pointer-events because this layer
+   covers the whole overlay and must not swallow a tap meant for Rematch. */
+.fireworks { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
 /* One shell: a point the sparks are flung from. The sparks are its children, so
    the shell only has to be placed and the sparks only have to know a bearing. */
 .shell { position: absolute; width: 0; height: 0; }
@@ -322,22 +329,8 @@
                1.5px -1.5px 0 #000, -1.5px -1.5px 0 #000, 0 4px 18px rgb(0 0 0 / .45); }
 
 /* Dash splash particles. The whole splash is on screen for SPLASH_MS (3.6s, in
-   RoomScreen), so every animation here has to finish inside that. */
+   GameRoute), so every animation here has to finish inside that. */
 .splash-fx { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
-.spark { position: absolute; left: 50%; top: 50%;
-  font-size: calc(clamp(34px, 9.5vw, 58px) * var(--size, 1));
-  animation: spark-out 2400ms ease-out var(--delay, 0ms) both; }
-/* Rotate out along --a, then counter-rotate the glyph so it flies upright. */
-/* Out along --a, with the glyph counter-rotated so it flies upright, plus a slow
-   tumble of its own so a burst of forty does not look stamped from one die. */
-@keyframes spark-out {
-  0%   { transform: translate(-50%, -50%) rotate(var(--a)) translateX(0)
-                    rotate(calc(-1 * var(--a))) scale(.3); opacity: 0; }
-  15%  { opacity: 1; }
-  70%  { opacity: 1; }
-  100% { transform: translate(-50%, -50%) rotate(var(--a)) translateX(var(--d))
-                    rotate(calc(-1 * var(--a) + var(--spin, 0deg))) scale(1.25); opacity: 0; }
-}
 /* Twice the size the table saw, which is what "200% larger" asks for: the glyph
    is the joke, and at 24px on a 393px screen it was a speck. Falling slower and
    for longer is the other half - it has twice as far to travel at this size. */
@@ -351,14 +344,11 @@
 /* MotionConfig reducedMotion does not reach CSS keyframes, so this is on its own:
    same glyphs, same message, parked instead of moving. */
 @media (prefers-reduced-motion: reduce) {
-  [data-platform] .spark { animation: none; opacity: .9;
-    transform: translate(-50%, -50%) rotate(var(--a)) translateX(var(--d))
-               rotate(calc(-1 * var(--a))); }
   [data-platform] .faller { animation: none; opacity: .9; top: 16vh; }
   /* The fireworks were missed when this block was written: 705 flying, flickering
      elements on a phone that had asked for stillness. Gone entirely rather than
-     parked - a still firework is a smear of dots, and the glitter above already
-     carries the celebration. */
+     parked - a still firework is a smear of dots, and the sheet they go off
+     behind already says who won. */
   [data-platform] .shell b, [data-platform] .shell i { animation: none; opacity: 0; }
 }
 

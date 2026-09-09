@@ -464,8 +464,13 @@ describe('DashSplash', () => {
   it('throws exactly one kind of thing at a viewer', () => {
     const glitter = render({ base: 'glitter', trophy: false });
     expect(glitter).toContain('🥳');
+    expect(glitter).toContain('😎');
     expect(glitter).not.toContain('😢');
-    expect(glitter).toContain('fireworks');
+    // A dash is weather like every other verdict now: the same falling lanes,
+    // different glyphs. The fireworks moved to the game-over sheet, and a round
+    // win that looked like the end of the game is what they were doing wrong.
+    expect(glitter).toContain('faller');
+    expect(glitter).not.toContain('fireworks');
     const poo = render({ base: 'poo', trophy: false });
     expect(poo).toContain('💩');
     expect(poo).not.toContain('🥳');

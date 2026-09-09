@@ -1,4 +1,5 @@
 import { useGameStore, isHost } from '../../state/store';
+import { Fireworks } from './Fireworks';
 import { winnerIds } from '../../game/scoring';
 import { ScoreList } from './ScoreList';
 import { Commentary } from './Commentary';
@@ -19,6 +20,11 @@ export function GameOverOverlay() {
 
   return (
     <div className="overlay">
+      {/* The game's own celebration, behind the sheet that says who won. A dash
+          rains emoji; winning is the thing that gets fireworks. They go off once,
+          over the scrim and under the numbers, and are finished by the time
+          anybody has read the sheet. */}
+      <Fireworks />
       <div className="sheet">
         <h2 style={{ margin: 0 }}>
           🏆 {winners.map(w => room.players[w]?.name).join(' & ')} wins!

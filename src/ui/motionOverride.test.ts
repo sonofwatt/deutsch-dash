@@ -23,7 +23,6 @@ const ANIMATED = [
   // The flipped pile travelling back onto the draw pile at the end of a lap.
   ['.wood-collect', 'wood-collect'],
   ['.faller', 'fall-down'],
-  ['.spark', 'spark-out'],
   // The fireworks: the ignition bloom and a spark. A spark runs two animations,
   // and the computed name lists both.
   ['.shell b', 'shell-flash'],
@@ -34,7 +33,6 @@ const PAGE = `<!doctype html><html><head><style>${CSS}</style></head><body>
   <div class="wood-deal"><div class="card">7</div></div>
   <div class="wood-collect"></div>
   <div class="faller">X</div>
-  <div class="spark"></div>
   <div class="fireworks"><span class="shell"><b></b><i></i></span></div>
 </body></html>`;
 

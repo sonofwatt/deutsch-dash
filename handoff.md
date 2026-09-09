@@ -31,7 +31,7 @@ instead, check both directions before releasing: the new client against the rule
 still live, and the PREVIOUS client against the new rules, which is the half this
 file's own warning cannot cover._
 
-_**500 tests** (431 unit and 24 in a real browser; 45 against the emulator, all
+_**503 tests** (431 unit and 27 in a real browser; 45 against the emulator, all
 green). This is the only place in the repo that quotes a count -
 it drifted three separate ways when it lived in four places, so keep it here and
 nowhere else. Both sides of the 2026-09-04 merge rewrote this line, which is the
@@ -1511,7 +1511,28 @@ only where a play is still being reconciled.
 anywhere, and handing every tied player a toilet would be a lie about a change
 that did not happen. Same reasoning as `basement` in the commentary.
 
-### The dasher gets fireworks _(#58)_
+### Fireworks are for winning; a dash rains _(#58)_
+
+**Everybody gets the same weather now, and only the glyphs differ.** Asked for on
+2026-09-09. The dasher used to get fifteen firework shells and a burst of emoji
+radiating out of the middle while everybody else got falling emoji, which made a
+round win look like the end of the game. A dash now rains 😎🥳🔥 down the same
+lanes a bad round rains 💩 down, and the fireworks belong to the sheet that says
+who WON. `DashSplash` is one `Rain` with a name over it; `Fireworks` moved into
+its own file on the way, because its one caller is no longer the splash. The
+radiating burst went with the change: `.spark` and `spark-out` are deleted rather
+than left for a caller that no longer exists.
+
+**The fireworks go BEHIND the final score sheet, and "behind" needed a rule.**
+`.fireworks` is positioned and carries a `z-index`; `.sheet` was not positioned at
+all, so source order bought nothing and the sparks painted over the totals. The
+sheet carries `position: relative; z-index: 1` for that. The layer under it
+carries `pointer-events: none` for a different reason: it covers the whole
+overlay, and a finished game whose Rematch button has been swallowed has no way
+out at all. `overlayLayers.test.ts` measures the paint order and the tap in a real
+browser, because neither is a question markup can answer - and it first proves the
+layer actually reaches the sheet, so a green result cannot come from a layer that
+was never in the way.
 
 **Fifteen shells at forty-six sparks each**, about 690 elements - ten times the
 first cut. It is affordable because it exists for 3.6 seconds and nothing reflows:
@@ -1519,24 +1540,26 @@ a spark's FLIGHT is transform and opacity. The twinkle alongside it is
 `filter: brightness`, which is paint rather than composite - the one property here
 that is not free. It stays because it cannot move to opacity without fighting the
 flight's own fade on that property, and it is the first thing to look at if the
-splash ever costs. This paragraph claimed transform and opacity alone until
-2026-09-05; the audit caught it. **Worth re-measuring on a low-end phone before it grows again.** Each
-shell also fires a one-element ignition bloom, which is most of why it reads as
-going OFF rather than as dots appearing, and every sixth spark is small and white
-against the coloured ones - which is what turns a burst into a glittery one. The
-flicker is a `brightness` twinkle running alongside the flight on its own offset
-per spark, not a fade.
+celebration ever costs. This paragraph claimed transform and opacity alone until
+2026-09-05; the audit caught it. **Worth re-measuring on a low-end phone before it
+grows again.** Each shell also fires a one-element ignition bloom, which is most of
+why it reads as going OFF rather than as dots appearing, and every sixth spark is
+small and white against the coloured ones - which is what turns a burst into a
+glittery one. The flicker is a `brightness` twinkle running alongside the flight
+on its own offset per spark, not a fade. Each shell is a point; its sparks are
+children that know only a bearing, fly out along it and take a little gravity at
+the end, which is the whole difference between a firework and a starburst.
 
-Three glyphs (😎🥳🔥) rather than eight - a burst reads as a celebration when the
-eye takes it in at once, and eight faces at forty copies read as a pile of
-stickers - over five CSS firework shells staggered across the splash. Each shell
-is a point; its sparks are children that know only a bearing, fly out along it and
-take a little gravity at the end, which is the whole difference between a firework
-and a starburst.
+**They run ONCE.** The overlay stays up until somebody leaves or rematches, and a
+loop would still be going off behind the numbers a minute later. The shells are
+staggered across three seconds, which is roughly how long it takes to read who
+won.
 
-**Three layers, and the order is the point.** Fireworks at `z-index: 1`, the emoji
-at 2, and `.dash-say` at 3 - the name is the one piece of information the splash
-carries and `.splash-fx` was painting straight over it.
+**Three glyphs (😎🥳🔥) rather than eight**, falling: a celebration reads as one
+thing when the eye takes it in at once, and eight different faces read as a pile
+of stickers. Under reduced motion on a phone the fallers park where they are and
+the fireworks are dropped entirely - a still firework is a smear of dots, and the
+sheet they go off behind already says who won.
 
 ### The wood flip stopped being watchable _(#59)_
 
@@ -2157,8 +2180,9 @@ nobody has decided about them rather than because they are hard:
   leader election over `BroadcastChannel`.
 - **Long-session memory was never measured.** The maps in the store are bounded
   and cleared per round, but nothing has a number for the heap after ten rounds of
-  remounting 75 cards and 690 firework elements. The layout suite already has the
-  browser wiring a heap reading needs.
+  remounting 75 cards, plus the 690 firework elements the final sheet brings once
+  at the end. The layout suite already has the browser wiring a heap reading
+  needs.
 - **The board is pointer-only.** No keyboard route, no focusable pile, no
   announcement when the board changes, while the chrome around it is labelled
   throughout. It stands out beside the care taken over reduced motion. The cheap
@@ -2708,6 +2732,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `0feb7b3` | A new icon, full bleed, and a script that renders its PNGs from the SVG instead of redrawing them |
 | `ef9aa6b` | A second, simpler drawing of the icon for the tab, where the full one is a speck |
 | `ad471e9` | The icon on the home screen, beside the title |
+| `PENDING` | A dash rains emoji; the fireworks moved behind the sheet that says who won |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
