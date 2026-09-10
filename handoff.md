@@ -3780,7 +3780,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `0e1adb7` | Six soundbite fixes: the first press, the queue, the sticky menu, the stack, the chime |
 | `1e1a4d8` | Another 50ms off the wood step, so the cards overlap by 100ms |
 | `28f4d70` | A finished pile turns over to show whose it was; the bots hesitate |
-| _pending_ | Genius lies in wait; countdown tones; the race remarks get seen |
+| `45c275d` | Genius lies in wait; countdown tones; the race remarks get seen |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
