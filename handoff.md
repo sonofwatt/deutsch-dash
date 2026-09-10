@@ -3104,7 +3104,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `f59bb68` | The haloes arrive one at a time, the first one centred |
 | `55abb9b` | The flick cone down to 20 degrees, in the game and on the bench together |
 | `57d1c1e` | The near radius down to 25px, which moves the swept band with it |
-| _pending_ | Bots aim at the lowest open space; Genius cheats four ways |
+| `ec976fc` | Bots aim at the lowest open space; Genius cheats four ways |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
