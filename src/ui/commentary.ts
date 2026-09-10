@@ -112,6 +112,8 @@ export function commentary(input: CommentaryInput): Remark[] {
       'Round over by mutual exhaustion. No winner, only survivors.',
       `Nobody moved. Nobody scored. Nobody covered themselves in glory.`,
       `Nobody could move. I call that a stand-off. Well - I call it that, nobody else does.`,
+      `A round where the cards beat all of you at once. Rare, and richly deserved.`,
+      `Everyone ran out of moves simultaneously. Say what you like, it is a kind of teamwork.`,
     ]);
   }
   if (dashedBy && input.durationMs != null && seconds > 0 && seconds <= 60) {
@@ -154,6 +156,8 @@ export function commentary(input: CommentaryInput): Remark[] {
       'A round so bad the scoreboard went backwards for all of you.',
       `Every single score went down. A collective achievement, of sorts.`,
       `Everyone went backwards. A group effort, and the group should be ashamed.`,
+      `Nobody gained a point. Genuinely impressive - you would have done better not playing.`,
+      `All of you finished worse than you started. That takes coordination.`,
     ]);
   }
   if (dashedBy && (scores?.[dashedBy]?.centerCount ?? 0) >= 8) {
@@ -289,23 +293,55 @@ export function commentary(input: CommentaryInput): Remark[] {
       `${plural(topPair[1], 'time')} ${nameOf(a)} and ${nameOf(b)} went for the same card. At this point just deal them their own table.`,
     ], [a, b]);
   }
+  /**
+   * The three race rules, and they sit HIGH on purpose.
+   *
+   * They were written at 60-62, which put them under about twenty-five other
+   * rules for six slots - so they existed and were essentially never shown. The
+   * table asked for all three by name, which is as clear a statement as there is
+   * that races are what this room finds interesting about a round. Priorities
+   * follow what people want to read, not what was written first.
+   */
   const bully = Object.entries(won).sort(([, a], [, b]) => b - a)[0];
   if (bully && bully[1] >= 3) {
-    add('bully', 62, [
-      `${nameOf(bully[0])} won ${plural(bully[1], 'race')} to the same space. Fast hands.`,
-      `${bully[1]} cards snatched out from under people by ${nameOf(bully[0])}.`,
-      `${nameOf(bully[0])} has taken ${plural(bully[1], 'pile')} off people who were already reaching. Charming.`,
-      `${nameOf(bully[0])} keeps getting there first. Some people have no manners and excellent reflexes.`,
+    add('bully', 83, [
+      `${nameOf(bully[0])} won ${plural(bully[1], 'race')}. Reflexes like that usually come with a warning label.`,
+      `${bully[1]} cards taken out from under people by ${nameOf(bully[0])}, who would like you to know it was skill.`,
+      `${nameOf(bully[0])} got there first ${plural(bully[1], 'time')}. Not fast - just faster than everyone you know.`,
+      `${nameOf(bully[0])} has now snatched ${plural(bully[1], 'pile')} off people mid-reach. No notes. Well, one note.`,
+      `${plural(bully[1], 'race')} to ${nameOf(bully[0])}. At some point this stops being luck and starts being a personality.`,
     ], [bully[0]]);
   }
   const unlucky = Object.entries(lost).sort(([, a], [, b]) => b - a)[0];
   if (unlucky && unlucky[1] >= 3) {
-    add('unlucky', 60, [
+    add('unlucky', 81, [
       `${nameOf(unlucky[0])} lost ${plural(unlucky[1], 'race')}. Fractionally too slow, ${plural(unlucky[1], 'separate time')}.`,
-      `${nameOf(unlucky[0])} has been second to the same pile ${unlucky[1]} times. Painful.`,
-      `${nameOf(unlucky[0])} lost ${bully ? '' : ''}${unlucky[1]} races. Always the bridesmaid, never fast enough.`,
-      `${nameOf(unlucky[0])} keeps arriving second. Close, but no cigar - and no card either.`,
+      `${nameOf(unlucky[0])} arrived second ${plural(unlucky[1], 'time')}. Consistency is a virtue. This is not the one.`,
+      `${plural(unlucky[1], 'race')} lost by ${nameOf(unlucky[0])}, who has now perfected the reaching motion without the card.`,
+      `${nameOf(unlucky[0])} keeps getting there just after everyone else. Bold strategy, no results yet.`,
+      `${nameOf(unlucky[0])} has been beaten to ${plural(unlucky[1], 'pile')}. Somebody get them a shorter arm span.`,
     ], [unlucky[0]]);
+  }
+  /**
+   * Most races INVOLVED IN, whoever won them - the player everybody keeps
+   * bumping into. Distinct from the two above, which are about the outcome, and
+   * from `rivalry`, which is about one PAIR going for the same pile.
+   */
+  const racer = Object.entries(ids.reduce((acc, id) => {
+    const n = (won[id] ?? 0) + (lost[id] ?? 0);
+    if (n > 0) acc[id] = n;
+    return acc;
+  }, {} as Record<string, number>)).sort(([, a], [, b]) => b - a)[0];
+  if (racer && racer[1] >= 3) {
+    const w = won[racer[0]] ?? 0;
+    const l = lost[racer[0]] ?? 0;
+    add('most-races', 79, [
+      `${nameOf(racer[0])} was in ${plural(racer[1], 'race')} this round. Nobody else is having this much trouble sharing.`,
+      `${plural(racer[1], 'contested card')}, all of them involving ${nameOf(racer[0])}. Coincidence, surely.`,
+      `${nameOf(racer[0])} went for the same card as somebody else ${plural(racer[1], 'time')}: ${w} won, ${l} lost. Busy hands, mixed reviews.`,
+      `Every time two people reached for one pile, ${nameOf(racer[0])} was one of them. ${plural(racer[1], 'time')}. Take the hint.`,
+      `${nameOf(racer[0])} spent this round racing rather than playing - ${plural(racer[1], 'time')}, ${w} of them successfully.`,
+    ], [racer[0]]);
   }
 
   // === the board ===========================================================
@@ -587,9 +623,13 @@ export function commentary(input: CommentaryInput): Remark[] {
     add('champion', 99, margin >= 20 ? [
       `${nameOf(leader)} wins by ${margin}. The rest of you were furniture.`,
       `${nameOf(leader)} takes it at a canter. Nobody laid a glove on them.`,
+      `${nameOf(leader)} wins by ${margin}, which is less a win than a lesson nobody asked for.`,
+      `${margin} points clear. ${nameOf(leader)} was playing a different game, possibly a different sport.`,
     ] : [
       `${nameOf(leader)} takes it by ${margin}. Close enough to hurt.`,
       `${nameOf(leader)} wins, barely. ${nameOf(current[1])} will be thinking about that one.`,
+      `${nameOf(leader)} by ${margin}. ${nameOf(current[1])} will replay this one at three in the morning for years.`,
+      `${margin} in it. ${nameOf(leader)} will call it skill; ${nameOf(current[1])} knows better.`,
     ], [leader, ...(current[1] ? [current[1]] : [])]);
     // Strictly lowest, not merely sorted last: on a table where everyone is level on
   // the same negative score, naming one of them is just picking on whoever RTDB

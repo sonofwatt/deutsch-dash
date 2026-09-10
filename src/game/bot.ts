@@ -75,6 +75,9 @@ export const BOT_PROFILES: Record<BotLevel, BotProfile> = {
  *     that knows when the board moved.
  *  4. dashPlanBonus - it plays off the WHOLE Dash pile rather than off the card
  *     on top of it, which is the one piece of hidden information in this game.
+ *  5. GENIUS_AMBUSH_MS - it holds a card that continues a run until the player
+ *     reaches for one of their own, and takes the space the moment they do.
+ *     Driven from state/store.ts, the only place that can see a finger go down.
  *
  * Nothing here makes it a better judge of a legal move: `rankMove` is the same
  * for every level. It knows more, reaches further and answers faster, which is
@@ -98,6 +101,27 @@ export const GENIUS_REWIND_TURNS = 2;
  * runs at its own delay like everybody else.
  */
 export const GENIUS_RACE_EDGE_MS = 100;
+
+/**
+ * How long Genius will lie in wait holding a card that continues a run, before
+ * giving up and simply playing it.
+ *
+ * The nastiest of the cheats and the one asked for last: **it does not play the
+ * card, it waits for you to reach for yours, and then takes the space.** A card
+ * that is next in a sequence is the one you are most likely to be going for too,
+ * so holding it turns every one of those into a race the player starts from
+ * behind - they have to see it, decide and move a finger; Genius has only to
+ * notice the finger.
+ *
+ * The cap is what stops that being a bot that never plays: two seconds of nobody
+ * reaching for anything and it puts the card down like an ordinary player. It is
+ * also what keeps a round moving while the only human at the table is thinking.
+ *
+ * **Only a play that CONTINUES a run is held.** An Ace opening an empty space is
+ * not "next in the sequence" and is not contested the same way - any empty space
+ * will do for it, so there is nobody to ambush out of it.
+ */
+export const GENIUS_AMBUSH_MS = 2000;
 
 /**
  * Three cards a turn, except on the lap where Genius deals them one at a time.

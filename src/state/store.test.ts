@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createGameStore, legalTargets, tableReady, HOST_AWAY_MS, AWAY_MS, type Deps } from './store';
+import { GENIUS_AMBUSH_MS } from '../game/bot';
 import type { PlayResult } from '../net/plays';
 import type { JoinResult } from '../net/rooms';
 import { deal, buildDeck } from '../game/deck';
@@ -17,6 +18,7 @@ function fakeDeps(over: Partial<Deps> = {}): Deps {
     setReady: vi.fn(async () => {}),
     saySoundbite: vi.fn(async () => {}),
     playSoundbite: vi.fn(() => true),
+    playCountdown: vi.fn(() => true),
     setSittingOut: vi.fn(async () => {}),
     setPaleCards: vi.fn(async () => {}),
     setSounds: vi.fn(async () => {}),
@@ -1121,21 +1123,82 @@ describe('the Genius cheats', () => {
    */
   const pinRandom = () => vi.spyOn(Math, 'random').mockReturnValue(1);
 
-  it('answers a board that just moved inside a tenth of a second', async () => {
-    // The race edge. A person has to see the card land, work out what it opened
-    // and get a card of their own onto it; Genius has it done in 100ms, which is
-    // well inside its own 320-700ms band and is why it is a cheat and not a tuning.
-    const { deps, store, snapshot } = await table();
+  /**
+   * A board where the bot's only play CONTINUES a run, which is the shape the
+   * ambush holds: dash a red 2, and the red Ace goes down on the board.
+   */
+  const readyToPounce = async () => {
+    const t = await table();
     const rand = pinRandom();
     vi.useFakeTimers();
     // Nothing playable: a red 2 with no red Ace anywhere on the board.
-    snapshot(room('genius', dead({ dash: [c(2, 'red', 'bot_star')] }), [{ stack: [], history: [] }]));
+    t.snapshot(room('genius', dead({ dash: [c(2, 'red', 'bot_star')] }), [{ stack: [], history: [] }]));
     await vi.advanceTimersByTimeAsync(800); // its 700ms turn, which adopts the hand
+    expect(t.deps.playToCenter).not.toHaveBeenCalled();
+    // Somebody plays the red Ace. The bot's red 2 now has somewhere to go.
+    t.snapshot(room('genius', dead({ dash: [c(2, 'red', 'bot_star')] }), [{ stack: [c(1, 'red')], history: [] }]));
+    return { ...t, rand };
+  };
+
+  it('lies in wait on a card that continues a run, rather than playing it', async () => {
+    // The ambush supersedes the race edge for exactly this shape, and that is the
+    // point of it: sniping the space the moment a person plays is a race they can
+    // at least see coming. Waiting for their FINGER is not.
+    const { deps, store, rand } = await readyToPounce();
+    await vi.advanceTimersByTimeAsync(1500); // well past the 100ms edge, inside the cap
     expect(deps.playToCenter).not.toHaveBeenCalled();
-    // Somebody plays the red Ace. Now the bot's red 2 has somewhere to go, and its
-    // own next turn is not due for another 600ms.
-    snapshot(room('genius', dead({ dash: [c(2, 'red', 'bot_star')] }), [{ stack: [c(1, 'red')], history: [] }]));
-    await vi.advanceTimersByTimeAsync(150);
+    store.getState().leave();
+    vi.useRealTimers();
+    rand.mockRestore();
+  });
+
+  it('takes the space the instant the player reaches for a card', async () => {
+    const { deps, store, rand } = await readyToPounce();
+    await vi.advanceTimersByTimeAsync(300);
+    expect(deps.playToCenter).not.toHaveBeenCalled();
+    store.getState().noteReach();       // a finger goes down on one of my cards
+    await vi.advanceTimersByTimeAsync(1);
+    store.getState().leave();
+    vi.useRealTimers();
+    rand.mockRestore();
+    expect(deps.playToCenter).toHaveBeenCalledWith(
+      'ABCDEF', 0, { v: 2, suit: 'red', owner: 'bot_star' });
+  });
+
+  it('gives up and plays it anyway once the cap runs out', async () => {
+    // Two seconds of nobody reaching for anything and it puts the card down like
+    // an ordinary player, which is what stops this being a bot that never plays.
+    const { deps, store, rand } = await readyToPounce();
+    await vi.advanceTimersByTimeAsync(GENIUS_AMBUSH_MS + 100);
+    store.getState().leave();
+    vi.useRealTimers();
+    rand.mockRestore();
+    expect(deps.playToCenter).toHaveBeenCalledWith(
+      'ABCDEF', 0, { v: 2, suit: 'red', owner: 'bot_star' });
+  });
+
+  it('does not lie in wait on an Ace, which is not next in any sequence', async () => {
+    // Any empty space will do for an Ace, so there is nobody to ambush out of it -
+    // and a bot that held its Aces too would simply be a slower bot.
+    const { deps, store, snapshot } = await table();
+    const rand = pinRandom();
+    vi.useFakeTimers();
+    snapshot(room('genius', dead({ dash: [c(1, 'blue', 'bot_star')] }), [{ stack: [], history: [] }]));
+    await vi.advanceTimersByTimeAsync(800);
+    store.getState().leave();
+    vi.useRealTimers();
+    rand.mockRestore();
+    expect(deps.playToCenter).toHaveBeenCalledWith(
+      'ABCDEF', 0, { v: 1, suit: 'blue', owner: 'bot_star' });
+  });
+
+  it('leaves every other level to play the moment it can', async () => {
+    // The ambush is a cheat, so only the level that is allowed to cheat gets it.
+    const { deps, store, snapshot } = await table();
+    const rand = pinRandom();
+    vi.useFakeTimers();
+    snapshot(room('hard', dead({ dash: [c(2, 'red', 'bot_star')] }), [{ stack: [c(1, 'red')], history: [] }]));
+    await vi.advanceTimersByTimeAsync(3000); // its band plus the hesitation
     store.getState().leave();
     vi.useRealTimers();
     rand.mockRestore();

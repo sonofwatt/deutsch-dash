@@ -8,13 +8,13 @@ import { flipWood, rewindWood, rotateWood, sinkWoodTop, WOOD_STEP } from '../gam
 import { reconcileTableau } from '../game/center';
 import { buildDeck, deal, shuffle } from '../game/deck';
 import { botCheats, botDelay, botLevelOf, botReachStep, botWoodStep, chooseBotAction,
-  GENIUS_RACE_EDGE_MS, hasCenterPlay, type BotLevel } from '../game/bot';
+  GENIUS_AMBUSH_MS, GENIUS_RACE_EDGE_MS, hasCenterPlay, type BotLevel } from '../game/bot';
 import * as netRooms from '../net/rooms';
 import * as netPlays from '../net/plays';
 import type { PlayResult } from '../net/plays';
 import { pickNextHost, allConnectedStuck } from '../net/plays';
 import { ensureSignedIn, reconnect, watchConnected } from '../net/firebase';
-import { playSoundbite } from '../ui/sound/engine';
+import { playCountdown, playSoundbite } from '../ui/sound/engine';
 import type { JoinResult } from '../net/rooms';
 
 // How long the host may stay disconnected in the watchdog below before a stand-in claims
@@ -75,6 +75,8 @@ export interface Deps {
    * Returns whether it reached this device, which is what drives the emoji rain.
    */
   playSoundbite(id: SoundbiteId): boolean;
+  /** One tone of the lobby countdown. `digit` is what the lobby shows, so 0 is GO. */
+  playCountdown(digit: number): boolean;
   setSittingOut(code: string, uid: string, on: boolean): Promise<void>;
   setPaleCards(code: string, on: boolean): Promise<void>;
   setSounds(code: string, on: boolean): Promise<void>;
@@ -163,6 +165,15 @@ export interface GameStore {
   markStuck(): void;
   /** Any sign of life from the player: clears the away flag and restarts its timer. */
   noteActivity(): void;
+  /**
+   * A finger has gone down on one of this player's own cards.
+   *
+   * Narrower than `noteActivity`, which any touch anywhere satisfies, because the
+   * one thing that reads it wants exactly this: a Genius bot lying in wait for the
+   * player to REACH for a card, so it can take the space first. See the ambush in
+   * `driveBot`.
+   */
+  noteReach(): void;
   /** The tab was hidden or shown. In the LOBBY that is exactly what away means. */
   noteVisible(visible: boolean): void;
   setTarget(n: number): void;
@@ -279,6 +290,29 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
   // that counts and the host only drives bots; cleared with `flips`.
   const woodLaps = new Map<string, number>();
   /**
+   * Genius bots lying in wait, and when each started waiting.
+   *
+   * The ambush: a Genius holding a card that continues a run does not play it, it
+   * waits for the player to reach for one of their own and takes the space the
+   * moment they do. See GENIUS_AMBUSH_MS.
+   *
+   * **It can only see the finger on THIS device.** The host drives every bot, and
+   * a touch is not written anywhere - it would be a database write per finger, on
+   * every card, for a decoration. So a Genius ambushes the host's own player and
+   * nobody else's, and at a table of several humans the others simply race it on
+   * the ordinary 100ms edge. That is the honest limit of the cheat and it is the
+   * right trade: the alternative is chatter on every touch by every player.
+   */
+  const ambush = new Map<string, number>();
+  /**
+   * When the player on this device last put a finger on one of their own cards.
+   *
+   * A LOCAL clock, and only ever compared against `ambush`, which is set from the
+   * same clock on the same device - so this never compares two devices' time, the
+   * thing `awayAt` and the race nonces are so careful about.
+   */
+  let reachedAt = 0;
+  /**
    * The `says/$uid` nonce each player was last seen holding, so a soundbite plays
    * when it CHANGES rather than when it is present.
    *
@@ -293,6 +327,15 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
    * that every client reads the same one. See SoundbiteSay.
    */
   const saidAt = new Map<string, number>();
+  /**
+   * The countdown digit this client last saw, so a tone plays when it CHANGES.
+   *
+   * `undefined` means nothing has been seen yet and the first value is adopted in
+   * silence - walking into a lobby that is already counting should not fire the
+   * digit you arrived on, only the ones after it. The same rule as `saidAt` above,
+   * the emoji rain and the finished-pile flip; it keeps coming up.
+   */
+  let lastCountdown: number | null | undefined = undefined;
   /** Strictly increasing, so every play is a fresh key for the emoji rain. */
   let soundSeq = 0;
   // `<code>/<roundNumber>` of a score commit that was REJECTED, so it is attempted
@@ -520,6 +563,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
     function stopBots() {
       for (const t of botTimers.values()) clearTimeout(t);
       botTimers.clear();
+      ambush.clear();
     }
 
     function setBotTableau(id: string, t: Tableau) {
@@ -605,6 +649,27 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         syncStuck(id, next, reachStep);
         return;
       }
+      /**
+       * The ambush. A Genius holding a card that CONTINUES a run sits on it until
+       * the player reaches for one of their own, or until the cap runs out.
+       *
+       * An Ace opening an empty space is not held: it is not next in any sequence
+       * and any empty space will do for it, so there is nobody to ambush out of
+       * it. Anything else clears a stale wait - the board may have moved under the
+       * bot while it was lying there.
+       */
+      const holdable = botCheats(level) && action.kind === 'center'
+        && (room.round.spaces[action.space]?.stack.length ?? 0) > 0;
+      if (!holdable) ambush.delete(id);
+      else {
+        const since = ambush.get(id);
+        if (since === undefined) { ambush.set(id, Date.now()); return; }
+        // Both of these are this device's own clock, set a moment apart. Never
+        // another device's - see `reachedAt`.
+        const reached = reachedAt > since;
+        if (!reached && Date.now() - since < GENIUS_AMBUSH_MS) return;
+        ambush.delete(id);
+      }
       if (action.kind === 'post') {
         const next = placeOnPost(t, action.source, action.post);
         if (next) commit(next);
@@ -635,7 +700,14 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
           const s = get();
           const p = s.room?.players[id];
           if (p?.isBot && s.online && s.room?.meta.phase === 'playing' && isHost(s)) {
-            scheduleBot(id, botLevelOf(p.botLevel));
+            // Lying in wait: the next wake is the cap itself, so the bot gives up
+            // exactly on time rather than on whenever its ordinary delay next
+            // came round. `springAmbush` pulls it forward the instant a finger
+            // goes down, which is the whole point of the thing.
+            const since = ambush.get(id);
+            scheduleBot(id, botLevelOf(p.botLevel),
+              since === undefined ? undefined
+                : Math.max(0, GENIUS_AMBUSH_MS - (Date.now() - since)));
           }
         });
       };
@@ -676,6 +748,27 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         if (pending) clearTimeout(pending);
         botTimers.delete(id);
         scheduleBot(id, level, GENIUS_RACE_EDGE_MS);
+      }
+    }
+
+    /**
+     * A finger has gone down on one of this player's cards: every Genius lying in
+     * wait plays NOW, before the card in the hand can reach the board.
+     *
+     * Deliberately not on a poll. The whole cheat is that the bot answers the
+     * REACH rather than the play, and a poll interval is exactly the head start
+     * that would give back.
+     */
+    function springAmbush() {
+      if (ambush.size === 0) return;
+      const s = get();
+      if (!s.online || s.room?.meta.phase !== 'playing' || !isHost(s)) return;
+      for (const id of ambush.keys()) {
+        if (botBusy.has(id)) continue; // mid-turn: it reschedules itself on the way out
+        const pending = botTimers.get(id);
+        if (pending) clearTimeout(pending);
+        botTimers.delete(id);
+        scheduleBot(id, botLevelOf(s.room.players[id]?.botLevel), 0);
       }
     }
 
@@ -789,6 +882,17 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
           saidAt.set(who, said.at);
           if (who === me || seen === undefined || seen === said.at) continue;
           if (deps.playSoundbite(said.id)) set({ lastSound: { id: said.id, seq: ++soundSeq } });
+        }
+        // (2b) The countdown's own tones: three ticks and a GO, one per digit.
+        //
+        // Played off the DIGIT rather than off a timer of this client's own, so
+        // the sound cannot drift from the number on screen - they are the same
+        // event. The host's write is the single clock; see RoomMeta.countdown.
+        const digit = room.meta.countdown ?? null;
+        if (lastCountdown === undefined) lastCountdown = digit;
+        else if (digit !== lastCountdown) {
+          lastCountdown = digit;
+          if (digit != null) deps.playCountdown(digit);
         }
         syncCountdown(room); // somebody readied, un-readied, joined or wandered off
         syncAllStuck(); // the centre moved: someone may have just been freed, or trapped
@@ -909,6 +1013,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
       // still sitting in THIS one were heard the first time. Either way the map
       // starts empty and the first snapshot adopts what it finds without playing.
       saidAt.clear();
+      lastCountdown = undefined;
       unwatch = deps.watchRoom(code, onSnapshot);
       set({ code, uid, joinPhase: 'in-room' });
     }
@@ -992,6 +1097,9 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
       },
 
       select(source) {
+        // Tapping a card IS reaching for it, so a Genius lying in wait springs on
+        // this exactly as it does on a drag. See noteReach.
+        get().noteReach();
         const cur = get().selection;
         set({ selection: JSON.stringify(cur) === JSON.stringify(source) ? null : source });
       },
@@ -1158,6 +1266,10 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
       },
 
       noteActivity,
+      noteReach() {
+        reachedAt = Date.now();
+        springAmbush();
+      },
 
       /**
        * Away, in the lobby, means "not looking at this tab" - and unlike the
@@ -1338,6 +1450,7 @@ const realDeps: Deps = {
   setReady: netRooms.setReady,
   saySoundbite: netRooms.saySoundbite,
   playSoundbite,
+  playCountdown,
   setSittingOut: netRooms.setSittingOut,
   setPaleCards: netRooms.setPaleCards,
   setSounds: netRooms.setSounds,

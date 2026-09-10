@@ -68,6 +68,7 @@ export function Game() {
   const online = useGameStore(s => s.online);
   const actionError = useGameStore(s => s.actionError);
   const noteActivity = useGameStore(s => s.noteActivity);
+  const noteReach = useGameStore(s => s.noteReach);
   const setSittingOut = useGameStore(s => s.setSittingOut);
   const setSingleFlip = useGameStore(s => s.setSingleFlip);
   const dealMeIn = useGameStore(s => s.dealMeIn);
@@ -345,7 +346,11 @@ export function Game() {
             stuck={me.stuckAt != null}
             onSinkWood={stuckAwhile ? sinkWood : undefined}
             postHighlight={targets.posts} onSelect={select} onFlip={flip}
-            onTapPost={i => void playTo({ post: i })} startDrag={startDrag}
+            onTapPost={i => void playTo({ post: i })}
+            // Wrapped rather than passed straight through: a finger going down on
+            // a card is the signal a Genius bot is lying in wait for, and this is
+            // the only place the app learns about one. See noteReach.
+            startDrag={(e, card, source) => { noteReach(); startDrag(e, card, source); }}
             soundLauncher={canSound && barOn ? <SoundLauncher onSay={say} /> : undefined} />
         </motion.div>
         {/* A host write that was refused. It belongs on THIS screen and not only

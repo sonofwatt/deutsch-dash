@@ -53,7 +53,7 @@ both directions before releasing: the new client against the rules still live,
 and the PREVIOUS client against the new rules, which is the half this file's own
 warning cannot cover._
 
-_**745 tests** (591 unit and 102 in a real browser; 52 against the emulator, all
+_**762 tests** (608 unit and 102 in a real browser; 52 against the emulator, all
 green). This is the only place in the repo that quotes a count -
 it drifted three separate ways when it lived in four places, so keep it here and
 nowhere else. Both sides of the 2026-09-04 merge rewrote this line, which is the
@@ -1483,6 +1483,57 @@ became, written by the host in `commitScores` beside the rest of the tally.
   panel says so rather than rendering an empty box.
 - A round with a TOTAL but no DELTA is a round that player sat out. A round with
   no total for them at all is a round they were not in, and it is left out.
+
+### Genius lies in wait, the countdown has tones, and the sheet got ruder _(2026-09-10)_
+
+**The ambush is the nastiest cheat in the box.** A Genius holding a card that
+CONTINUES a run does not play it. It waits for the player to reach for a card of
+their own, and takes the space the moment a finger goes down - before the card in
+the hand can get there. Two seconds of nobody reaching and it plays anyway, which
+is what stops it being a bot that never moves.
+
+- **It supersedes the race edge for that shape**, and deliberately. Sniping the
+  space the instant a person PLAYS is a race they can at least see coming;
+  answering the reach is not. The 100ms edge still covers everything else.
+- **Only a run-continuation is held.** An Ace opening an empty space is not next
+  in any sequence and any empty space will do for it, so there is nobody to
+  ambush out of it - and a bot that held its Aces too would just be a slower bot.
+- **It can only see the finger on the HOST's device.** The host drives every bot
+  and a touch is not written anywhere; broadcasting one would be a database write
+  per finger, per card, for a decoration. So at a table of several humans the
+  others race it on the ordinary edge. That is the honest limit of the cheat.
+- **`reachedAt` and `ambush` are the same device's clock**, compared only against
+  each other. Never two devices' - the thing `awayAt` and the race nonces are so
+  careful about.
+- **The wake-up while waiting is the cap itself**, not the ordinary delay, so the
+  bot gives up exactly on time; `springAmbush` pulls it forward to zero the
+  instant a finger goes down. A poll would have handed back exactly the head start
+  the cheat is for.
+
+**The lobby countdown has tones**, given as a synthesis recipe: a band-limited
+pulse at 30% duty with its upper partials rolled off, through a 3.2kHz lowpass.
+440Hz for 3, 2 and 1; 880Hz held longer for GO.
+
+- **Translated, not shipped as a file.** `createPeriodicWave` takes the harmonic
+  series directly, which is what the recipe already was - additive, so there is
+  nothing to alias.
+- **The timing is not in the recipe.** It placed its beeps a second apart by hand;
+  here every client plays a tone when the DIGIT CHANGES, so the sound cannot drift
+  from the number on screen - they are the same event. The host's write is the
+  single clock, exactly as `RoomMeta.countdown` describes.
+- **The first digit seen is adopted in silence**, so walking into a lobby that is
+  already counting does not fire the number you arrived on. That rule again.
+- Gated by the device's own sound switch and nothing else. `soundsOn` is the
+  host's switch for the BOARD, and the lobby has always been where a table finds
+  out sound exists at all.
+
+**The race remarks moved up the order, and there is a third one.** `bully` and
+`unlucky` were written at 60-62, which put them under about twenty-five other
+rules competing for six slots - so they existed and were essentially never seen.
+The table asking for both by name is as clear a statement as there is that races
+are what this room finds interesting, so they now sit at 83 and 81, with a new
+`most-races` at 79 for whoever was in the most of them however they went.
+**Priorities follow what people want to read, not what was written first.**
 
 ### A finished pile turns over, and the bots hesitate _(2026-09-10)_
 
@@ -3729,6 +3780,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `0e1adb7` | Six soundbite fixes: the first press, the queue, the sticky menu, the stack, the chime |
 | `1e1a4d8` | Another 50ms off the wood step, so the cards overlap by 100ms |
 | `28f4d70` | A finished pile turns over to show whose it was; the bots hesitate |
+| _pending_ | Genius lies in wait; countdown tones; the race remarks get seen |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.

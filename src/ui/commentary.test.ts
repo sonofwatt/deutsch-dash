@@ -65,6 +65,33 @@ describe('commentary', () => {
     expect(text).toContain('Bo');
   });
 
+  it('names whoever was in the most races, whether or not they won them', () => {
+    // Distinct from `bully` (won the most) and `unlucky` (lost the most): this is
+    // the player everybody kept bumping into, however it went for them.
+    // Three players, because with two every race involves both of them and the
+    // count can only ever tie. Ann loses two to Bo and wins two off Cy: four
+    // races, against two each for the others.
+    const players = { ann: player('Ann', 20), bo: player('Bo', 18), cy: player('Cy', 15) };
+    const scores = { ann: sc(6, 0), bo: sc(4, 1), cy: sc(3, 1) };
+    const duels = { ann: { bo: 2 }, cy: { ann: 2 } };
+    const text = textOf(base({ players, scores, duels }), 'most-races');
+    expect(text).toContain('Ann');
+    expect(text).toMatch(/\b4\b/);
+  });
+
+  it('holds all three race remarks to three, and shows them where they can be seen', () => {
+    // Written at 60-62 to begin with, which put them under about twenty-five other
+    // rules for six slots - so they existed and were essentially never shown.
+    const two = { ann: { bo: 2 } };
+    expect(ids(base({ duels: two }))).not.toContain('bully');
+    expect(ids(base({ duels: two }))).not.toContain('unlucky');
+    expect(ids(base({ duels: two }))).not.toContain('most-races');
+    const three = { ann: { bo: 3 } };
+    const got = ids(base({ duels: three }));
+    expect(got).toContain('bully');      // Bo won three
+    expect(got).toContain('unlucky');    // Ann lost three
+  });
+
   it('ignores duels involving somebody who has left the room', () => {
     // A player removed between the race and the sheet must not become "undefined".
     const remarks = commentary(base({ duels: { ann: { ghost: 5 } } }));

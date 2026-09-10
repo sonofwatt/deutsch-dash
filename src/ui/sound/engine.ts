@@ -14,6 +14,7 @@
  */
 
 import { SOUNDBITES, type SoundbiteId, type Voice } from '../../game/soundbites';
+import { partialsFor, PULSE_LOWPASS, pulseHarmonics, toneFor, type Tone } from '../../game/countdown';
 
 /** Trim under every clip, so the recipes can be written at comfortable peaks. */
 const MASTER = 0.5;
@@ -39,6 +40,8 @@ let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 let noise: AudioBuffer | null = null;
 let enabled = false;
+/** The countdown's pulse wave, per pitch. Built once and reused. */
+const pulses = new Map<number, PeriodicWave>();
 
 /**
  * Whether this phone makes any noise at all. Default off, and the ONE gate: the
@@ -188,7 +191,75 @@ export function playSoundbite(id: SoundbiteId): boolean {
   return true;
 }
 
+/**
+ * The countdown's wave at one pitch: a band-limited pulse, built from the
+ * harmonics in `countdown.ts` and cached because there are only ever two.
+ */
+function pulseWave(c: AudioContext, freq: number): PeriodicWave {
+  const held = pulses.get(freq);
+  if (held) return held;
+  const imag = pulseHarmonics(partialsFor(freq, c.sampleRate));
+  // Sine components go in `imag`; `real` is the cosine half and stays flat.
+  const wave = c.createPeriodicWave(new Float32Array(imag.length), imag,
+    { disableNormalization: false });
+  pulses.set(freq, wave);
+  return wave;
+}
+
+/**
+ * One countdown tone. `digit` is what the lobby is showing, so 0 is GO.
+ *
+ * Reports whether it reached the device, exactly like `playSoundbite`, and is
+ * gated by the same switch: a phone with sound off counts down in silence.
+ *
+ * The envelope is the recipe's: a soft way in, a slow exponential sag across the
+ * body of the note rather than a decay to nothing, and a short fade at the end
+ * so it stops without a click. `exponentialRampToValueAtTime` IS an exponential,
+ * so ramping to `exp(-2.1 . dur)` of the peak over the note reproduces the curve
+ * exactly rather than approximating it.
+ */
+export function playCountdown(digit: number): boolean {
+  if (!enabled) return false;
+  const c = audio();
+  if (!c || !master) return false;
+  const tone = toneFor(digit);
+  if (c.state !== 'running') {
+    void unlockAudio().then(() => {
+      if (enabled && ctx === c && master && c.state === 'running') fireTone(c, master, tone);
+    });
+    return true;
+  }
+  fireTone(c, master, tone);
+  return true;
+}
+
+const TONE_ATTACK = 0.012;
+/** The recipe's `exp(-0.35 . t . 6)`, which is `exp(-2.1 . t)`. */
+const TONE_SAG = 2.1;
+
+function fireTone(c: AudioContext, out: GainNode, tone: Tone): void {
+  const t = c.currentTime;
+  const peak = 0.30;
+  const env = c.createGain();
+  env.gain.setValueAtTime(0.0001, t);
+  env.gain.exponentialRampToValueAtTime(peak, t + TONE_ATTACK);
+  env.gain.exponentialRampToValueAtTime(peak * Math.exp(-TONE_SAG * tone.dur),
+    t + Math.max(TONE_ATTACK, tone.dur - tone.release));
+  env.gain.exponentialRampToValueAtTime(0.0001, t + tone.dur);
+  // Rounds off the edges, which is what keeps a 30% pulse from reading as an
+  // alarm. The roll-off in the harmonics has already done most of it.
+  const lp = c.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.value = PULSE_LOWPASS;
+  const osc = c.createOscillator();
+  osc.setPeriodicWave(pulseWave(c, tone.freq));
+  osc.frequency.setValueAtTime(tone.freq, t);
+  osc.connect(env).connect(lp).connect(out);
+  osc.start(t);
+  osc.stop(t + tone.dur);
+}
+
 /** Tests only: forget the context between cases. */
 export function resetSoundForTests(): void {
-  ctx = null; master = null; noise = null; enabled = false;
+  ctx = null; master = null; noise = null; enabled = false; pulses.clear();
 }
