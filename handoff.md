@@ -3496,6 +3496,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `57d1c1e` | The near radius down to 25px, which moves the swept band with it |
 | `ec976fc` | Bots aim at the lowest open space; Genius cheats four ways |
 | `5657a09` | The wood turn at half speed, gather in the middle of the deal |
+| `PENDING` | Eight canned soundbites, a host switch and a player switch, a launcher over the Dash pile with tap and hold-to-slide, and the emoji falling down the top third of the screen |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
