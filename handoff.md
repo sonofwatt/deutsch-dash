@@ -10,14 +10,26 @@ suite. A commit sitting unpushed has already invalidated one playtest - what
 people are playing is whatever last reached Pages - so check `git status -sb`
 before trusting what a table reports._
 
-_**`a2b4df5` (v1.5.28) was pushed to `main` on 2026-09-10 and its Pages deploy has
-NOT been checked from here** - there was no `gh` on the machine that pushed it, so
-nothing above a green tick was available and a green tick is not what this file
-counts. Verify it the way the paragraph below verifies its own claim before
-telling a table what they are playing. The last deploy anybody actually confirmed
-is the one that paragraph describes._
+_**What is live on Pages is `94891dc`, v1.5.28**, deployed 2026-09-10: the bots
+aiming at the lowest open space, and the four Genius cheats. Checked rather than
+read off a green tick, and without `gh` on the machine - fetch the served HTML,
+follow it to the `index-*.js` it links, and read the two counters out of the
+bundle, because **the version is never a literal string in the build**. It is
+computed at runtime from `MAJOR`, `FEATURE_BATCHES` and `SMALL_CHANGES`, which
+minify to something like `pn=1,mn=47,hn=58` next to `formatVersion`'s own
+`t*10+n`; grepping the bundle for `1.5.28` finds nothing and proves nothing. Run
+those three through `formatVersion` to get the version. The same fetch confirmed
+the change itself and not just the number: the live bundle carries the `rewind`
+action branch, `REWIND_RANK`, `BotProfile.cheats` and the `?.isBot` guard on the
+race edge._
 
-_**What was live on Pages before that push is `e23448f`, v1.4.61**, deployed 2026-09-06, and the
+_A local `npm run build` will NOT hash the same as the deployed bundle even at the
+identical commit, so do not read a mismatch as a bad deploy. CI builds with the
+Pages subpath and a local build does not: the difference is `deutsch-dash/`
+inserted at two asset paths, plus the chunk-name hashes that cascade off it.
+Diffing the two showed those and nothing else._
+
+_**The deploy before it was `e23448f`, v1.4.61**, deployed 2026-09-06, and the
 icon work is all of it: the new icon full bleed, the 16px cut of it in the tab,
 and the full drawing 44px on the home screen beside the title. Checked rather
 than read off a green tick - every icon file on Pages hashes the same as its copy
