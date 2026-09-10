@@ -5,7 +5,7 @@ should cost a flag and not a rebuild.
 
 # Project Handoff - Deutsch Dash
 
-_Last updated: 2026-09-06. Working tree clean, CI green including the emulator
+_Last updated: 2026-09-10. Working tree clean, CI green including the emulator
 suite. A commit sitting unpushed has already invalidated one playtest - what
 people are playing is whatever last reached Pages - so check `git status -sb`
 before trusting what a table reports._
@@ -31,7 +31,7 @@ instead, check both directions before releasing: the new client against the rule
 still live, and the PREVIOUS client against the new rules, which is the half this
 file's own warning cannot cover._
 
-_**539 tests** (465 unit and 27 in a real browser; 47 against the emulator, all
+_**567 tests** (493 unit and 27 in a real browser; 47 against the emulator, all
 green). This is the only place in the repo that quotes a count -
 it drifted three separate ways when it lived in four places, so keep it here and
 nowhere else. Both sides of the 2026-09-04 merge rewrote this line, which is the
@@ -389,6 +389,20 @@ render, and it sets state.
 - **Only the host runs the bot loop.** `driveBot` bails on `isHost`. Bot hands
   live in client-only `botTableaus` state, and a new host re-adopts them from
   `room.round.tableaus[id]` via `reconcileTableau`.
+- **Genius cheats, and every other level does not.** `BotProfile.cheats` is the
+  flag and `CHEATS` in `bot.ts` is the list. It is deliberately not a difficulty
+  knob: the other three levels are handicapped by speed and attention only, and
+  adding a fifth level or retuning the ladder must not turn this on by accident.
+- **A bot's wood step is its own, not the table's.** `botWoodStep` can hand Genius
+  a one-card lap, so anything reading `WOOD_STEP` or `woodStep(room)` for a BOT is
+  wrong. `driveBot` computes `step` once at the top and every branch uses it.
+- **`isStuck` takes a separate `reachStep`** for the same reason, and only Genius
+  passes a different one (`botReachStep`). Judged at three it would be declared
+  stuck holding a card its one-card lap is two laps from turning up - and a bot
+  declared stuck stops turning its pile at all, which would take the cheat away
+  before it ever fired. The BAR underneath stays on the table's pace, so a genuinely
+  dead hand still admits it as fast as anybody's and the all-stuck rotation is not
+  delayed.
 - **Bots are excluded from `meta/playerCount`** because that validate rule
   forbids the value ever decreasing - counting a bot would permanently consume a
   seat when it was removed. The 8-seat total is enforced client-side in `Lobby`.
@@ -1125,6 +1139,64 @@ became, written by the host in `commitScores` beside the rest of the tally.
   panel says so rather than rendering an empty box.
 - A round with a TOTAL but no DELTA is a round that player sat out. A round with
   no total for them at all is a round they were not in, and it is left out.
+
+### The bots aim low, and Genius cheats _(2026-09-10)_
+
+Two requests off one message, and only the first one touches every level.
+
+**A bot puts its card in the lowest space that will take it.** For any one card
+every legal space is the same kind of landing - an Ace only ever opens an empty
+space, and everything else only ever continues a run of its own suit - so which
+one it goes to was free, and the bot was spending it on whichever came first,
+which is the top-left of the board. On a big screen that is a long way from the
+hand the player is actually watching. `lowestSpaceFor` re-aims the play AFTER the
+move has been chosen, so it never competes with choosing it, and it runs on the
+sloppy path too, which is most rolls at the bottom of the ladder. Every level,
+because it is not a handicap in either direction.
+
+**Genius may now break four rules.** Asked for in those words: "that player should
+be able to cheat". The top rung was already about as fast as a rung can be before
+it stops looking like a player, so the way up was to let it know more and reach
+further rather than to shorten its delay again. `BotProfile.cheats` gates all four
+and only Genius has it.
+
+- **A one-card lap every third time round the wood** (`botWoodStep`). A
+  three-at-a-time cycle only exposes every third card when the pile length is a
+  multiple of three, which is how a round is dealt; this is the host's deadlock
+  rescue, granted permanently to one player and switched on by itself. The base is
+  still the TABLE's step, so the cheat can only ever make a pile more reachable
+  than the rules allow, never less.
+- **It can put the last turn or two back face-down** (`rewindWood`, `rewindMoves`)
+  to reach a card it has already gone past, when the board has since made that
+  card playable. Ranked at 50: below every centre play, above every post build, so
+  it goes back when the alternative is shuffling cards between posts and never
+  when there is a card to put on the board this instant. Only the index moves, so
+  `persistWoodIndex` is the correct write.
+- **It answers a board that moved in 100ms** (`GENIUS_RACE_EDGE_MS`, `armRaceEdge`
+  in `store.ts`). A person has to see the card land, work out what it opened and
+  get a card of their own onto it; a tenth of a second is inside all of that, so
+  Genius wins essentially every race it goes for. It is a REACTION and not a second
+  clock: it is armed only on a snapshot where a centre space actually changed
+  hands, and only for a bot that has a card it could put on the board right now.
+  Between board changes Genius still runs at its own 320-700ms delay.
+- **It plays off the whole Dash pile, not the card on top of it**
+  (`dashPlanBonus`). That pile is the one piece of hidden information a player
+  holds and emptying it is the only way to win a round, so this is the cheat that
+  is really a cheat. Worth at most 25, scaled by how deep the card it frees is
+  buried, which is less than the 30-point gap between a Dash play and a wood one -
+  so a plan can reorder moves inside a tier and can never talk the bot out of
+  playing off the Dash pile itself.
+
+**`rankMove` is still the same function for every level.** None of these makes
+Genius a better judge of a legal move; it knows more, reaches further and answers
+faster, which is what cheating is. That line is worth keeping, because the moment
+a cheat becomes "plays better cards" the ladder stops being tunable.
+
+**One old inconsistency went with it:** `driveBot` called `flipWood(t)` with the
+default step and so turned three at a time straight through the host's
+single-flip rescue, while `syncStuck` was already judging the bot at one. A bot
+turning three while judged on one can sit out the whole rescue holding the card
+the rescue existed to reach. It uses `woodStep(room)` as its base now.
 
 ### The host can remove a player
 
@@ -1954,6 +2026,15 @@ so the next retune cannot put a level out of sequence by accident.
 A bot punches above its settings because it never makes an illegal move and never
 loses track of the board, so **the only honest handicaps are speed and
 attention** - which is why none of the knobs is "plays worse cards".
+
+That still holds for Easy, Medium and Hard. Genius stopped being handicapped at
+all on 2026-09-10 and started cheating instead - see "The bots aim low, and Genius
+cheats" above - but the thing this paragraph is protecting survived it: even the
+cheats do not touch `rankMove`.
+
+**The test count line and the header date.** The count above the first heading is
+the only place in the repo that quotes one, and it moves with any change that adds
+tests. This batch took it from 539 to 567.
 
 ### A wood turn deals three cards _(#45)_
 
@@ -3023,6 +3104,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `f59bb68` | The haloes arrive one at a time, the first one centred |
 | `55abb9b` | The flick cone down to 20 degrees, in the game and on the bench together |
 | `57d1c1e` | The near radius down to 25px, which moves the swept band with it |
+| _pending_ | Bots aim at the lowest open space; Genius cheats four ways |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.

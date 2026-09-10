@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { BOT_PROFILES, botDelay, botId, botMoves, chooseBotAction, isBotId, rankMove,
-  type BotLevel } from './bot';
+import { BOT_PROFILES, botDelay, botId, botMoves, botReachStep, botWoodStep, chooseBotAction,
+  dashPlanBonus, hasCenterPlay, isBotId, rankMove, rewindMoves, type BotLevel } from './bot';
 import type { Card, CenterSpace, Suit, Tableau } from './types';
 
 const c = (v: number, suit: Suit, owner = 'bot'): Card => ({ v, suit, owner });
@@ -45,8 +45,10 @@ describe('chooseBotAction', () => {
   const t = tab({ dash: [c(1, 'red')], post: [[c(1, 'blue')], [], []], wood: [c(1, 'green')], woodIndex: 1 });
 
   it('a hard bot takes the best move on the board', () => {
+    // space 1, not space 0: the move is chosen on its merits and then aimed at the
+    // lowest space that will take the card. See lowestSpaceFor.
     const a = chooseBotAction(t, spaces(2), 'hard', scripted(0.99));
-    expect(a).toEqual({ kind: 'center', source: { kind: 'dash' }, space: 0 });
+    expect(a).toEqual({ kind: 'center', source: { kind: 'dash' }, space: 1 });
   });
   it('a sloppy roll still only ever returns a legal move', () => {
     const legal = botMoves(t, spaces(2));
@@ -158,5 +160,137 @@ describe('botLevelOf', () => {
     expect(botLevelOf('impossible')).toBe('medium');
     expect(botLevelOf('hasOwnProperty')).toBe('medium');
     expect(botLevelOf(undefined)).toBe('medium');
+  });
+});
+
+describe('where on the board a bot puts its card', () => {
+  // Asked for on 2026-09-10: bots opening spaces along the top row put their cards
+  // as far from the eye as the board allows, which on a big screen is a long way
+  // from the hand the player is watching. Every level, because it is not a
+  // handicap in either direction - nothing about the play changes but where it
+  // lands.
+  it('takes the lowest space that would have the card, not the first', () => {
+    const t = tab({ dash: [c(1, 'red')] });
+    expect(chooseBotAction(t, spaces(4), 'hard', scripted(0.99)))
+      .toEqual({ kind: 'center', source: { kind: 'dash' }, space: 3 });
+  });
+
+  it('does it on a sloppy roll too, which is most rolls at the bottom of the ladder', () => {
+    // dither missed, sloppiness hit, no wood to be distracted by, first move drawn
+    const t = tab({ dash: [c(1, 'red')] });
+    expect(chooseBotAction(t, spaces(4), 'easy', scripted(0.99, 0, 0)))
+      .toEqual({ kind: 'center', source: { kind: 'dash' }, space: 3 });
+  });
+
+  it('only moves down to a space that would ACTUALLY take the card', () => {
+    // a red 2 has one home on this board however far down the empty ones go
+    const t = tab({ dash: [c(2, 'red')] });
+    expect(chooseBotAction(t, spaces(4, { 0: [c(1, 'red')] }), 'hard', scripted(0.99)))
+      .toEqual({ kind: 'center', source: { kind: 'dash' }, space: 0 });
+  });
+
+  it('picks the lower of two piles that would both continue the run', () => {
+    const t = tab({ dash: [c(2, 'red')] });
+    const board = spaces(4, { 0: [c(1, 'red')], 2: [c(1, 'red')] });
+    expect(chooseBotAction(t, board, 'hard', scripted(0.99)))
+      .toEqual({ kind: 'center', source: { kind: 'dash' }, space: 2 });
+  });
+});
+
+describe('the Genius cheats', () => {
+  /** Nothing playable, nothing buildable, and an Ace one turn back up the wood. */
+  const turnedPast = tab({
+    dash: [c(9, 'red')],
+    post: [[c(9, 'blue')], [c(9, 'green')], [c(9, 'yellow')]],
+    wood: [c(5, 'red'), c(6, 'red'), c(1, 'blue'), c(7, 'red'), c(8, 'red'), c(4, 'green')],
+    woodIndex: 6,
+  });
+
+  it('deals the wood one card at a time on every third lap, and only for Genius', () => {
+    expect([0, 1, 2, 3, 4, 5].map(l => botWoodStep('genius', l))).toEqual([3, 3, 1, 3, 3, 1]);
+    expect([0, 1, 2, 3].map(l => botWoodStep('hard', l))).toEqual([3, 3, 3, 3]);
+  });
+
+  it('never turns more of the pile than the table is turning', () => {
+    // the host's deadlock rescue is already a card at a time for everybody, and
+    // the cheat may only ever make a pile more reachable, never less
+    expect(botWoodStep('genius', 0, 1)).toBe(1);
+    expect(botWoodStep('genius', 2, 1)).toBe(1);
+  });
+
+  it('is judged on what a one-card lap reaches, because it gets one', () => {
+    expect(botReachStep('genius')).toBe(1);
+    expect(botReachStep('hard')).toBe(3);
+    expect(botReachStep('easy')).toBe(3);
+  });
+
+  it('steps back to a card it turned past; every other level turns three more', () => {
+    expect(chooseBotAction(turnedPast, spaces(2), 'genius', () => 0.99))
+      .toEqual({ kind: 'rewind', turns: 1 });
+    expect(chooseBotAction(turnedPast, spaces(2), 'hard', () => 0.99))
+      .toEqual({ kind: 'flip' });
+  });
+
+  it('offers a rewind only for a card it could put on the BOARD', () => {
+    // a full board with the blue Ace already down: nothing back up the pile is
+    // worth going back for any more
+    expect(rewindMoves(turnedPast, spaces(2), 3)).toEqual([{ kind: 'rewind', turns: 1 }]);
+    expect(rewindMoves(turnedPast, spaces(1, { 0: [c(1, 'blue')] }), 3)).toEqual([]);
+  });
+
+  it('never rewinds past a card it could play this instant', () => {
+    const holding = { ...turnedPast, dash: [c(1, 'red')] };
+    expect(chooseBotAction(holding, spaces(2), 'genius', () => 0.99))
+      .toEqual({ kind: 'center', source: { kind: 'dash' }, space: 1 });
+  });
+
+  it('rewinds rather than shuffle cards between posts, which wins nothing', () => {
+    const shuffling = { ...turnedPast, post: [[c(9, 'blue')], [c(8, 'green')], []] };
+    expect(chooseBotAction(shuffling, spaces(2), 'genius', () => 0.99))
+      .toEqual({ kind: 'rewind', turns: 1 });
+    // the same hand at Hard: the post build is the only move it can see
+    expect(chooseBotAction(shuffling, spaces(2), 'hard', () => 0.99))
+      .toEqual({ kind: 'post', source: { kind: 'post', index: 1 }, post: 0 });
+  });
+
+  it('plays off the whole Dash pile, not just the card on top of it', () => {
+    // Two Aces to choose from. Freeing a post outranks a wood play for anybody who
+    // can only see the top of their Dash pile - but the green Ace is what lets the
+    // buried green 2 out, and only Genius knows the green 2 is there.
+    const buried = tab({
+      dash: [c(2, 'green'), c(9, 'blue')],
+      post: [[c(1, 'red')], [c(9, 'yellow')], [c(8, 'blue')]],
+      wood: [c(1, 'green')], woodIndex: 1,
+    });
+    expect(chooseBotAction(buried, spaces(3), 'hard', () => 0.99))
+      .toEqual({ kind: 'center', source: { kind: 'post', index: 0 }, space: 2 });
+    expect(chooseBotAction(buried, spaces(3), 'genius', () => 0.99))
+      .toEqual({ kind: 'center', source: { kind: 'wood' }, space: 2 });
+  });
+
+  it('rates a buried card by how soon it comes up, and never above the Dash pile itself', () => {
+    const t = tab({ dash: [c(2, 'red'), c(9, 'blue')], wood: [c(1, 'red')], woodIndex: 1 });
+    const deep = tab({ dash: [c(2, 'red'), c(8, 'blue'), c(9, 'blue')], wood: [c(1, 'red')], woodIndex: 1 });
+    const play = { kind: 'center' as const, source: { kind: 'wood' as const }, space: 0 };
+    expect(dashPlanBonus(t, play)).toBeGreaterThan(dashPlanBonus(deep, play));
+    // a wood play plus the best plan there is still loses to playing off the Dash
+    const best = Math.max(...[t, deep].map(h => rankMove(h, play) + dashPlanBonus(h, play)));
+    expect(best).toBeLessThan(rankMove(t, { kind: 'center', source: { kind: 'dash' }, space: 0 }));
+  });
+
+  it('is worth nothing on a move that opens nothing, and nothing to a bot that cannot cheat', () => {
+    const t = tab({ dash: [c(2, 'red'), c(9, 'blue')], wood: [c(1, 'green')], woodIndex: 1 });
+    expect(dashPlanBonus(t, { kind: 'center', source: { kind: 'wood' }, space: 0 })).toBe(0);
+  });
+});
+
+describe('hasCenterPlay', () => {
+  // What the race edge is armed on: only the board is shared, so only a centre
+  // play is a thing two players can be racing for.
+  it('counts a card that could go on the board, and not a post build', () => {
+    const onBoard = tab({ dash: [c(1, 'red')] });
+    const postOnly = tab({ dash: [c(8, 'green')], post: [[c(9, 'blue')], [], []] });
+    expect(hasCenterPlay(onBoard, spaces(2))).toBe(true);
+    expect(hasCenterPlay(postOnly, spaces(2))).toBe(false);
   });
 });

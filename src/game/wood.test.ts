@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { flipWood, rotateWood, sinkWoodTop, woodCycleTops } from './wood';
+import { flipWood, rewindWood, rotateWood, sinkWoodTop, woodCycleTops } from './wood';
 import type { Card, Suit, Tableau } from './types';
 
 const c = (v: number, suit: Suit): Card => ({ v, suit, owner: 'me' });
@@ -135,5 +135,38 @@ describe('sinkWoodTop', () => {
   it('does nothing with nothing turned over, or a pile of one', () => {
     expect(sinkWoodTop(woodTab(cards(6), 0))).toEqual(woodTab(cards(6), 0));
     expect(sinkWoodTop(woodTab(cards(1), 1))).toEqual(woodTab(cards(1), 1));
+  });
+});
+
+describe('rewindWood', () => {
+  // The Genius bot's cheat, and nothing else calls it: see CHEATS in bot.ts.
+  const t = woodTab(cards(9), 6); // six face up, so the top is the 6
+
+  it('puts the last turn back face down, so the card before it is on top again', () => {
+    const back = rewindWood(t, 1);
+    expect(back.woodIndex).toBe(3);
+    expect(back.wood[back.woodIndex - 1].v).toBe(3);
+  });
+
+  it('leaves the pile itself alone, so the index alone describes the hand', () => {
+    const back = rewindWood(t, 1);
+    expect(back.wood).toBe(t.wood);
+    expect(back.wood.map(x => x.v)).toEqual(cards(9).map(x => x.v));
+  });
+
+  it('refuses to land on nothing face up, which exposes no card at all', () => {
+    expect(rewindWood(t, 2)).toBe(t);                    // 6 - 2 x 3 lands on zero
+    const shallow = woodTab(cards(9), 2);
+    expect(rewindWood(shallow, 1)).toBe(shallow);        // and 2 - 3 is past the end
+  });
+
+  it('refuses a turn count of zero or less', () => {
+    expect(rewindWood(t, 0)).toBe(t);
+    expect(rewindWood(t, -1)).toBe(t);
+  });
+
+  it('steps back a card at a time on a lap that was dealt a card at a time', () => {
+    expect(rewindWood(t, 1, 1).woodIndex).toBe(5);
+    expect(rewindWood(t, 2, 1).woodIndex).toBe(4);
   });
 });

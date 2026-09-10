@@ -213,17 +213,38 @@ below.)
 
 ## AI players
 
-The host can add AI players in the lobby at Easy, Medium or Hard. Difficulty is
-mostly hands, not brains: every level only ever makes legal moves, and the levels
-differ in how fast they act (`BOT_PROFILES` in `src/game/bot.ts`), how often they
-take a worse legal move than the best one available, how often they fumble a turn
-entirely, and how often they turn wood over instead of noticing the play in front
-of them. Effective rate works out at roughly one action every 4.9s / 2.3s / 1.1s.
-All three were tuned down after the first game against them - a bot punches above
-its settings because it never plays illegally and never loses track of the board,
-so speed and attention are the only honest handicaps. Move quality is ranked
-the way the game actually rewards - anything that takes a card off the Dash pile,
-or empties a post so the Dash pile refills it, beats an equivalent wood play.
+The host can add AI players in the lobby at Easy, Medium, Hard or Genius. For the
+first three, difficulty is mostly hands, not brains: every level only ever makes
+legal moves, and the levels differ in how fast they act (`BOT_PROFILES` in
+`src/game/bot.ts`), how often they take a worse legal move than the best one
+available, how often they fumble a turn entirely, and how often they turn wood
+over instead of noticing the play in front of them. Effective rate works out at
+roughly one action every 9.2s / 4.9s / 2.3s. They were tuned down twice after real
+games against them - a bot punches above its settings because it never plays
+illegally and never loses track of the board, so speed and attention are the only
+honest handicaps. Move quality is ranked the way the game actually rewards -
+anything that takes a card off the Dash pile, or empties a post so the Dash pile
+refills it, beats an equivalent wood play.
+
+**Genius cheats**, and is the only level that does. It acts about twice a second,
+and on top of that it:
+
+- deals its wood **one card at a time on every third lap**, which reaches the
+  cards a three-at-a-time cycle never shows;
+- can **put the last turn or two back face-down** to pick up a card it went past,
+  once the board has made that card playable;
+- **answers a card landing on the board within a tenth of a second**, so it wins
+  essentially every race it goes for;
+- and **plays off its whole Dash pile rather than the card on top of it**, which
+  is the one thing a human player cannot see.
+
+None of that makes it a better judge of a legal move - it uses the same ranking
+every other level does. It knows more, reaches further and answers faster.
+
+**Where a bot puts its card:** in the lowest open space that will take it. For any
+one card the legal spaces are interchangeable, so the choice is free, and a card
+that lands at the bottom of the board is nearer the hand you are already looking
+at than one that lands in the top-left corner.
 
 Bots have no client and no auth identity of their own: **the host plays their
 hands**, and if the host changes mid-game the new host picks them up. They are

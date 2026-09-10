@@ -104,3 +104,23 @@ export function woodCycleTops(t: Tableau, step: number = WOOD_STEP): Card[] {
   }
   return out;
 }
+
+/**
+ * Put the last few turns back face-down, so the card that was on top before them
+ * is on top again.
+ *
+ * Nobody may do this with real cards, and that is the point: it is one of the
+ * Genius bot's cheats (see CHEATS in bot.ts) and nothing else calls it. A player
+ * who turns three cards past the one they needed has to go the long way round the
+ * pile to see it again; Genius simply steps back to it.
+ *
+ * Only the INDEX moves, so the pile still describes the same cards in the same
+ * order and `persistWoodIndex` is enough to store it. Refuses to land on zero:
+ * an index of zero is a pile with nothing face up, which exposes no card at all
+ * and so is never what a rewind was for.
+ */
+export function rewindWood(t: Tableau, turns: number, step: number = WOOD_STEP): Tableau {
+  const at = t.woodIndex - turns * step;
+  if (turns < 1 || at < 1) return t;
+  return { ...t, woodIndex: at };
+}

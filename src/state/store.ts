@@ -3,10 +3,11 @@ import { useStore } from 'zustand';
 import type { BadgeId } from '../game/badges';
 import { cardId, type Card, type CenterSpace, type PlayerInfo, type PlaySource, type Room, type Tableau } from '../game/types';
 import { canBuildOnPost, canPlayToSpace, isStuck, placeOnPost, sourceTop, takeCard, putBack } from '../game/rules';
-import { flipWood, rotateWood, sinkWoodTop, WOOD_STEP } from '../game/wood';
+import { flipWood, rewindWood, rotateWood, sinkWoodTop, WOOD_STEP } from '../game/wood';
 import { reconcileTableau } from '../game/center';
 import { buildDeck, deal, shuffle } from '../game/deck';
-import { botDelay, botLevelOf, chooseBotAction, type BotLevel } from '../game/bot';
+import { botCheats, botDelay, botLevelOf, botReachStep, botWoodStep, chooseBotAction,
+  GENIUS_RACE_EDGE_MS, hasCenterPlay, type BotLevel } from '../game/bot';
 import * as netRooms from '../net/rooms';
 import * as netPlays from '../net/plays';
 import type { PlayResult } from '../net/plays';
@@ -228,6 +229,11 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
   // tell "no move right now" (flip and try again) from "been through the whole
   // pile and there is nothing" - see isStuck in rules.ts.
   const flips = new Map<string, number>();
+  // How many times each BOT has turned its wood pile right over this round. Only
+  // Genius reads it, and only to know which lap it is on: every third one it deals
+  // the pile a card at a time (botWoodStep). Bots only, because it is the host
+  // that counts and the host only drives bots; cleared with `flips`.
+  const woodLaps = new Map<string, number>();
   // `<code>/<roundNumber>` of a score commit that was REJECTED, so it is attempted
   // once per round and not once per snapshot. A rejected write is rolled back out
   // of the local cache, which raises a fresh snapshot, which used to re-enter the
@@ -296,7 +302,12 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
       if (code && room?.meta.singleFlip) void deps.setSingleFlip(code, false);
     }
 
-    function syncStuck(id: string, t: Tableau | null | undefined) {
+    /**
+     * `reachStep` is the turn size this hand is judged to REACH with, which is the
+     * table's own step for everybody except the Genius bot - see botReachStep and
+     * the comment on isStuck.
+     */
+    function syncStuck(id: string, t: Tableau | null | undefined, reachStep?: number) {
       const { room, code, online } = get();
       if (!room || !code || !t || !online) return;
       if (room.meta.phase !== 'playing' || !room.round) return;
@@ -305,7 +316,8 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
       // A player sitting out still HAS a hand (it is what they rejoin with), so
       // without this they would be declared stuck for a round they are not in.
       if (p.sittingOut) return;
-      const stuck = isStuck(t, room.round.spaces, flips.get(id) ?? 0, woodStep(room));
+      const step = woodStep(room);
+      const stuck = isStuck(t, room.round.spaces, flips.get(id) ?? 0, step, reachStep ?? step);
       if (stuck && p.stuckAt == null) void deps.declareStuck(code, id);
       else if (!stuck && p.stuckAt != null) void deps.clearStuck(code, id);
     }
@@ -317,7 +329,8 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
       syncStuck(s.uid, s.tableau);
       if (!isHost(s) || !s.room) return;
       for (const [id, p] of Object.entries(s.room.players)) {
-        if (p.isBot) syncStuck(id, s.botTableaus[id]);
+        if (!p.isBot) continue;
+        syncStuck(id, s.botTableaus[id], botReachStep(botLevelOf(p.botLevel), woodStep(s.room)));
       }
     }
 
@@ -467,6 +480,14 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
       const p = room.players[id];
       if (!p?.isBot) return;
       const level: BotLevel = botLevelOf(p.botLevel);
+      // What a turn of THIS bot's pile brings over, and what its hand is judged to
+      // reach. The same as everybody else's unless it is allowed to cheat: see
+      // botWoodStep and botReachStep. The base is the table's own step, so the
+      // host's deadlock rescue reaches the bots too - which it did not before, and
+      // a bot turning three while being judged on one could sit out a rescue
+      // holding a card the rescue existed to reach.
+      const step = botWoodStep(level, woodLaps.get(id) ?? 0, woodStep(room));
+      const reachStep = botReachStep(level, woodStep(room));
 
       let t = get().botTableaus[id];
       if (!t) {
@@ -476,8 +497,8 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         setBotTableau(id, t);
       }
 
-      const action = chooseBotAction(t, room.round.spaces, level);
-      if (!action) { syncStuck(id, t); return; } // nothing to do, and maybe nothing possible
+      const action = chooseBotAction(t, room.round.spaces, level, undefined, step);
+      if (!action) { syncStuck(id, t, reachStep); return; } // nothing to do, and maybe nothing possible
 
       const commit = (next: Tableau) => {
         setBotTableau(id, next);
@@ -494,14 +515,33 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         // as the table stayed stalled. The next board change runs syncAllStuck and
         // withdraws the claim, and the bot picks up from there.
         if (p.stuckAt != null) return;
-        const next = flipWood(t);
+        const next = flipWood(t, step);
         setBotTableau(id, next);
         // Same reason as the player's `flip`: a turn that takes the pile over
-        // reorders it, so the index alone would not describe the same cards.
-        if (next.wood !== t.wood) void deps.persistTableau(code, id, next);
-        else void deps.persistWoodIndex(code, id, next.woodIndex);
+        // reorders it, so the index alone would not describe the same cards. It is
+        // also the one event that means a lap has finished, which is what Genius
+        // counts its single-card lap off.
+        if (next.wood !== t.wood) {
+          woodLaps.set(id, (woodLaps.get(id) ?? 0) + 1);
+          void deps.persistTableau(code, id, next);
+        } else void deps.persistWoodIndex(code, id, next.woodIndex);
         flips.set(id, (flips.get(id) ?? 0) + 1);
-        syncStuck(id, next);
+        syncStuck(id, next, reachStep);
+        return;
+      }
+      if (action.kind === 'rewind') {
+        // A cheat, and only Genius is offered it (see CHEATS in bot.ts). The pile
+        // itself does not move, only how much of it is face up, so the index alone
+        // describes it and the cheap write is the correct one.
+        const next = rewindWood(t, action.turns, step);
+        if (next === t) return;
+        setBotTableau(id, next);
+        void deps.persistWoodIndex(code, id, next.woodIndex);
+        // Counted as a turn like any other. It is not progress, and a bot that
+        // walked its pile backwards for ever without one would never admit to
+        // being stuck.
+        flips.set(id, (flips.get(id) ?? 0) + 1);
+        syncStuck(id, next, reachStep);
         return;
       }
       if (action.kind === 'post') {
@@ -523,7 +563,8 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
       else void deps.reportRace(code, action.space, id, res.winner).catch(() => {});
     }
 
-    function scheduleBot(id: string, level: BotLevel) {
+    /** `delayMs` overrides the level's own band. Only the race edge passes one. */
+    function scheduleBot(id: string, level: BotLevel, delayMs?: number) {
       if (botTimers.has(id) || botBusy.has(id)) return;
       const fire = () => {
         botTimers.delete(id);
@@ -537,7 +578,44 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
           }
         });
       };
-      botTimers.set(id, setTimeout(fire, botDelay(level)));
+      botTimers.set(id, setTimeout(fire, delayMs ?? botDelay(level)));
+    }
+
+    /**
+     * Genius answers a board that has just moved in a tenth of a second.
+     *
+     * The cheat is a REACTION and not a second clock: it fires only on a snapshot
+     * where a PERSON put a card on the board, and only for a bot that has a card
+     * it could put there in reply. Between those Genius runs at its own delay like
+     * every other level, so this does not quietly turn a 320-700ms bot into a
+     * 100ms one - it wins the moments that are races and nothing else. See
+     * GENIUS_RACE_EDGE_MS.
+     *
+     * **A bot's own play must never arm this**, which is what the caller's
+     * `humanMoved` is for. Every play raises a snapshot, so arming off any change
+     * at all would have a Genius bot re-arming itself the instant it played: a
+     * hundred milliseconds later, for ever, and two of them at one table would
+     * hold each other there. A race is against a person; the rate is then bounded
+     * by how fast people actually play.
+     *
+     * Bots that are mid-turn are left alone: `driveBot` reschedules them on the
+     * way out, and cutting in front of that would run two loops for one bot.
+     */
+    function armRaceEdge(room: Room) {
+      const s = get();
+      if (!room.round || room.meta.phase !== 'playing' || !s.online) return;
+      if (!isHost({ uid: s.uid, room })) return;
+      for (const [id, p] of Object.entries(room.players)) {
+        if (!p.isBot || p.sittingOut || p.stuckAt != null) continue;
+        const level = botLevelOf(p.botLevel);
+        if (!botCheats(level) || botBusy.has(id)) continue;
+        const t = s.botTableaus[id];
+        if (!t || !hasCenterPlay(t, room.round.spaces)) continue;
+        const pending = botTimers.get(id);
+        if (pending) clearTimeout(pending);
+        botTimers.delete(id);
+        scheduleBot(id, level, GENIUS_RACE_EDGE_MS);
+      }
     }
 
     /** Start or stop the bot loops to match the room we are looking at. */
@@ -565,6 +643,11 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
       // every space whose top card has changed, and who put it there. Runs on
       // re-entrant snapshots too - this is a record of what the board did, not a
       // side effect, and missing one would lose a race.
+      // Did a PERSON move the board in this snapshot, as opposed to a hand, a
+      // presence flag, or one of this client's own bots? That is the only thing
+      // the Genius race edge answers - see armRaceEdge below for why it must not
+      // answer a bot.
+      let humanMoved = false;
       if (room?.round && s.room?.round) {
         const was = s.room.round.spaces, now = room.round.spaces;
         for (let i = 0; i < now.length; i++) {
@@ -572,6 +655,9 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
           const after = now[i]?.stack?.[now[i].stack.length - 1];
           if (!after || (before && cardId(before) === cardId(after))) continue;
           spaceTouched.set(i, { at: Date.now(), by: after.owner, reported: false });
+          // A card whose owner has since left the room reads as a person, which is
+          // the safe way round: the edge is a reaction, not a permission.
+          if (!room.players[after.owner]?.isBot) humanMoved = true;
         }
       }
       // KICKED: I was in this room's player list a snapshot ago and I am not in
@@ -619,8 +705,13 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         }
         if (phase !== 'playing' && get().tableau) set({ tableau: null, selection: null });
         // (2) AI players. Bot hands belong to a single round, exactly like ours.
-        if (phase !== 'playing') { if (Object.keys(get().botTableaus).length) set({ botTableaus: {} }); flips.clear(); }
+        if (phase !== 'playing') {
+          if (Object.keys(get().botTableaus).length) set({ botTableaus: {} });
+          flips.clear();
+          woodLaps.clear();
+        }
         syncBots(room);
+        if (humanMoved) armRaceEdge(room); // Genius gets to answer it first
         syncCountdown(room); // somebody readied, un-readied, joined or wandered off
         syncAllStuck(); // the centre moved: someone may have just been freed, or trapped
         if (phase === 'playing') armAway(); else disarmAway();
@@ -807,6 +898,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         stopBots();
         stopCountdown();
         flips.clear();
+        woodLaps.clear();
         spaceTouched.clear();
         forcedCountdown = false;
         commitFailedFor = null;

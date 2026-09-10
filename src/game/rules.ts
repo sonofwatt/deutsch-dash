@@ -188,11 +188,20 @@ export function placeOnPost(t: Tableau, source: PlaySource, postIndex: number): 
  */
 export function isStuck(
   t: Tableau, spaces: CenterSpace[], flipsSinceProgress: number, step: number = WOOD_STEP,
+  reachStep: number = step,
 ): boolean {
   // Reachable, not merely playable. A card three turns down the wood is a move
   // this player has, and telling them they have none while they can still turn
   // the pile over to it is simply wrong - which is what the table reported.
-  if (hasReachableMove(t, spaces, step)) return false;
+  //
+  // `reachStep` is that question's OWN step, and defaults to the pace one because
+  // for a person they are the same number. They come apart for exactly one player:
+  // the Genius bot turns its pile one card at a time every third lap, so it
+  // reaches every card in it (reachStep 1) while still turning the pile at the
+  // table's pace (step 3), and the bar below has to stay on the pace or a
+  // deadlocked table would wait three times as long for it to admit it. See
+  // botReachStep.
+  if (hasReachableMove(t, spaces, reachStep)) return false;
   if (t.wood.length === 0) return true;
   return flipsSinceProgress >= Math.ceil(t.wood.length / step);
 }

@@ -420,3 +420,37 @@ describe('putBack', () => {
     expect(bare.post[1]).toEqual([c(8, 'green')]);
   });
 });
+
+describe('isStuck judged on a different turn size than it is paced by', () => {
+  // The Genius bot turns its pile one card at a time on every third lap, so it
+  // reaches cards a three-at-a-time cycle never shows. `reachStep` is that
+  // question's own step; the BAR below it stays on the table's pace. See
+  // botReachStep in game/bot.ts.
+  const board = [space()];
+  // A pile of three at index 0: a turn of three only ever brings the LAST card up,
+  // and the Ace that would open the board is the middle one.
+  const hidden = tab({
+    dash: [c(9, 'yellow')],
+    post: [[c(9, 'blue')], [c(8, 'red')], [c(3, 'green')]],
+    wood: [c(5, 'blue'), c(1, 'red'), c(9, 'green')],
+  });
+
+  it('is stuck at three and not at one, because one reaches the Ace', () => {
+    expect(hasReachableMove(hidden, board, 3)).toBe(false);
+    expect(hasReachableMove(hidden, board, 1)).toBe(true);
+    expect(isStuck(hidden, board, 99, 3)).toBe(true);
+    expect(isStuck(hidden, board, 99, 3, 1)).toBe(false);
+  });
+
+  it('still counts fruitless turns at the table pace, so a dead hand admits it as fast as any other', () => {
+    const dead = { ...hidden, wood: [c(5, 'blue'), c(6, 'blue'), c(9, 'green')] };
+    expect(hasReachableMove(dead, board, 1)).toBe(false);
+    // ceil(3 / 3) is one turn. Counting the bar on the reach step would have made
+    // it three, and a deadlocked table would wait three times as long to rotate.
+    expect(isStuck(dead, board, 1, 3, 1)).toBe(true);
+  });
+
+  it('is the same number twice for everybody else', () => {
+    expect(isStuck(hidden, board, 99, 3)).toBe(isStuck(hidden, board, 99, 3, 3));
+  });
+});

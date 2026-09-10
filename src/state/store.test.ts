@@ -1075,6 +1075,142 @@ describe('AI players', () => {
   });
 });
 
+describe('the Genius cheats', () => {
+  /** One empty space, one human, and one bot at the level under test. */
+  function room(level: 'hard' | 'genius', t: Tableau, spaces: CenterSpace[]): Room {
+    return {
+      meta: { createdAt: 1, hostId: 'me', creatorId: 'me', targetScore: 75, phase: 'playing', roundNumber: 1 },
+      players: {
+        me: { name: 'D', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, awayAt: null, score: 0 },
+        bot_star: { name: 'Ada', badgeId: 'star', joinedAt: 2, connected: true, stuckAt: null, awayAt: null,
+                    score: 0, isBot: true, botLevel: level },
+      },
+      round: {
+        spaces, tableaus: { me: deal(buildDeck('me'), 3), bot_star: t },
+        dashedBy: null, scores: null, races: null, duels: null, endedAt: null, stuckRounds: 0, startedAt: 1,
+      },
+    };
+  }
+
+  async function table() {
+    let cb!: (r: Room | null) => void;
+    const deps = fakeDeps({
+      watchRoom: vi.fn((_code: string, f: (room: Room | null) => void) => { cb = f; return () => {}; }),
+    });
+    const store = createGameStore(deps);
+    await store.getState().enterRoom('ABCDEF', 'D', 'tulip');
+    return { deps, store, snapshot: (r: Room) => cb(r) };
+  }
+
+  const dead = (over: Partial<Tableau> = {}): Tableau => ({
+    dash: [c(9, 'blue', 'bot_star')], post: [[], [], []], wood: [], woodIndex: 0, ...over,
+  });
+
+  /**
+   * Math.random pinned to the top of every band: the longest delay the level has,
+   * and never a dithered or sloppy roll.
+   *
+   * These tests measure WHEN a bot acted, and without this a bot's ordinary timer
+   * can land inside the window - so "it did not react to the board" becomes "it
+   * happened not to have acted yet", which was one run in four. Pinned, every
+   * bot's next turn is a known number of milliseconds away and the 100ms edge is
+   * the only thing that can beat it there.
+   */
+  const pinRandom = () => vi.spyOn(Math, 'random').mockReturnValue(1);
+
+  it('answers a board that just moved inside a tenth of a second', async () => {
+    // The race edge. A person has to see the card land, work out what it opened
+    // and get a card of their own onto it; Genius has it done in 100ms, which is
+    // well inside its own 320-700ms band and is why it is a cheat and not a tuning.
+    const { deps, store, snapshot } = await table();
+    const rand = pinRandom();
+    vi.useFakeTimers();
+    // Nothing playable: a red 2 with no red Ace anywhere on the board.
+    snapshot(room('genius', dead({ dash: [c(2, 'red', 'bot_star')] }), [{ stack: [], history: [] }]));
+    await vi.advanceTimersByTimeAsync(800); // its 700ms turn, which adopts the hand
+    expect(deps.playToCenter).not.toHaveBeenCalled();
+    // Somebody plays the red Ace. Now the bot's red 2 has somewhere to go, and its
+    // own next turn is not due for another 600ms.
+    snapshot(room('genius', dead({ dash: [c(2, 'red', 'bot_star')] }), [{ stack: [c(1, 'red')], history: [] }]));
+    await vi.advanceTimersByTimeAsync(150);
+    store.getState().leave();
+    vi.useRealTimers();
+    rand.mockRestore();
+    expect(deps.playToCenter).toHaveBeenCalledWith(
+      'ABCDEF', 0, { v: 2, suit: 'red', owner: 'bot_star' });
+  });
+
+  it('but never off another bot\'s play, which is what would run away', async () => {
+    // Every play raises a snapshot, so arming off any board change at all would
+    // have a Genius bot re-arm itself the moment it played - 100ms later, for
+    // ever - and two at one table would hold each other there. A race is against
+    // a person.
+    const { deps, store, snapshot } = await table();
+    const rand = pinRandom();
+    vi.useFakeTimers();
+    snapshot(room('genius', dead({ dash: [c(2, 'red', 'bot_star')] }), [{ stack: [], history: [] }]));
+    await vi.advanceTimersByTimeAsync(800);
+    // The red Ace this time belongs to a bot at the table, not to a player.
+    const board = [{ stack: [c(1, 'red', 'bot_star')], history: [] }];
+    snapshot(room('genius', dead({ dash: [c(2, 'red', 'bot_star')] }), board));
+    await vi.advanceTimersByTimeAsync(150);
+    store.getState().leave();
+    vi.useRealTimers();
+    rand.mockRestore();
+    expect(deps.playToCenter).not.toHaveBeenCalled();
+  });
+
+  it('and nobody else does: Hard is still waiting out its own delay', async () => {
+    const { deps, store, snapshot } = await table();
+    const rand = pinRandom();
+    vi.useFakeTimers();
+    snapshot(room('hard', dead({ dash: [c(2, 'red', 'bot_star')] }), [{ stack: [], history: [] }]));
+    await vi.advanceTimersByTimeAsync(800);
+    snapshot(room('hard', dead({ dash: [c(2, 'red', 'bot_star')] }), [{ stack: [c(1, 'red')], history: [] }]));
+    await vi.advanceTimersByTimeAsync(150);
+    store.getState().leave();
+    vi.useRealTimers();
+    rand.mockRestore();
+    expect(deps.playToCenter).not.toHaveBeenCalled();
+  });
+
+  // Nine cards, six of them face up. The card on top is dead and so is the one a
+  // turn forward; the red Ace is one turn BACK, which nobody but Genius may reach.
+  const turnedPast = (): Tableau => dead({
+    wood: ([[5, 'blue'], [6, 'blue'], [1, 'red'], [7, 'blue'], [8, 'blue'], [9, 'green'],
+            [5, 'green'], [6, 'green'], [7, 'green']] as [number, Suit][])
+      .map(([v, suit]) => c(v, suit, 'bot_star')),
+    woodIndex: 6,
+  });
+
+  it('puts a turn of the wood back to reach a card it went past', async () => {
+    const { deps, store, snapshot } = await table();
+    const rand = pinRandom();
+    vi.useFakeTimers();
+    snapshot(room('genius', turnedPast(), [{ stack: [], history: [] }]));
+    await vi.advanceTimersByTimeAsync(800);
+    store.getState().leave();
+    vi.useRealTimers();
+    rand.mockRestore();
+    const first = vi.mocked(deps.persistWoodIndex).mock.calls.find(call => call[1] === 'bot_star');
+    expect(first?.[2]).toBe(3); // backwards, from 6. The pile itself never moved.
+  });
+
+  it('where every other level can only turn three more over', async () => {
+    const { deps, store, snapshot } = await table();
+    const rand = pinRandom();
+    vi.useFakeTimers();
+    snapshot(room('hard', turnedPast(), [{ stack: [], history: [] }]));
+    await vi.advanceTimersByTimeAsync(2700); // its 2600ms turn, and no dither
+    store.getState().leave();
+    vi.useRealTimers();
+    rand.mockRestore();
+    const mine = vi.mocked(deps.persistWoodIndex).mock.calls.filter(call => call[1] === 'bot_star');
+    expect(mine.length).toBeGreaterThan(0);
+    expect(mine[0][2]).toBe(9); // forwards, from 6, and past the card it wanted
+  });
+});
+
 describe('automatic stuck detection', () => {
   // Only a red 6 could land here, so a blue 9 on top of the Dash pile is dead
   const blocked = (): CenterSpace[] => [{ stack: [c(5, 'red')], history: [] }];
