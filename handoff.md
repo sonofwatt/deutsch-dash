@@ -10,7 +10,14 @@ suite. A commit sitting unpushed has already invalidated one playtest - what
 people are playing is whatever last reached Pages - so check `git status -sb`
 before trusting what a table reports._
 
-_**What is live on Pages is `e23448f`, v1.4.61**, deployed 2026-09-06, and the
+_**`a2b4df5` (v1.5.28) was pushed to `main` on 2026-09-10 and its Pages deploy has
+NOT been checked from here** - there was no `gh` on the machine that pushed it, so
+nothing above a green tick was available and a green tick is not what this file
+counts. Verify it the way the paragraph below verifies its own claim before
+telling a table what they are playing. The last deploy anybody actually confirmed
+is the one that paragraph describes._
+
+_**What was live on Pages before that push is `e23448f`, v1.4.61**, deployed 2026-09-06, and the
 icon work is all of it: the new icon full bleed, the 16px cut of it in the tab,
 and the full drawing 44px on the home screen beside the title. Checked rather
 than read off a green tick - every icon file on Pages hashes the same as its copy
