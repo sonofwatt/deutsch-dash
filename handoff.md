@@ -2928,7 +2928,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `bdfabce` | Roman candles up the edges of the win, a different instrument from the shells |
 | `facfaf8` | The host can remove a player, in the lobby or mid-game, and the removed client leaves cleanly |
 | `6d89e1b` | Options below the ready button, a rematch that waits, a ready pill that says away, score history behind a total, and fireworks for the winner alone |
-| `PENDING` | A player who is still stuck after sinking a card stays stuck, and can send the next one down at once |
+| `00b145d` | A player who is still stuck after sinking a card stays stuck, and can send the next one down at once |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
