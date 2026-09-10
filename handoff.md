@@ -50,7 +50,7 @@ instead, check both directions before releasing: the new client against the rule
 still live, and the PREVIOUS client against the new rules, which is the half this
 file's own warning cannot cover._
 
-_**581 tests** (502 unit and 32 in a real browser; 47 against the emulator, all
+_**PENDING tests** (PENDING unit and PENDING in a real browser; PENDING against the emulator, all
 green). This is the only place in the repo that quotes a count -
 it drifted three separate ways when it lived in four places, so keep it here and
 nowhere else. Both sides of the 2026-09-04 merge rewrote this line, which is the
@@ -183,6 +183,11 @@ Three changes make it survivable now, all worth keeping:
 
 The `races` (`7803a44`) and `duels` (`05516a8`) grants have the same exposure: a
 skipped deploy makes race flashes and rivalry commentary silently vanish.
+
+**`says` is the newest one, and it fails in the nastiest way of the three.** A
+soundbite plays on the presser's own phone before the write goes out, so against
+undeployed rules the presser hears it, nobody else does, and nothing on screen
+says why. Whoever pressed it will report that soundbites work.
 
 ### Firebase and the emulator
 
@@ -843,6 +848,257 @@ why each thing is shaped the way it is, not to track work. The playtest requests
 were numbered #1-#23 as they were asked for; all are built except **#1 (retired)**
 and **#4 (deferred, below)**. The numbers are kept in the headings so older notes
 and commit messages still resolve.
+
+### The table can make a noise _(2026-09-10)_
+
+Eight canned soundbites a player can throw at the table: Cheer, Groan, Hurry up,
+Oops, Laugh, Wow, Boo and Ta-da. This is the **cheaper alternative** out of
+`docs/audio-2026-09-09.md`, built first on that document's own argument. No
+microphone, no permission prompt, no upload, no moderation problem and no
+normalisation problem. It is also not throwaway work: the playback path, the
+one-at-a-time queue and the per-device switch are the same pieces real voice
+clips would need.
+
+#### Two switches, and which way each one defaults
+
+This is the part to read before changing anything here, because the two defaults
+are a matched pair and either one on its own is wrong.
+
+- **`meta.soundsOn` is the HOST's, and it defaults OFF.** It is the master switch
+  for the BOARD: off, and the game screen has no note in the head island, no
+  button over the Dash pile and no menu - **gone, not disabled**. This is where
+  the "four phones at one table playing the same noise a beat apart" problem is
+  handled. One person decides the table wants this.
+- **`bz.soundOn` is the PLAYER's, and it defaults ON.** Once the host has said
+  yes, nobody has to go hunting for a control. It is stored as "is it off", so
+  absent reads as on - which covers every phone that has never been asked, every
+  private window, and every browser with storage blocked. A player who switches
+  it off stays off in every future game until they switch it back.
+
+The engine runs on the AND of the two, and `useSoundOn(allowed)` is the only
+place that combines them: the lobby passes `true` unconditionally, the board
+passes `meta.soundsOn`. **Keeping them separate is what stops the host's switch
+quietly rewriting eight phones' settings** - flip the room option off and back on
+and every player's own preference is still whatever it was.
+
+**The host's switch deliberately does not reach the lobby.** Soundbites in the
+lobby are how a table finds out these exist and what they sound like, and a room
+that has not switched them on for play is exactly the room that needs to hear
+them first. So the lobby tray is gated on the player's switch alone.
+
+**In the lobby, the switch shows and hides the grid itself.** Turning it off is a
+player saying they do not want any of this, so leaving eight buttons behind would
+be leaving the feature on screen for somebody who has just switched it off. It
+also keeps the switch honest: what it shows is exactly what it does. The switch
+itself always survives, or there would be no way back on.
+
+#### On the board
+
+**The note in the head island is a SHOW/HIDE for the launcher, not a sound
+toggle.** The sound switches live in the lobby; mid-round the only question is
+how much board you want. The note itself is absent entirely unless the host has
+sound on AND this player does - a control that cannot do anything is worse than
+no control.
+
+**The launcher sits in the band above the DASH column**, the strip the wood
+column's two-card height leaves empty, sized off the card like everything else in
+that row. `.wood-note` spans the same strip, so `.has-sound` shortens it by a
+card; without that they sit on each other and the note is the wider of the two.
+Wood and Dash are always at opposite ends, so the launcher and the note inset
+from opposite sides.
+
+Two gestures on one button, and telling them apart is a clock and a distance
+rather than a mode:
+
+- **Tap** and the menu opens and STAYS open, so a table can fire off three in a
+  row. It closes when you press anywhere outside its borders.
+- **Press and hold**, slide onto a soundbite, and lift: that one plays once and
+  the menu closes with it. One gesture, no second tap, which is what you want
+  mid-round with a hand of cards to get back to.
+
+A pointer that goes up inside `TAP_MS` **and** never moved past `SLOP_PX` was a
+tap. Anything else was a hold, and a hold that ended over nothing simply closes.
+Both thresholds are generous, because the cost of guessing wrong is one extra tap
+and never a lost card.
+
+**The hit test is rects, not `elementFromPoint`**, and both reasons bite: the
+menu sits under a full-screen dismiss backdrop, so a hit test would find the
+backdrop; and the gesture holds a pointer CAPTURE on the launch button, so the
+grid's own buttons never see the events. `hitSoundbite` is pure and tested,
+including that the gaps between buttons return null - lifting a thumb between two
+buttons must play NOTHING, because snapping to the nearest would fire a soundbite
+the player had deliberately slid off.
+
+Two things that are easy to lose and both cost a card:
+
+- **`touch-action: none` on the launcher.** Without it the browser takes the
+  vertical drag as a scroll and the slide never reaches `onPointerMove`. Same
+  trap the card drag hits.
+- **The backdrop takes the dismissing press.** Pressing outside closes the menu
+  and must not ALSO land a card in the middle, and `onPointerDown` rather than
+  `onClick` because the board is played with pointer events.
+
+#### The emoji rain
+
+Every soundbite that reaches a device also draws itself: seven copies of its
+glyph falling from the top of the screen, stopping about a third of the way down.
+
+A soundbite you can only hear misses anybody whose phone is face down, silenced
+by the OS, or simply not being looked at. Which is also why `playSoundbite`
+returns **"reached this device"** rather than "made a noise": a context that has
+not been unlocked yet gets the emoji and misses the sound, and the glyph is the
+half that still works when the audio does not. A clip dropped for backing the
+queue up gets neither, so a player leaning on the buttons cannot bury the screen
+in emoji either.
+
+**A third of the way down, not the whole screen.** The dash splash falls the full
+height because it IS the moment and owns the screen for 3.6 seconds; this arrives
+mid-round over a board somebody is playing. The top third is the head row and the
+opponent strip, which is the part of the screen with nothing in it a thumb wants.
+
+**It cannot be touched, and that is the hard requirement.** `pointer-events:
+none` on a `position: fixed` layer rendered outside every drop target, beside the
+drag ghost. Measured rather than assumed: with the rain on screen,
+`elementFromPoint` over a Dash card returns the card. A decoration that could eat
+a play would be worse than no decoration.
+
+**Linear, from just above the top edge.** It was an ease-in from `-14vh` first,
+which spent its first 700ms out of sight and read as the emoji lagging the sound
+by most of a second. It clears the edge inside ~150ms now.
+
+The nonce it is keyed on is a **counter, not a clock**. `Date.now()` repeats
+inside a millisecond, and two soundbites landing in one snapshot would then share
+a value and the second would not redraw.
+
+#### The lobby's option list
+
+Five host options is too many to sit loose above the ready button, so they are
+behind one tap with a chevron that turns. **The host gets them open and everybody
+else gets them shut**: the host is the only person who can change any of them,
+and for everyone else they describe a match they are about to play anyway. The
+choice is remembered per device once made either way, and the stored value wins
+over the host default, so a host who prefers the list shut keeps it shut. The
+list is the same list for everybody - a player still needs to be able to see what
+they are playing.
+
+#### The wire
+
+**`rooms/$code/says/$uid = { id, at }`, and every word of that path is load
+bearing.**
+
+- **Keyed by uid and OVERWRITTEN, never pushed.** That is what bounds the node to
+  the eight seats however long the game runs, and it is why there is no sweep to
+  write - the voice-clip design in the research note has to carry one. Deleting
+  the room takes them with it.
+- **On the ROOM and not on the round**, because the lobby is where a table waits
+  for people and is exactly where they want to make a noise at each other.
+- **`at` is a NONCE, exactly like `RaceRecord.at`.** Two phones do not agree on
+  the time, so nothing compares it against a local clock. Every client remembers
+  the value it last saw per player and plays when it CHANGES. It is
+  `serverTimestamp()` so that every client reads the same value.
+- **The first value seen for a uid is adopted SILENTLY.** The node is never
+  swept, so the last press of a game sits there until the room is deleted, and
+  without this, walking into a room would replay it. The map is cleared in
+  `watch()` so leaving and coming back is a fresh start rather than a burst of
+  noise on arrival.
+- **Comparing the nonce and not the id** is what makes pressing the same button
+  twice audible twice, which is the normal case rather than an edge case.
+- **`say` plays locally FIRST and writes second**, the same decision the scowl
+  takes: the presser gets their noise immediately and gets it even if the write
+  is refused. Which is why `onSnapshot` skips this player's own entry - hearing
+  the echo would be the same clip twice, the second time a round trip late.
+- **Fire and forget.** A soundbite that does not arrive is worth no error on
+  anybody's screen; `actionError` is for a host write that cost the table
+  something.
+
+**The rules bound this node tightly, and it is the one node in the app a player
+writes something that looks like free text to.** `says/$uid` is writable by that
+player or the host (the host grant is the only way to tidy up after somebody who
+has gone). `.validate` requires exactly `id` and `at`, the id must match a short
+closed list of the eight, and **`$other` is `".validate": false`** so nothing can
+ride along beside them. That closes the "nothing bounds the SIZE of a write" gap
+from the 2026-09-03 audit for this node at least, which matters because it is the
+node most obviously shaped like somewhere to put a payload.
+
+**The id list in `database.rules.json` is a bare regex mirroring the catalogue**,
+the same way `MAX_PLAYERS` is mirrored there as a literal `8`, because the rules
+language cannot import anything. `soundbites.test.ts` fails when the two drift.
+The drift that matters is one direction: a soundbite added to the catalogue and
+not to the rules is a button that writes, is refused by the live database, and
+**plays on the presser's own phone anyway** because `say` plays locally first.
+Nobody else hears it and nothing on screen says why, which is the exact shape of
+the stats-grant failure that cost a whole playtest.
+
+#### The clips themselves
+
+**They are synthesised, not files.** Nothing loads an asset: each clip is a few
+oscillator and noise bursts built at play time from a recipe in
+`src/game/soundbites.ts`. That keeps them out of the bundle entirely - there is
+no audio in `public/` and the entry chunk did not move - and it is also the limit
+on what they can be. A synthesised cheer is a rising triad, not a crowd. The set
+is picked for what reads clearly as an abstract noise, which is why it is stings
+and not impressions.
+
+**Eight, not the dozen the research note sketched.** Four across by two down is
+what fits on the narrowest phone without the tray scrolling, and eight distinct
+noises is about where a table stops being able to tell them apart. Adding a ninth
+is one entry in the catalogue plus its recipe, and `soundbites.test.ts` fails if
+the count stops fitting the grid.
+
+- **`src/game/soundbites.ts`** is DATA and stays pure, so the whole catalogue is
+  testable in node where there is no `AudioContext`. It sits in `game/` beside
+  `badges.ts` rather than under `ui/` because `net/rooms.ts` validates ids
+  against it, and `net` must not import from the UI layer.
+- **`src/ui/sound/engine.ts`** is the only half that touches the browser.
+  Everything in it is lazy and nothing runs at module scope, for the same reason
+  `localStorage` is kept out of module scope: `environment: 'node'` means a
+  construction at import time would take out every file that transitively imports
+  it. **The context is not built until sound is switched on**, so a device that
+  never gets there never allocates an audio device at all. Verified in a real
+  browser: a client with sound off reports zero `AudioContext`s after another
+  client has pressed a soundbite.
+- **The queue never overlaps two clips.** Two players pressing at the same moment
+  is common at a table, and two clips on top of each other is a noise rather than
+  two messages. It also drops anything that would land more than two seconds out,
+  or a table enjoying itself backs the queue up until the noises are commentary
+  on a round that finished.
+- **A limiter on the master**, threshold -6, ratio 20, 3ms attack. Same shape as
+  the one the research note put on the receiving end of a voice clip, and the
+  reason the recipes can be careless about stacking.
+
+#### The head row overflow, which was already there
+
+The board's island in the top right goes to four buttons when the note is
+showing. That is 39px more in a row that also carries the round number, the name
+and score, and a "reconnecting" pill. It put the island's right edge 12px past
+the edge of a 393px phone, taking the theme toggle with it.
+
+The cause was not the flex row and was **not new**: `.game` is a grid with one
+implicit `auto` column, and a grid item's automatic minimum size is its
+MIN-CONTENT width, so a head row that did not fit did not shrink to the phone, it
+made the column wider than the phone. On `main` before any of this, a long name
+plus the reconnecting pill already pushed the toggle off screen at 360 and 393.
+The fourth button only made it reachable with a short name too. `min-width: 0` on
+`.game-head` is what lets it shrink, and `.game-head .muted` is what actually
+gives, because the name and score are the only thing in the row that is not a
+control or a fixed fact. It must not wrap: the head is an `auto` track and a
+second line comes straight off the board.
+
+`gameHeadLayout.test.ts` measures it at every size the tableau suite covers, with
+a short name and a long one, with and without the pill. It checks three separate
+things, because two of them would pass while the row was still wrong: nothing
+past the right edge, the island still on one line, and **all four buttons still
+at their full 37x30**, since squeezing them would "fit" and quietly undo the 20%
+they were deliberately given.
+
+`soundLauncherLayout.test.ts` does the same job for the hand: the launcher covers
+no card, does not sit on the stuck note, and its menu opens upwards and stays on
+screen at BOTH wood sides. That last one is why it is worth measuring - the menu
+is anchored to the launcher, which moves end to end with the Dash pile, so a
+fixed side would hang half of it off the phone for every left-handed player. The
+harness derives `--hand-card` the way `.game` does rather than pinning it to a
+number, because a row wider than the phone would hang the menu off it however the
+menu is written.
 
 ### The drop zone and the board _(#8, #3, #21, #23)_
 
@@ -2695,17 +2951,27 @@ clean run: `reconcileTableau` filters post stacks by centre membership and
 - **Your own wood still shows an empty slot** under the face-down pile before the
   first flip, where an opponent's empty slots are gone. Arguably a target rather
   than a gap - it is where the turned-over card lands.
-- **Audio: quick voice messages, and sound effects.** Researched on 2026-09-09 and
-  written up in `docs/audio-2026-09-09.md`. Nothing built, on purpose. The short
-  version: push-to-talk clips fit this app as base64 in the room (about 8 kB for
-  three seconds of Opus) rather than as WebRTC or as another Firebase product, and
-  the levelling the table asked for wants three mechanisms rather than one -
-  the browser's own AGC, a `DynamicsCompressorNode` in the capture graph BEFORE
-  the encoder, and a stored gain applied through a limiter at playback. The doc
-  also lists the sound-effect events worth having, ranked. **The decision both
-  are waiting on is the same one**: this is a game people play sitting together,
-  and four phones at one table playing the same sound a beat apart is worse than
-  silence. Settle that once, for voice and effects together.
+- **Audio: the rest of it.** The shared decision is TAKEN and the cheap half is
+  built: see "The table can make a noise" above, and `docs/audio-2026-09-09.md`
+  for the research it came out of. The answer is **two switches**: the host's
+  `meta.soundsOn` defaults OFF and governs the board, and each player's own
+  `bz.soundOn` defaults ON. Anything added below inherits BOTH rather than
+  introducing its own.
+  Two things are still unbuilt, both deliberately:
+  - **Sound effects on game events** (Part 2 of the research note), ranked there
+    by value. A lost race is the one worth having first: today it is a flash you
+    often miss because you were looking at your own hand. The playback path, the
+    one-at-a-time queue and the switch all exist now, so the work is the recipes
+    and the wiring, not the machinery. Watch the frequency: a centre-space land
+    is the most common event in the game and needs to be under 60ms and
+    pitch-varied per play, or it is a machine gun.
+  - **Quick voice messages** (Part 1). Still the bigger job and still worth doing
+    as base64 in the room, about 8 kB for three seconds of Opus, rather than as
+    WebRTC or as another Firebase product. The levelling wants all three
+    mechanisms: the browser's own AGC, a `DynamicsCompressorNode` in the capture
+    graph BEFORE the encoder, and a stored gain applied through a limiter at
+    playback. It is also the one node that would need a size bound in the rules
+    and a sweep, neither of which the soundbites needed.
 
 ---
 
@@ -2819,6 +3085,33 @@ assuming a code fault.
 
 ### Never actually played
 
+- **Whether the soundbites SOUND like anything.** They were verified in a real
+  browser end to end - one client presses, the other client's audio graph builds
+  exactly the right number of voices, sound stays off by default, and the sender
+  does not hear its own echo back - but that measures scheduling, not sound.
+  Nobody has listened to them. Eight synthesised stings that are individually
+  fine can still be indistinguishable from each other across a table, and Groan
+  in particular is a falling tone doing the work of a voice. Expect this to want
+  a tuning pass on the recipes in `src/game/soundbites.ts`, which is the only
+  file that has to change for it.
+- **The silent switch, and this is the one to be wary of.** Web Audio plays
+  straight through iOS's mute switch; `<audio>` elements do not. So a phone that
+  was silenced in a pocket will still make these noises. The mitigation is that
+  the HOST's switch defaults off, so a table is silent until somebody asks for
+  it - but note that the player's own switch defaults ON, so once the host says
+  yes, a silenced phone in a pocket IS in scope. That is a mitigation and not a
+  fix. Nothing in the app can read the switch; the real fix would be rendering
+  each clip to a buffer and playing it through an `<audio>` element, which is a
+  much heavier path and was not worth it before anybody had heard the clips.
+- **The press-and-hold gesture on a real thumb.** It was driven with a synthetic
+  pointer - down, hold past `TAP_MS`, slide, lift over a target - and the arming
+  and the dismiss both behave. A mouse is not a thumb: whether `SLOP_PX` is
+  forgiving enough for somebody holding a phone one-handed mid-round, and whether
+  the menu opens somewhere a thumb can actually reach the far corner of, are both
+  unmeasured.
+- **iOS at all.** The audio unlock is a `resume()` inside the toggle's own tap,
+  which is what Safari requires, and the lobby exists as the calm place to do it.
+  That reasoning has not met a real iPhone.
 - A full round to completion on the new board - dash call, scoring overlay, next
   round, rematch.
 - **AI players end to end.** The bot loop has only run against fake deps and fake

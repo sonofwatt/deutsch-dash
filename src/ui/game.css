@@ -51,7 +51,23 @@
   user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; overflow: hidden; }
 /* The theme toggle is inside the head's pill on this screen, so nothing is
    floating over the row and no corner needs reserving. */
-.game-head { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+/* position: relative so the soundbite tray can hang off it without joining the
+   grid. See .soundbite-pop in ui.css for why it must not take a track. */
+/* `min-width: 0` because .game's single implicit column is `auto`, and a grid
+   item's automatic minimum is its MIN-CONTENT width - so a head row that did not
+   fit did not shrink, it made the column wider than the phone and pushed its own
+   right-hand end off the screen. That is not a hypothetical: a fourth button in
+   the island beside the reconnecting pill did exactly that at 393px. Same
+   minmax(0, ...) reasoning as .board's middle column, one level up.
+   position: relative anchors the soundbite tray, which must not join the grid -
+   see .soundbite-pop in ui.css. Measured in gameHeadLayout.test.ts. */
+.game-head { display: flex; align-items: center; gap: 8px; font-size: 13px;
+  position: relative; min-width: 0; }
+/* The name and score are the one thing in this row allowed to give. Everything
+   else is a control or a fixed fact - the round number, the reconnecting pill,
+   the button island - and the row must not wrap, because the head is an `auto`
+   track and a second line would come straight off the board. */
+.game-head .muted { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Board = finished-pile rail | centre grid + snap band | finished-pile rail */
 .board { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px;
@@ -582,3 +598,42 @@
 .wood-note.drop-band { border: 0; background: none; }
 .tableau-zone.wood-left .wood-note { left: calc(var(--hand-card) + var(--tgap)); right: 0; }
 .tableau-zone.wood-right .wood-note { right: calc(var(--hand-card) + var(--tgap)); left: 0; }
+/* With the soundbite launcher up, the note gives up the Dash column as well as
+   the wood one. They shared that strip otherwise, and the note is the wider of
+   the two - it would have sat straight over the button. Wood and Dash are always
+   at opposite ends, so this is the other end from the rule above. */
+.tableau-zone.wood-left.has-sound .wood-note { right: calc(var(--hand-card) + var(--tgap)); }
+.tableau-zone.wood-right.has-sound .wood-note { left: calc(var(--hand-card) + var(--tgap)); }
+
+/* The soundbite launcher, in the band over the DASH column - the strip the wood
+   column's two-card height leaves empty. Sized off the card like everything else
+   in this row, so it holds its proportions from a small phone to a desktop. */
+.sb-launch-wrap { position: absolute; top: 0; z-index: 3; width: var(--hand-card); }
+.tableau-zone.wood-left .sb-launch-wrap { right: 0; }
+.tableau-zone.wood-right .sb-launch-wrap { left: 0; }
+.sb-launch { width: 100%; height: calc(var(--hand-card) * 1.4);
+  display: grid; place-items: center; cursor: pointer;
+  border: 1px dashed var(--line); border-radius: var(--radius);
+  background: var(--surface); color: var(--ink-soft);
+  font-size: calc(var(--hand-card) * .42); line-height: 1;
+  /* The gesture is a press and a slide. Without this the browser takes the
+     vertical drag as a scroll and the slide never reaches onPointerMove - the
+     same trap the card drag hits, and the reason .card carries it too. */
+  touch-action: none; -webkit-user-select: none; user-select: none; }
+.sb-launch.open { border-style: solid; border-color: var(--accent); color: var(--ink); }
+
+/* Full screen, under the menu and over everything else on the board: a press
+   outside the menu's borders closes it and must NOT also land a card in the
+   middle. Transparent on purpose - this is a dismiss target, not a scrim. */
+.sb-backdrop { position: fixed; inset: 0; z-index: 46; background: none; }
+/* Opens UPWARDS, off the top of the launcher: it is anchored to the hand at the
+   bottom of the screen, so downwards would be off the phone. Pinned to the same
+   end as the launcher and clamped to the viewport, which is what keeps it on
+   screen at both wood sides without a measurement. */
+.sb-menu { position: absolute; bottom: calc(100% + 8px); z-index: 47;
+  width: min(320px, calc(100vw - 24px)); padding: 10px;
+  border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--surface); box-shadow: var(--shadow);
+  touch-action: none; }
+.tableau-zone.wood-left .sb-menu { right: 0; }
+.tableau-zone.wood-right .sb-menu { left: 0; }

@@ -1,6 +1,7 @@
 import { createStore, type StoreApi } from 'zustand/vanilla';
 import { useStore } from 'zustand';
 import type { BadgeId } from '../game/badges';
+import type { SoundbiteId } from '../game/soundbites';
 import { cardId, type Card, type CenterSpace, type PlayerInfo, type PlaySource, type Room, type Tableau } from '../game/types';
 import { canBuildOnPost, canPlayToSpace, isStuck, placeOnPost, sourceTop, takeCard, putBack } from '../game/rules';
 import { flipWood, rewindWood, rotateWood, sinkWoodTop, WOOD_STEP } from '../game/wood';
@@ -13,6 +14,7 @@ import * as netPlays from '../net/plays';
 import type { PlayResult } from '../net/plays';
 import { pickNextHost, allConnectedStuck } from '../net/plays';
 import { ensureSignedIn, reconnect, watchConnected } from '../net/firebase';
+import { playSoundbite } from '../ui/sound/engine';
 import type { JoinResult } from '../net/rooms';
 
 // How long the host may stay disconnected in the watchdog below before a stand-in claims
@@ -67,8 +69,15 @@ export interface Deps {
   createRoom(name: string, badgeId: BadgeId): Promise<string>;
   setTargetScore(code: string, n: number): Promise<void>;
   setReady(code: string, uid: string, on: boolean): Promise<void>;
+  saySoundbite(code: string, uid: string, id: SoundbiteId): Promise<void>;
+  /**
+   * Fire a clip at this device's speakers. A no-op unless sound is switched on.
+   * Returns whether it reached this device, which is what drives the emoji rain.
+   */
+  playSoundbite(id: SoundbiteId): boolean;
   setSittingOut(code: string, uid: string, on: boolean): Promise<void>;
   setPaleCards(code: string, on: boolean): Promise<void>;
+  setSounds(code: string, on: boolean): Promise<void>;
   setFling(code: string, on: boolean): Promise<void>;
   setSingleFlip(code: string, on: boolean): Promise<void>;
   setCountdown(code: string, n: number | null): Promise<void>;
@@ -117,6 +126,18 @@ export interface GameStore {
    * count does not reliably change across one.
    */
   woodTurnover: WoodTurnover | null;
+  /**
+   * The last soundbite this device actually played, for the emoji rain.
+   *
+   * A nonce for the view exactly like `woodTurnover`: never persisted and
+   * never read back. `seq` exists only so that the same soundbite twice in a row
+   * remounts the rain and replays it, and it is a COUNTER rather than a clock -
+   * `Date.now()` repeats inside a millisecond, and two soundbites landing in one
+   * snapshot would then share a value and the second would not redraw. Local,
+   * not the room's nonce: it is set where playback happened, so a device with
+   * sound off leaves it null and rains nothing.
+   */
+  lastSound: { id: SoundbiteId; seq: number } | null;
   joinPhase: 'idle' | 'joining' | 'in-room';
   joinError: string | null;
   // Hands of the AI players this client is driving. Only ever populated on the
@@ -146,9 +167,16 @@ export interface GameStore {
   noteVisible(visible: boolean): void;
   setTarget(n: number): void;
   setReady(on: boolean): void;
+  /**
+   * Press a soundbite at the table. Plays on THIS device immediately and writes
+   * it to the room for everybody else, in that order - see `say`.
+   */
+  say(id: SoundbiteId): void;
   setSittingOut(on: boolean): void;
   setIdentity(name: string, badgeId: BadgeId): void;
   setPaleCards(on: boolean): void;
+  /** Host-only: whether the BOARD has soundbites at all. The lobby keeps its own. */
+  setSounds(on: boolean): void;
   setFling(on: boolean): void;
   /** Host-only, and only meaningful while the table is deadlocked. */
   setSingleFlip(on: boolean): void;
@@ -250,6 +278,23 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
   // the pile a card at a time (botWoodStep). Bots only, because it is the host
   // that counts and the host only drives bots; cleared with `flips`.
   const woodLaps = new Map<string, number>();
+  /**
+   * The `says/$uid` nonce each player was last seen holding, so a soundbite plays
+   * when it CHANGES rather than when it is present.
+   *
+   * A value is adopted SILENTLY the first time a uid is seen, which is what stops
+   * joining a room replaying whatever the table pressed before you walked in - the
+   * node is not swept and the last press of the game sits there until the room is
+   * deleted. Cleared in `watch`, so leaving and coming back is a fresh start
+   * rather than a replay of the entry you already heard.
+   *
+   * Nonces are never compared for order, only for inequality: they are
+   * `serverTimestamp()` values, and the point of taking them from the server is
+   * that every client reads the same one. See SoundbiteSay.
+   */
+  const saidAt = new Map<string, number>();
+  /** Strictly increasing, so every play is a fresh key for the emoji rain. */
+  let soundSeq = 0;
   // `<code>/<roundNumber>` of a score commit that was REJECTED, so it is attempted
   // once per round and not once per snapshot. A rejected write is rolled back out
   // of the local cache, which raises a fresh snapshot, which used to re-enter the
@@ -728,6 +773,23 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         }
         syncBots(room);
         if (humanMoved) armRaceEdge(room); // Genius gets to answer it first
+        // (2a) Soundbites somebody else pressed. Before the countdown and the
+        // rotation on purpose: those can end a round, and the noise belongs to
+        // the moment it was sent rather than to whatever the table did next.
+        //
+        // Every player's own press already played locally in `say`, so `me` is
+        // skipped here or the presser hears it twice.
+        //
+        // The engine is the gate: `playSoundbite` is a no-op on a device that has
+        // not switched sound on, so this costs a map lookup per player and
+        // nothing else for everybody who never turns it on. Which is everybody,
+        // until they ask.
+        for (const [who, said] of Object.entries(room.says ?? {})) {
+          const seen = saidAt.get(who);
+          saidAt.set(who, said.at);
+          if (who === me || seen === undefined || seen === said.at) continue;
+          if (deps.playSoundbite(said.id)) set({ lastSound: { id: said.id, seq: ++soundSeq } });
+        }
         syncCountdown(room); // somebody readied, un-readied, joined or wandered off
         syncAllStuck(); // the centre moved: someone may have just been freed, or trapped
         if (phase === 'playing') armAway(); else disarmAway();
@@ -843,6 +905,10 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
 
     function watch(code: string, uid: string) {
       unwatch?.();
+      // A room's soundbite nonces mean nothing in the next room, and the entries
+      // still sitting in THIS one were heard the first time. Either way the map
+      // starts empty and the first snapshot adopts what it finds without playing.
+      saidAt.clear();
       unwatch = deps.watchRoom(code, onSnapshot);
       set({ code, uid, joinPhase: 'in-room' });
     }
@@ -850,7 +916,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
     return {
       uid: null, code: null, room: null, tableau: null, selection: null,
       lastRejected: null, joinPhase: 'idle', joinError: null, online: true,
-      botTableaus: {}, actionError: null, woodTurnover: null,
+      botTableaus: {}, actionError: null, woodTurnover: null, lastSound: null,
 
       setOnline(v) {
         set({ online: v });
@@ -1114,6 +1180,29 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         const { code, uid } = get();
         if (code && uid) hostAction(deps.setReady(code, uid, on), 'change your ready state');
       },
+      /**
+       * Play it HERE first, then tell the room.
+       *
+       * The local play is not an optimisation, it is the same decision the
+       * scowl takes: the presser gets their noise immediately and gets it even
+       * if the write is refused or the room has gone. It also keeps the sound
+       * off the round trip, which at a table is the difference between a
+       * soundbite and a delayed reaction.
+       *
+       * Which is why `onSnapshot` skips this player's own entry: hearing it
+       * again when the write echoes back would be the same clip twice.
+       *
+       * Fire and forget. A soundbite that does not arrive is worth no error on
+       * anybody's screen - `actionError` is for a host write that cost the
+       * table something.
+       */
+      say(id) {
+        const { code, uid } = get();
+        // The rain follows the sound: if this device is switched off, or the host
+        // has taken sound off the board, playSoundbite says so and nothing falls.
+        if (deps.playSoundbite(id)) set({ lastSound: { id, seq: ++soundSeq } });
+        if (code && uid) void deps.saySoundbite(code, uid, id).catch(() => {});
+      },
       setSittingOut(on) {
         const { code, uid } = get();
         if (!code || !uid) return;
@@ -1124,6 +1213,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         hostAction(deps.setSittingOut(code, uid, on), 'change whether you are sitting out');
       },
       setPaleCards(on) { const c = get().code; if (c) void deps.setPaleCards(c, on); },
+      setSounds(on) { const c = get().code; if (c) void deps.setSounds(c, on); },
       setFling(on) { const c = get().code; if (c) void deps.setFling(c, on); },
       setSingleFlip(on) { const c = get().code; if (c) void deps.setSingleFlip(c, on); },
       /**
@@ -1246,8 +1336,11 @@ const realDeps: Deps = {
   createRoom: netRooms.createRoom,
   setTargetScore: netRooms.setTargetScore,
   setReady: netRooms.setReady,
+  saySoundbite: netRooms.saySoundbite,
+  playSoundbite,
   setSittingOut: netRooms.setSittingOut,
   setPaleCards: netRooms.setPaleCards,
+  setSounds: netRooms.setSounds,
   setFling: netRooms.setFling,
   setSingleFlip: netRooms.setSingleFlip,
   setCountdown: netRooms.setCountdown,

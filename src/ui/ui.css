@@ -106,11 +106,15 @@
    .corner-btns is the same pill on every screen that has no head to hang it in.
    Grouping only: each button is still one tap. */
 .head-btns { margin-left: auto; }
-/* --btn-w carries the whole width of the island: 3 x 37 + 2 gaps + 2 padding + 2
-   border = 123px, against 102px when the buttons were 30 wide. The extra 20% went
-   into the BUTTONS rather than into the gaps or the padding, so what grew is the
-   part a thumb has to hit. Height is unchanged - the head row is `auto`, and
-   growing it would take the space off the board. */
+/* --btn-w carries the whole width of the island: on the board that is three
+   buttons, or FOUR when the soundbite note is showing (the host has sound on and
+   so has this player). Four is 4 x 37 + 3 gaps + 2 padding + 2 border = 162px,
+   against 123px for three, and four is what the layout test measures because it
+   is the case that has to fit. The 37 came from giving
+   the buttons 20% more than the 30 they started at, rather than giving it to the
+   gaps or the padding, so what grew is the part a thumb has to hit. Height is
+   unchanged - the head row is `auto`, and growing it would take the space off the
+   board. The corner pill uses the same rule and still holds one. */
 .head-btns, .corner-btns {
   --btn-w: 37px; --btn-h: 30px;
   display: flex; align-items: center; gap: 2px; padding: 3px;
@@ -123,6 +127,10 @@
   font-size: 15px; line-height: 1; display: grid; place-items: center; cursor: pointer;
   flex: 0 0 auto; }
 .side-swap:active { background: color-mix(in srgb, var(--ink) 10%, transparent); }
+/* Sound on reads at full ink, off stays as quiet as its siblings. The glyph does
+   not change between the two: a note that turned into a crossed-out note would
+   read as "tap to unmute", and this button opens a tray. */
+.sound-btn[data-on="yes"] { color: var(--ink); }
 /* Armed: the second tap ends the round for this player, so it stops looking like
    the quiet siblings beside it and says what it is about to do. */
 .side-swap.arming { width: auto; padding: 0 10px; font-size: 12px; font-weight: 800;
@@ -417,6 +425,12 @@
    same glyphs, same message, parked instead of moving. */
 @media (prefers-reduced-motion: reduce) {
   [data-platform] .faller { animation: none; opacity: .9; top: 16vh; }
+  /* Same treatment for the soundbite rain: the glyph still says who said what,
+     it just arrives parked instead of falling. Left visible rather than removed
+     because on a phone that has asked for stillness it is the ONLY signal a
+     soundbite happened at all. It fades out on its own timer in React, so a
+     parked one does not sit there for the rest of the round. */
+  [data-platform] .sound-drop { animation: none; opacity: .95; top: 18vh; }
   /* The fireworks were missed when this block was written: 2165 flying, flickering
      elements on a phone that had asked for stillness. Gone entirely rather than
      parked - a still firework is a smear of dots, and the sheet they go off
@@ -450,3 +464,67 @@
   fill: #ffffff; stroke: #111111; stroke-width: 1.6;
   stroke-linejoin: round; stroke-linecap: round; }
 .door-ajar .knob { fill: #111111; stroke: none; }
+
+/* The soundbite's emoji, falling about a third of the way down the screen.
+   FIXED and pointer-events: none, both load bearing: it is drawn outside every
+   drop target and cannot be touched, so a card flicked through it lands exactly
+   where it would have. A decoration that could eat a play is worse than none.
+   z-index sits above the board and below the drag ghost (50), the corner pill
+   (60) and every overlay (100+), so it never covers a score sheet or a splash. */
+.sound-rain { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 45; }
+/* Smaller than the dash splash's .faller, which is twice this: that one is the
+   whole moment and this arrives mid-round over a board being played. */
+/* LINEAR, and starting just above the top edge rather than a screen above it.
+   Both are about how fast the first glyph appears: an ease-in from -14vh spent
+   its first 700ms out of sight, which read as the emoji lagging the sound by
+   most of a second. This clears the edge inside ~150ms. */
+.sound-drop { position: absolute; top: -10vh; font-size: clamp(28px, 8vw, 46px);
+  animation: sound-fall var(--dur, 1000ms) linear var(--delay, 0ms) both; }
+/* Stops at --end rather than running off the bottom, and fades out there.
+   Falling the whole height would drag the eye down past the board every time
+   somebody at the table pressed a button. */
+@keyframes sound-fall {
+  0%   { transform: translateY(0) rotate(0); opacity: 0; }
+  10%  { opacity: 1; }
+  70%  { opacity: 1; }
+  100% { transform: translateY(var(--end, 30vh)) rotate(var(--spin)); opacity: 0; }
+}
+
+/* ---- Soundbites -------------------------------------------------------- */
+/* The tray is one component in two places: an ordinary block in the lobby, and a
+   popover on the board. Both styles live HERE rather than in game.css because
+   the lobby is the calm place to switch sound on and game.css only arrives with
+   the board chunk. */
+.soundbites { display: grid; gap: 8px; }
+/* Four across, which is what the eight in the catalogue were chosen to fit:
+   two tidy rows on the narrowest phone, no scrolling, and no row of five that
+   wraps to a lonely three. */
+.soundbite-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.soundbite { display: grid; gap: 2px; place-items: center; padding: 8px 2px;
+  min-height: 54px; border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--surface); color: var(--ink); cursor: pointer; }
+.soundbite:active { background: color-mix(in srgb, var(--ink) 10%, transparent); }
+.soundbite-glyph { font-size: 20px; line-height: 1; }
+/* The label is what a player reads the first time and stops reading after that,
+   so it is small and quiet rather than competing with the glyph. */
+.soundbite-label { font-size: 11px; line-height: 1.1; color: var(--ink-soft); text-align: center; }
+.soundbite-hint { font-size: 12px; margin: 0; }
+
+/* The one under a sliding thumb. Not a hover state - there is no hover on a
+   phone - so it is set from the hit test in SoundLauncher and has to be loud
+   enough to read at the edge of vision while the thumb is over it. */
+.soundbite.armed { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  transform: scale(1.06); }
+
+/* The lobby's option list, behind one tap. The chevron turns rather than being
+   swapped for another glyph, so the two states are the same object moving. */
+.options-head { display: flex; align-items: center; gap: 8px; width: 100%;
+  justify-content: flex-start; font-weight: 700; }
+.chev { display: inline-block; transition: transform 120ms ease; color: var(--ink-soft); }
+.options-head.open .chev { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) {
+  /* The phone guard, for the same reason every other block here carries it: a
+     desktop asking for less motion is usually asking for less POLISH, and this
+     is a 120ms turn on a chevron. */
+  [data-platform] .chev { transition: none; }
+}

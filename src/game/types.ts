@@ -63,6 +63,24 @@ export interface RoomMeta {
    */
   singleFlip?: boolean;
   /**
+   * Whether soundbites exist ON THE BOARD at all.
+   *
+   * A host option, and the master switch: off, and the game screen has no note
+   * in the head island, no button over the Dash pile and no menu - not a
+   * disabled one, GONE. Off is also the default, which is where the "four phones
+   * at one table playing the same noise a beat apart" problem is now handled:
+   * one person decides the table wants this, rather than every phone arriving
+   * loud and each player having to shut their own up.
+   *
+   * **It does not reach the lobby.** Soundbites in the lobby are how a table
+   * finds out these exist and what they sound like, and a room that has not
+   * switched them on for play is exactly the room that needs to hear them first.
+   * Each player still has their own switch on top of this (see prefs.ts): the
+   * host says whether the table has sound, the player says whether their phone
+   * joins in.
+   */
+  soundsOn?: boolean;
+  /**
    * The lobby countdown: 3, 2, 1, then 0 which reads "GO!", then absent again.
    *
    * A NUMBER the host writes, not a deadline every client races its own clock
@@ -193,7 +211,8 @@ export interface RoundState {
  * are adopted silently, so joining a room does not replay whatever the table
  * pressed before you walked in.
  */
-export interface SoundbiteSay { id: string; at: number }
+import type { SoundbiteId } from './soundbites';
+export interface SoundbiteSay { id: SoundbiteId; at: number }
 
 import type { GameStats } from './stats';
 export interface Room {

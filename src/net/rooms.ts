@@ -6,10 +6,11 @@ import { dueForSweep, forgetOwnRoom, readOwnRooms, rememberOwnRoom } from './own
 import { makeRoomCode } from './roomCodes';
 import type { BadgeId } from '../game/badges';
 import { botId, type BotLevel } from '../game/bot';
-import type { PlayerInfo, Room, RoomMeta, RoundState } from '../game/types';
+import type { PlayerInfo, Room, RoomMeta, RoundState, SoundbiteSay } from '../game/types';
 import { normalizeSpaces, normalizeTableau } from '../game/center';
 import { MAX_SPACES, postCountForPlayers, spaceCountForPlayers } from '../game/rules';
 import { normalizeStats } from '../game/stats';
+import { isSoundbiteId, type SoundbiteId } from '../game/soundbites';
 
 export const ROOM_TTL_MS = 24 * 60 * 60 * 1000;
 // Mirrored in database.rules.json's rooms/$code/meta/playerCount .validate
@@ -44,6 +45,7 @@ export function normalizeRoom(raw: unknown): Room | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as {
     meta?: RoomMeta; players?: Record<string, PlayerInfo>; round?: unknown; stats?: unknown;
+    says?: unknown;
   };
   if (!r.meta || !r.players) return null;
   const players: Record<string, PlayerInfo> = {};
@@ -111,7 +113,31 @@ export function normalizeRoom(raw: unknown): Room | null {
       endedAt: typeof rr.endedAt === 'number' ? rr.endedAt : null,
     };
   }
-  return { meta, players, round, stats: normalizeStats(r.stats) };
+  return { meta, players, round, stats: normalizeStats(r.stats), says: normalizeSays(r.says) };
+}
+
+/**
+ * The soundbites the table has pressed, held to ones that exist.
+ *
+ * Same defensive reasoning as everywhere else in this file: `says/$uid` is
+ * writable by the player it belongs to, so the id in it arrived from another
+ * client and a hand-edited or retired value must never reach the engine, which
+ * looks the recipe up by id and would find nothing. The rules validate it too;
+ * the client does not get to assume the rules were deployed.
+ *
+ * A dropped entry is silence for that player, not a broken room.
+ */
+function normalizeSays(raw: unknown): Record<string, SoundbiteSay> | null {
+  const rec = record<Record<string, unknown>>(raw);
+  if (!rec) return null;
+  const out: Record<string, SoundbiteSay> = {};
+  for (const [uid, v] of Object.entries(rec)) {
+    if (!v || typeof v !== 'object') continue;
+    const { id, at } = v as { id?: unknown; at?: unknown };
+    if (!isSoundbiteId(id) || typeof at !== 'number' || !Number.isFinite(at)) continue;
+    out[uid] = { id, at };
+  }
+  return Object.keys(out).length ? out : null;
 }
 
 function playerRecord(name: string, badgeId: BadgeId): Omit<PlayerInfo, 'joinedAt'> & { joinedAt: object } {
@@ -345,6 +371,24 @@ export function setTargetScore(code: string, target: number): Promise<void> {
   return set(ref(db, `rooms/${code}/meta/targetScore`), target);
 }
 
+/**
+ * "I pressed a soundbite." Own node, own uid.
+ *
+ * `set` on `says/$uid` rather than a push: one entry per player, replaced every
+ * time, so the node is bounded by the eight seats and there is nothing to sweep.
+ * Pushing would grow it for as long as the table kept pressing, and would need
+ * the same host sweep the voice-clip design in `docs/audio-2026-09-09.md` has to
+ * carry.
+ *
+ * `at` is `serverTimestamp()` so that every client reads the SAME value - it is
+ * a nonce for change detection, never a moment compared against a local clock
+ * (the trap `awayAt` and `RaceRecord.at` both dodge). A player pressing the same
+ * soundbite twice still moves it, which is what makes the second press audible.
+ */
+export function saySoundbite(code: string, uid: string, id: SoundbiteId): Promise<void> {
+  return set(ref(db, `rooms/${code}/says/${uid}`), { id, at: serverTimestamp() });
+}
+
 /** "I am ready." Own record, own uid - already covered by players/$uid's rule. */
 export function setReady(code: string, uid: string, on: boolean): Promise<void> {
   return set(ref(db, `rooms/${code}/players/${uid}/ready`), on ? true : null);
@@ -444,6 +488,11 @@ export function setFling(code: string, on: boolean): Promise<void> {
 /** The stuck-table rescue: one card per wood turn instead of three. */
 export function setSingleFlip(code: string, on: boolean): Promise<void> {
   return set(ref(db, `rooms/${code}/meta/singleFlip`), on ? true : null);
+}
+
+/** Host option. Absent means off, so switching it off writes false, not null. */
+export function setSounds(code: string, on: boolean): Promise<void> {
+  return set(ref(db, `rooms/${code}/meta/soundsOn`), on);
 }
 
 export function setPaleCards(code: string, on: boolean): Promise<void> {

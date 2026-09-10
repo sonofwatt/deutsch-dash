@@ -23,6 +23,9 @@ const ANIMATED = [
   // The flipped pile travelling back onto the draw pile at the end of a lap.
   ['.wood-collect', 'wood-collect'],
   ['.faller', 'fall-down'],
+  // The soundbite rain. Parked rather than removed on a phone that asked for
+  // stillness: the glyph is the only signal a soundbite happened at all there.
+  ['.sound-drop', 'sound-fall'],
   // The fireworks: the ignition bloom, an ordinary spark, and a white one. Only
   // the white sixth twinkles, so only its computed name lists two animations, and
   // both are here because the reduced-motion block now has to switch off a rule
@@ -41,6 +44,7 @@ const PAGE = `<!doctype html><html><head><style>${CSS}</style></head><body>
   <div class="wood-deal"><div class="card">7</div></div>
   <div class="wood-collect"></div>
   <div class="faller">X</div>
+  <div class="sound-rain"><span class="sound-drop">X</span></div>
   <div class="fireworks"><span class="shell"><b></b><i></i><i class="glint"></i></span>
     <span class="candle"><i></i></span></div>
 </body></html>`;

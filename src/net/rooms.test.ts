@@ -73,6 +73,35 @@ describe('a room is read defensively', () => {
     expect(room.round!.stuckRounds).toBe(0);
   });
 
+  it('drops a soundbite that is not one of ours', () => {
+    // says/$uid is writable by the player it belongs to, so the id arrived from
+    // another client. A retired or hand-edited value reaching the engine is a
+    // lookup that finds nothing - the same trap readSavedBadge exists for.
+    const r = base() as Record<string, unknown>;
+    r.says = {
+      a: { id: 'cheer', at: 5 },
+      b: { id: 'airhorn', at: 6 },          // not in the catalogue
+      c: { id: 'groan', at: 'soon' },       // nonce that is not a number
+      d: { id: 'groan' },                   // no nonce at all
+      e: { at: 7 },                         // no id at all
+      f: 'boo',                             // not even a record
+      g: { id: 'wow', at: NaN },            // a nonce that compares false to itself
+    };
+    expect(normalizeRoom(r)!.says).toEqual({ a: { id: 'cheer', at: 5 } });
+  });
+
+  it('reads a room with no soundbites as null rather than an empty object', () => {
+    // So `room.says ?? {}` in the snapshot handler has one shape to deal with,
+    // and a room that predates the feature reads the same as one nobody has
+    // pressed anything in.
+    expect(normalizeRoom(base())!.says).toBeNull();
+    const r = base() as Record<string, unknown>;
+    r.says = { a: { id: 'nope', at: 1 } };
+    expect(normalizeRoom(r)!.says).toBeNull();
+    r.says = 'cheer';
+    expect(normalizeRoom(r)!.says).toBeNull();
+  });
+
   it('holds a name to the length the join form allows', () => {
     const r = base(); r.players.a.name = 'x'.repeat(5000);
     expect(normalizeRoom(r)!.players.a.name).toHaveLength(14);

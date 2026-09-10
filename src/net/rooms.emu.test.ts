@@ -252,6 +252,69 @@ emu('server-side player cap and badge uniqueness (database.rules.json)', () => {
     await assertFails(racerCtx.database().ref(`rooms/${code}/stats/rounds`).set(99));
   });
 
+  it('holds meta/soundsOn to a boolean', async () => {
+    const code = 'SOUNDOPT1';
+    await seedRoom(code, 0);
+    const db = hostCtx.database();
+    await assertSucceeds(db.ref(`rooms/${code}/meta/soundsOn`).set(true));
+    await assertSucceeds(db.ref(`rooms/${code}/meta/soundsOn`).set(false));
+    // Off is written as FALSE rather than removed, so `?? false` and a forged
+    // truthy string can never disagree about what the host chose.
+    await assertFails(db.ref(`rooms/${code}/meta/soundsOn`).set('yes'));
+    await assertFails(db.ref(`rooms/${code}/meta/soundsOn`).set(1));
+  });
+
+  it('lets a player say a soundbite as themselves and nobody else', async () => {
+    const code = 'SAYSOWN01';
+    await seedRoom(code, 0);
+    const racer = racerCtx.database();
+    await assertSucceeds(racer.ref(`rooms/${code}/says/${RACER}`).set({ id: 'cheer', at: Date.now() }));
+    // Putting words in another player's mouth. Not a disaster - knowing the room
+    // code is the credential here and the trust model says so - but there is no
+    // reason to allow it when the path already carries the uid.
+    await assertFails(racer.ref(`rooms/${code}/says/${HOST}`).set({ id: 'boo', at: Date.now() }));
+    // The host can, on the same grant that lets them remove a player: theirs is
+    // the only client that can tidy up after somebody who has gone.
+    await assertSucceeds(hostCtx.database().ref(`rooms/${code}/says/${RACER}`).remove());
+  });
+
+  it('refuses a soundbite that is not in the catalogue', async () => {
+    const code = 'SAYSBAD01';
+    await seedRoom(code, 0);
+    const racer = racerCtx.database();
+    await assertFails(racer.ref(`rooms/${code}/says/${RACER}`).set({ id: 'airhorn', at: Date.now() }));
+    await assertFails(racer.ref(`rooms/${code}/says/${RACER}`).set({ id: '', at: Date.now() }));
+    // The whole point of the id being a short closed list: a node whose value is
+    // free text is a place to put a payload, and this is the one node in the app
+    // a player writes arbitrary-looking content to.
+    await assertFails(racer.ref(`rooms/${code}/says/${RACER}`).set({ id: 'x'.repeat(50000), at: 1 }));
+  });
+
+  it('refuses a says entry that is the wrong shape, so nothing can ride along in it', async () => {
+    const code = 'SAYSSHAPE';
+    await seedRoom(code, 0);
+    const racer = racerCtx.database();
+    await assertFails(racer.ref(`rooms/${code}/says/${RACER}`).set({ id: 'cheer' }));            // no nonce
+    await assertFails(racer.ref(`rooms/${code}/says/${RACER}`).set({ at: Date.now() }));         // no id
+    await assertFails(racer.ref(`rooms/${code}/says/${RACER}`).set({ id: 'cheer', at: 'now' })); // nonce is not a number
+    // $other is ".validate": false, which is what closes the size gap the
+    // 2026-09-03 audit left open - for this node at least.
+    await assertFails(racer.ref(`rooms/${code}/says/${RACER}`)
+      .set({ id: 'cheer', at: Date.now(), blob: 'x'.repeat(100000) }));
+  });
+
+  it('lets the same player replace their own soundbite, which is how pressing twice works', async () => {
+    const code = 'SAYSAGAIN';
+    await seedRoom(code, 0);
+    const racer = racerCtx.database();
+    await assertSucceeds(racer.ref(`rooms/${code}/says/${RACER}`).set({ id: 'laugh', at: 1 }));
+    await assertSucceeds(racer.ref(`rooms/${code}/says/${RACER}`).set({ id: 'laugh', at: 2 }));
+    const rec = (await racer.ref(`rooms/${code}/says/${RACER}`).get()).val();
+    // One entry per player, replaced rather than pushed: this is what bounds the
+    // node to the eight seats and is why there is no sweep to write.
+    expect(rec).toEqual({ id: 'laugh', at: 2 });
+  });
+
   it('rejects claiming a badge already held by another uid, but allows claiming a free one', async () => {
     const code = 'BADGERACE';
     await seedRoom(code, 0); // just the host, who holds 'tulip'

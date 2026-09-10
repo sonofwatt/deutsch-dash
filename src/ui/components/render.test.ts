@@ -7,6 +7,8 @@ import { OpponentStrip } from './OpponentStrip';
 import { ScoreHistory } from './ScoreHistory';
 import { ScoreRow } from './ScoreRow';
 import { DashSplash } from './DashSplash';
+import { SoundbiteTray } from './SoundbiteTray';
+import { SOUNDBITE_IDS } from '../../game/soundbites';
 import { ScoreList } from './ScoreList';
 import { rankRows } from '../scoreRanks';
 import { faceOffset, raceFlashes, HALO_CYCLE_MS, HALO_STAGGER_MS } from '../raceFlash';
@@ -803,5 +805,46 @@ describe('an unknown badge', () => {
       badgeOf: () => 'unicorn' as never, onTap: noop, onSnapTap: noop,
     }));
     expect(grid).toContain('?');
+  });
+});
+
+describe('the soundbite tray and launcher', () => {
+  const tray = (on: boolean) => renderToStaticMarkup(createElement(SoundbiteTray, {
+    on, onToggle: noop, onSay: noop,
+  }));
+
+  it('shows the eight buttons when sound is on for this phone', () => {
+    const html = tray(true);
+    for (const id of SOUNDBITE_IDS) expect(html).toContain(`data-sb="${id}"`);
+    expect(html).toContain('On for this phone');
+  });
+
+  it('shows NO buttons when the player has switched their own sound off', () => {
+    // Turning it off is a player saying they do not want any of this, so leaving
+    // the grid behind would be leaving the feature on screen for somebody who has
+    // just switched it off. It also keeps the switch honest: what it shows is
+    // exactly what it does.
+    const html = tray(false);
+    expect(html).not.toContain('data-sb=');
+    expect(html).toContain('Off for this phone');
+    // The switch itself must survive, or there is no way back on.
+    expect(html).toContain('aria-pressed="false"');
+  });
+
+  it('gives the tableau a launcher slot only when one is handed in', () => {
+    // The launcher is a node from Game.tsx, which is where the host option and
+    // the player's own switch are read. TableauView only knows where it goes,
+    // and `has-sound` is what shortens the stuck note out of its way.
+    const withOne = renderToStaticMarkup(createElement(TableauView, {
+      t: tableau(), badgeId: 'tulip' as const, selection: null, postHighlight: [],
+      onSelect: noop, onFlip: noop, onTapPost: noop, startDrag: noop,
+      soundLauncher: createElement('div', { className: 'sb-launch-wrap' }),
+    }));
+    expect(withOne).toContain('sb-launch-wrap');
+    expect(withOne).toContain('has-sound');
+
+    const without = renderTableau(tableau());
+    expect(without).not.toContain('sb-launch-wrap');
+    expect(without).not.toContain('has-sound');
   });
 });

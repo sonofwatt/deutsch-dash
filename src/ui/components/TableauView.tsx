@@ -104,6 +104,17 @@ export function TableauView(props: {
    * outside, and `dealtBefore` survives nowhere but the hand as it was.
    */
   turnover?: WoodTurnover | null;
+  /**
+   * The soundbite launcher, if the board is showing one, drawn in the band above
+   * the DASH column - the empty strip the wood column's two-card height leaves.
+   *
+   * Handed in as a node rather than built here, because the whole gesture (the
+   * hold, the slide, the dismiss backdrop) belongs to Game.tsx, which owns the
+   * state it drives. This component only knows where it goes. Optional, like
+   * every prop here: render.test.ts builds these as complete literals and
+   * `tsc -b` typechecks it, so a required prop would break the BUILD.
+   */
+  soundLauncher?: React.ReactNode;
 }) {
   const { t, badgeId } = props;
   const woodTop = t.woodIndex > 0 ? t.wood[t.woodIndex - 1] : null;
@@ -299,12 +310,17 @@ export function TableauView(props: {
   // row is board as far as the player is concerned, whether or not the drop
   // zone element reaches that far.
   return (
-    <div className={`tableau-zone wood-${props.woodSide}`} data-hand>
+    <div className={`tableau-zone wood-${props.woodSide}${props.soundLauncher ? ' has-sound' : ''}`} data-hand>
       {/* The piles are their own row inside the zone. The zone centres it and
           carries the edge guards; the row is exactly as wide as the piles, which
           is what the note below is positioned against. */}
       <div className="tableau-row">
       {ends}
+      {/* Over the Dash column, inside the pile row so it is measured against the
+          CARDS rather than the zone - the zone is as wide as the screen. The
+          same reasoning that put .wood-note here. `has-sound` above is what
+          shortens the stuck note so the two never sit on each other. */}
+      {props.soundLauncher}
       {/* The stuck note lives HERE, in the band above the post piles that the
           wood column's two-card height leaves empty. It is absolutely positioned
           INSIDE the pile row, so it costs no layout at all and it is measured

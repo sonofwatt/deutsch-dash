@@ -13,7 +13,7 @@
  * an audio device at all.
  */
 
-import { SOUNDBITES, clipLength, type SoundbiteId, type Voice } from './soundbites';
+import { SOUNDBITES, clipLength, type SoundbiteId, type Voice } from '../../game/soundbites';
 
 /** Trim under every clip, so the recipes can be written at comfortable peaks. */
 const MASTER = 0.5;
@@ -148,8 +148,16 @@ function schedule(c: AudioContext, out: GainNode, v: Voice, start: number): void
  *
  * They never overlap, which is the whole reason there is a queue: two players
  * pressing at the same moment is common at a table, and two clips on top of each
- * other is a noise rather than two messages. Returns whether anything was
- * scheduled, which is what the tests read.
+ * other is a noise rather than two messages.
+ *
+ * **Returns whether the soundbite REACHED this device**, which is a slightly
+ * different question from whether a sound came out, and it is the one the caller
+ * needs: the emoji rain is keyed off this. A device that is switched off gets
+ * neither. A device whose context has not been unlocked yet gets the emoji and
+ * misses the noise, which is the right way round - the glyph is the half that
+ * still works when the audio does not. A clip dropped for backing the queue up
+ * gets neither, so a player leaning on the buttons cannot bury the screen in
+ * emoji either.
  */
 export function playSoundbite(id: SoundbiteId): boolean {
   if (!enabled) return false;
@@ -159,8 +167,8 @@ export function playSoundbite(id: SoundbiteId): boolean {
   if (!c || !master) return false;
   // A context suspended by the OS (a backgrounded tab, or a first tap that never
   // came) would otherwise accept the schedule against a clock that is not moving
-  // and empty the whole queue at once on resume.
-  if (c.state !== 'running') { void unlockAudio(); return false; }
+  // and empty the whole queue at once on resume. Shown, not heard.
+  if (c.state !== 'running') { void unlockAudio(); return true; }
 
   const now = c.currentTime;
   if (nextFree < now) nextFree = now;

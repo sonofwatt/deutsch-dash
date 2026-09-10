@@ -6,7 +6,9 @@ import { APP_VERSION } from '../../version';
 import { MAX_PLAYERS } from '../../net/rooms';
 import { ShareInvite } from '../components/ShareInvite';
 import { BadgePicker } from '../components/BadgePicker';
-import { useWoodSide } from '../prefs';
+import { useOptionsOpen, useSoundOn, useWoodSide } from '../prefs';
+import { SoundbiteTray } from '../components/SoundbiteTray';
+import { SoundRain } from '../components/SoundRain';
 import type { PlayerInfo } from '../../game/types';
 
 // Dutch/German-flavoured, to sit alongside the human names without pretending to be one.
@@ -46,6 +48,12 @@ export function Lobby({ code }: { code: string }) {
   const actionError = useGameStore(s => s.actionError);
   const [level, setLevel] = useState<BotLevel>('medium');
   const [woodSide, swapSides] = useWoodSide();
+  // The lobby always allows sound, whatever the host has set for the BOARD: this
+  // is where a table finds out these exist. See SoundbiteTray.
+  const [soundOn, toggleSound] = useSoundOn(true);
+  const say = useGameStore(s => s.say);
+  const setSounds = useGameStore(s => s.setSounds);
+  const [optionsOpen, toggleOptions] = useOptionsOpen(host);
   // Which of my own two fields is open. Both close the moment I ready up.
   const [picking, setPicking] = useState(false);
   // Which player the Remove button is armed for, and nothing armed by default.
@@ -205,6 +213,16 @@ export function Lobby({ code }: { code: string }) {
           {woodSide === 'right' ? 'Right thumb ⇄' : 'Left thumb ⇄'}
         </button>
       </div>
+      {/* The tray is here in full rather than behind a button, and that is the
+          point of putting it in the lobby: this is the calm place, before the
+          cards land, where a player can try the noises out and decide whether
+          their own phone should be making them. On iOS it is also the only
+          place the permission-free audio unlock can happen somewhere unhurried -
+          Safari resumes a suspended AudioContext only from a real tap, and the
+          switch itself is that tap (see prefs.ts and sound/engine.ts). */}
+      <SoundbiteTray on={soundOn} onToggle={toggleSound} onSay={say} />
+      {/* Fixed and untouchable, so it costs the lobby no layout at all. */}
+      <SoundRain />
       {actionError && <p className="error">{actionError}</p>}
 
       {/* Mine, and the only place my own state is shown. Three states, three
@@ -241,12 +259,27 @@ export function Lobby({ code }: { code: string }) {
         </button>
       )}
 
-      {/* The four host options live DOWN HERE, under the buttons that actually
-          start a game. Asked for on 2026-09-09: they are set once by one person
-          and then never touched again, and sitting above the ready button they
-          were four rows of furniture between the room code and the only thing
-          most players come to this screen to press. Below the ready button and
-          the sit-out beneath it, so that pair still reads as one block. */}
+      {/* The host options live DOWN HERE, under the buttons that actually start a
+          game. Asked for on 2026-09-09: they are set once by one person and then
+          never touched again, and sitting above the ready button they were rows
+          of furniture between the room code and the only thing most players come
+          to this screen to press. Below the ready button and the sit-out beneath
+          it, so that pair still reads as one block.
+
+          Collapsed behind a chevron since 2026-09-10, because there are five of
+          them now. The HOST gets them open and everybody else gets them shut:
+          the host is the only person who can change any of them, and for
+          everyone else they describe a match they are about to play anyway. The
+          choice is remembered per device once made either way - see
+          useOptionsOpen. Either way it is one tap, and the list is the same list,
+          because a player still needs to be able to see what they are playing. */}
+      <button className={`btn btn-slim options-head${optionsOpen ? ' open' : ''}`}
+        onClick={toggleOptions} aria-expanded={optionsOpen}
+        aria-label={`Match options, ${optionsOpen ? 'showing' : 'hidden'}. Tap to ${optionsOpen ? 'hide' : 'show'}.`}>
+        <span className="chev" aria-hidden="true">&gt;</span>
+        <span>Match options</span>
+      </button>
+      {optionsOpen && (<>
       <div className="row">
         {/* Room-wide, not a device preference: hints are an advantage, and bot
             difficulty was tuned against a human without them. One switch covers
@@ -284,6 +317,20 @@ export function Lobby({ code }: { code: string }) {
         <input id="fling" type="checkbox" className="toggle" disabled={!host}
           checked={room.meta.flingOn ?? true} onChange={e => setFling(e.target.checked)} />
       </div>
+      <div className="row">
+        {/* The master switch for soundbites ON THE BOARD, and the one host option
+            that defaults OFF. That default is where the "four phones at one table
+            playing the same noise a beat apart" problem is handled: one person
+            decides the table wants this, rather than every phone arriving loud.
+            Switch it on and every player has sound without hunting for a control,
+            because their own switch defaults ON (prefs.ts).
+            It does NOT reach the lobby, which keeps its own tray either way. */}
+        <label className="muted" htmlFor="sounds">Soundbites in the game</label>
+        <span className="spacer" />
+        <input id="sounds" type="checkbox" className="toggle" disabled={!host}
+          checked={room.meta.soundsOn ?? false} onChange={e => setSounds(e.target.checked)} />
+      </div>
+      </>)}
 
       {/* The host keeps a way past a phone that has died: the ready gate must not
           be able to strand a table. It is gone entirely once everyone is ready,

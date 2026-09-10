@@ -21,7 +21,7 @@
  * browser.
  */
 
-import { EMOJI } from '../../game/badges';
+import { EMOJI } from './badges';
 
 export type SoundbiteId =
   | 'cheer' | 'groan' | 'hurry' | 'oops'

@@ -46,6 +46,9 @@
           },
           "paleCards": {
             ".validate": "newData.isBoolean()"
+          },
+          "soundsOn": {
+            ".validate": "newData.isBoolean()"
           }
         },
         "players": {
@@ -94,6 +97,21 @@
         },
         "stats": {
           ".write": "auth != null && root.child('rooms').child($code).child('meta').child('hostId').val() === auth.uid"
+        },
+        "says": {
+          "$uid": {
+            ".write": "auth != null && (auth.uid === $uid || root.child('rooms').child($code).child('meta').child('hostId').val() === auth.uid)",
+            ".validate": "newData.hasChildren(['id', 'at'])",
+            "id": {
+              ".validate": "newData.val().matches(/^(cheer|groan|hurry|oops|laugh|wow|boo|tada)$/)"
+            },
+            "at": {
+              ".validate": "newData.isNumber()"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
         },
         "round": {
           "spaces": {

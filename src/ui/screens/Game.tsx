@@ -14,7 +14,9 @@ import { ThemeToggle } from '../components/ThemeToggle';
 import { dropSpace, spaceCentres, useDrag, type DropTarget, type Point } from '../useDrag';
 import { raceFlashes } from '../raceFlash';
 import { useOpenings } from '../openings';
-import { useWoodSide } from '../prefs';
+import { useSoundOn, useWoodSide } from '../prefs';
+import { SoundLauncher } from '../components/SoundLauncher';
+import { SoundRain } from '../components/SoundRain';
 import type { CenterSpace, PlayerInfo, PlaySource } from '../../game/types';
 import '../game.css';
 
@@ -72,6 +74,18 @@ export function Game() {
   const sinkWood = useGameStore(s => s.sinkWood);
   const kickPlayer = useGameStore(s => s.kickPlayer);
   const [woodSide, swapSides] = useWoodSide();
+  const say = useGameStore(s => s.say);
+  // The host's master switch gates the whole feature on the board. Off, and the
+  // engine is silenced for this screen AND every control below is gone rather
+  // than disabled - see meta.soundsOn.
+  const roomSounds = room.meta.soundsOn ?? false;
+  const [soundOn] = useSoundOn(roomSounds);
+  // Whether the launcher over the Dash pile is showing. The note in the head
+  // island toggles it, so a player who wants the board clear gets it clear
+  // without going near the host's option. Starts hidden: the board is what this
+  // screen is for.
+  const [barOn, setBarOn] = useState(false);
+  const canSound = roomSounds && soundOn;
 
   // The helper hint waits for the player to go quiet, so it never fires under
   // somebody playing at speed. `activity` counts MY input only - deliberately not
@@ -282,6 +296,17 @@ export function Game() {
               forfeits its score, which is far too much to hang on one stray
               thumb in the corner of a board being played at speed. The armed
               state times out by itself so a mis-tap costs nothing. */}
+          {/* GONE, not disabled, when the host has sound off or this player has
+              switched their own off: a control that cannot do anything is worse
+              than no control. It shows or hides the launcher over the Dash pile
+              rather than toggling the sound itself - the sound switches live in
+              the lobby, and mid-round this is about how much board you want. */}
+          {canSound && (
+            <button className="side-swap sound-btn" data-on={barOn ? 'yes' : 'no'}
+              onClick={() => setBarOn(o => !o)} aria-pressed={barOn}
+              aria-label={`Soundbite button, ${barOn ? 'showing' : 'hidden'}. Tap to ${barOn ? 'hide' : 'show'} it.`}
+              title="Soundbites">♪</button>
+          )}
           {arming
             ? <button className="side-swap arming" onClick={() => { setArming(false); setSittingOut(true); }}
                 aria-label="Confirm sitting out of this round">out?</button>
@@ -320,7 +345,8 @@ export function Game() {
             stuck={me.stuckAt != null}
             onSinkWood={stuckAwhile ? sinkWood : undefined}
             postHighlight={targets.posts} onSelect={select} onFlip={flip}
-            onTapPost={i => void playTo({ post: i })} startDrag={startDrag} />
+            onTapPost={i => void playTo({ post: i })} startDrag={startDrag}
+            soundLauncher={canSound && barOn ? <SoundLauncher onSay={say} /> : undefined} />
         </motion.div>
         {/* A host write that was refused. It belongs on THIS screen and not only
             on the score sheet, because the write most likely to fail is the one
@@ -355,6 +381,10 @@ export function Game() {
         )}
       </div>
       {hand && drag && <DragGhost drag={drag} pointer={pointer} badgeId={me.badgeId} />}
+      {/* Beside the drag ghost and outside every drop target, which is what lets
+          it be `position: fixed` and untouchable. A card flicked through the
+          weather lands exactly where it would have. */}
+      <SoundRain />
     </div>
   );
 }

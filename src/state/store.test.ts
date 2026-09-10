@@ -15,8 +15,11 @@ function fakeDeps(over: Partial<Deps> = {}): Deps {
     createRoom: vi.fn(async () => 'ABCDEF'),
     setTargetScore: vi.fn(async () => {}),
     setReady: vi.fn(async () => {}),
+    saySoundbite: vi.fn(async () => {}),
+    playSoundbite: vi.fn(() => true),
     setSittingOut: vi.fn(async () => {}),
     setPaleCards: vi.fn(async () => {}),
+    setSounds: vi.fn(async () => {}),
     setFling: vi.fn(async () => {}),
     setSingleFlip: vi.fn(async () => {}),
     setCountdown: vi.fn(async () => {}),
@@ -1756,5 +1759,160 @@ describe('a wood turn that takes the pile over', () => {
     expect(store.getState().tableau!.wood.map(x => x.v)).toEqual([1, 2, 3, 4, 5]);
     expect(deps.persistWoodIndex).toHaveBeenCalledWith('ABCDEF', 'me', 3);
     expect(deps.persistTableau).not.toHaveBeenCalled();
+  });
+});
+
+describe('soundbites', () => {
+  /** A lobby with two players, and whatever the table has last pressed. */
+  const roomWith = (says: Room['says']): Room => ({
+    meta: { createdAt: 1, hostId: 'me', creatorId: 'me', targetScore: 75, phase: 'lobby', roundNumber: 0 },
+    players: {
+      me:  { name: 'D', badgeId: 'tulip',  joinedAt: 1, connected: true, stuckAt: null, awayAt: null, score: 0 },
+      you: { name: 'S', badgeId: 'clover', joinedAt: 2, connected: true, stuckAt: null, awayAt: null, score: 0 },
+    },
+    round: null,
+    says,
+  });
+
+  /** A store already in a room, plus the handle that feeds it snapshots. */
+  async function inRoom(over: Partial<Deps> = {}) {
+    let cb!: (room: Room | null) => void;
+    const deps = fakeDeps({
+      watchRoom: vi.fn((_c: string, f: (room: Room | null) => void) => { cb = f; return () => {}; }),
+      ...over,
+    });
+    const store = createGameStore(deps);
+    await store.getState().enterRoom('ABCDEF', 'D', 'tulip');
+    return { deps, store, snapshot: (r: Room | null) => cb(r) };
+  }
+
+  it('plays on this device first and tells the room second', async () => {
+    // The local play is the same decision the scowl takes: it lands immediately
+    // and survives a write that never arrives.
+    const { deps, store } = await inRoom();
+    store.getState().say('cheer');
+    expect(deps.playSoundbite).toHaveBeenCalledWith('cheer');
+    expect(deps.saySoundbite).toHaveBeenCalledWith('ABCDEF', 'me', 'cheer');
+  });
+
+  it('still plays locally when the write is refused', async () => {
+    // Fire and forget: a soundbite that does not reach the room is worth no
+    // error on anybody's screen, and must not become an unhandled rejection.
+    const { deps, store } = await inRoom({
+      saySoundbite: vi.fn(async () => { throw new Error('permission_denied'); }),
+    });
+    store.getState().say('boo');
+    expect(deps.playSoundbite).toHaveBeenCalledWith('boo');
+  });
+
+  it('adopts what is already in the room without playing it', async () => {
+    // The node is never swept, so the last press of a game sits there until the
+    // room is deleted. Walking in must not replay it.
+    const { deps, snapshot } = await inRoom();
+    snapshot(roomWith({ you: { id: 'cheer', at: 100 } }));
+    expect(deps.playSoundbite).not.toHaveBeenCalled();
+  });
+
+  it('plays somebody else\'s soundbite when the nonce CHANGES', async () => {
+    const { deps, snapshot } = await inRoom();
+    snapshot(roomWith({ you: { id: 'cheer', at: 100 } }));   // adopted, silent
+    snapshot(roomWith({ you: { id: 'groan', at: 101 } }));
+    expect(deps.playSoundbite).toHaveBeenCalledTimes(1);
+    expect(deps.playSoundbite).toHaveBeenCalledWith('groan');
+  });
+
+  it('plays the SAME soundbite twice when it is pressed twice', async () => {
+    // Which is why the nonce is compared and not the id: a table leaning on one
+    // button is the normal case, not an edge case.
+    const { deps, snapshot } = await inRoom();
+    snapshot(roomWith({ you: { id: 'laugh', at: 100 } }));
+    snapshot(roomWith({ you: { id: 'laugh', at: 101 } }));
+    snapshot(roomWith({ you: { id: 'laugh', at: 102 } }));
+    expect(deps.playSoundbite).toHaveBeenCalledTimes(2);
+  });
+
+  it('says nothing on a snapshot that did not move the nonce', async () => {
+    // Snapshots arrive for every reason there is - a player readying, a card
+    // landing, presence flapping - and almost none of them are a soundbite.
+    const { deps, snapshot } = await inRoom();
+    snapshot(roomWith({ you: { id: 'wow', at: 100 } }));
+    snapshot(roomWith({ you: { id: 'wow', at: 100 } }));
+    snapshot(roomWith({ you: { id: 'wow', at: 100 } }));
+    expect(deps.playSoundbite).not.toHaveBeenCalled();
+  });
+
+  it('never plays my own back to me', async () => {
+    // `say` already played it here. Hearing the echo would be the clip twice,
+    // the second time a round trip late.
+    const { deps, store, snapshot } = await inRoom();
+    snapshot(roomWith(null));
+    store.getState().say('tada');
+    expect(deps.playSoundbite).toHaveBeenCalledTimes(1);
+    snapshot(roomWith({ me: { id: 'tada', at: 200 } }));
+    snapshot(roomWith({ me: { id: 'tada', at: 201 } }));
+    expect(deps.playSoundbite).toHaveBeenCalledTimes(1);
+  });
+
+  it('plays one per player when several press at once', async () => {
+    const { deps, snapshot } = await inRoom();
+    snapshot(roomWith({ you: { id: 'cheer', at: 100 }, them: { id: 'boo', at: 100 } }));
+    snapshot(roomWith({ you: { id: 'cheer', at: 101 }, them: { id: 'boo', at: 101 } }));
+    expect(deps.playSoundbite).toHaveBeenCalledTimes(2);
+  });
+
+  it('forgets the nonces on leaving, so coming back is not a replay', async () => {
+    // enterRoom goes through watch(), which clears the map. Without that, a
+    // rejoin compares against nonces from the last visit and fires whatever has
+    // changed since - a burst of noise on arrival.
+    const { deps, store, snapshot } = await inRoom();
+    snapshot(roomWith({ you: { id: 'cheer', at: 100 } }));
+    store.getState().leave();
+    await store.getState().enterRoom('ABCDEF', 'D', 'tulip');
+    snapshot(roomWith({ you: { id: 'groan', at: 999 } }));
+    expect(deps.playSoundbite).not.toHaveBeenCalled();
+  });
+
+  it('marks a soundbite for the emoji rain when it actually played here', async () => {
+    const { store, snapshot } = await inRoom();
+    snapshot(roomWith(null));
+    expect(store.getState().lastSound).toBeNull();
+    store.getState().say('cheer');
+    expect(store.getState().lastSound).toMatchObject({ id: 'cheer' });
+  });
+
+  it('rains nothing on a device that did not play it', async () => {
+    // playSoundbite returns false when this phone is switched off, or when the
+    // host has taken sound off the board. The rain follows the sound: an emoji
+    // falling on a silent phone would be the feature leaking past its own switch.
+    const { store, snapshot } = await inRoom({ playSoundbite: vi.fn(() => false) });
+    snapshot(roomWith(null));
+    store.getState().say('cheer');
+    expect(store.getState().lastSound).toBeNull();
+    snapshot(roomWith({ you: { id: 'boo', at: 1 } }));
+    snapshot(roomWith({ you: { id: 'boo', at: 2 } }));
+    expect(store.getState().lastSound).toBeNull();
+  });
+
+  it('rains somebody else\'s soundbite too, with a fresh nonce each time', async () => {
+    const { store, snapshot } = await inRoom();
+    snapshot(roomWith({ you: { id: 'wow', at: 1 } }));
+    snapshot(roomWith({ you: { id: 'wow', at: 2 } }));
+    const first = store.getState().lastSound!;
+    expect(first).toMatchObject({ id: 'wow' });
+    // The same soundbite again must move `seq`, or the rain would not remount and
+    // the second press would fall silently in both senses. A counter and not a
+    // clock, so this holds even when both land inside one millisecond.
+    snapshot(roomWith({ you: { id: 'wow', at: 3 } }));
+    const second = store.getState().lastSound!;
+    expect(second.id).toBe('wow');
+    expect(second.seq).toBeGreaterThan(first.seq);
+  });
+
+  it('copes with a room that has no says node at all', async () => {
+    // Every room written before this shipped, and every test fixture.
+    const { deps, snapshot } = await inRoom();
+    snapshot(roomWith(undefined));
+    snapshot(roomWith(null));
+    expect(deps.playSoundbite).not.toHaveBeenCalled();
   });
 });
