@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useGameStore } from '../../state/store';
 import { SOUNDBITES } from '../../game/soundbites';
+import { expireFall, noteFall, seedFalls } from '../sound/soundFalls';
 
 /**
  * The soundbite's emoji, falling.
@@ -37,39 +38,58 @@ export const RAIN_MS = 1800;
 export function SoundRain() {
   const lastSound = useGameStore(s => s.lastSound);
   const seq = lastSound?.seq ?? null;
-  // `done` holds the nonce that has finished FALLING, and showing is derived from
-  // it rather than set alongside it. A second soundbite arriving mid-fall gets a
-  // nonce that no longer matches `done`, so the layer restarts instead of being
-  // swallowed by a timer already running - and nothing sets state during the
-  // effect, only from the timeout. Same shape as the hint's activity epoch in
-  // Game.tsx.
-  const [done, setDone] = useState<number | null>(null);
+  /**
+   * Which falls are on screen, and which nonce has been accounted for. Both live
+   * in `soundFalls.ts`, which is pure and holds the two behaviours that were
+   * reported as bugs: falls STACK rather than replacing each other, and a fresh
+   * mount adopts whatever was last played instead of replaying it.
+   *
+   * Seeded lazily so the adopt happens once, at mount, off the store as it stands
+   * then - which is the whole of the fix for emoji arriving at the start of a
+   * round.
+   */
+  const [state, setState] = useState(() => seedFalls(seq));
+  const { falls } = state;
+
   useEffect(() => {
-    if (seq == null) return;
-    const t = setTimeout(() => setDone(seq), RAIN_MS);
+    const id = lastSound?.id;
+    if (seq == null || !id) return;
+    setState(prev => noteFall(prev, id, seq));
+    const t = setTimeout(() => setState(prev => expireFall(prev, seq)), RAIN_MS);
     return () => clearTimeout(t);
+    // `seq` is the nonce and the only thing that may add a fall: reading
+    // `lastSound` here would re-run on an unrelated store write.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seq]);
 
-  if (!lastSound || seq == null || done === seq) return null;
-  const glyph = SOUNDBITES[lastSound.id]?.glyph;
-  if (!glyph) return null;
+  if (falls.length === 0) return null;
   return (
-    // Keyed on the nonce so the same soundbite twice in a row remounts and
-    // replays, rather than sitting there having already finished. Same trick the
-    // race flash uses on its own `at`, but a counter rather than a clock - see
-    // `lastSound` in the store for why that distinction is load bearing.
-    <div className="sound-rain" key={seq} aria-hidden="true">
-      {Array.from({ length: DROPS }, (_, i) => (
-        <span key={i} className="sound-drop" style={{
-          // Fixed lanes rather than a random scatter: this remounts often, and a
-          // fresh roll every time reads as flicker rather than as weather.
-          left: `${6 + i * 13.5 + (i % 2 ? 3 : 0)}%`,
-          ['--delay' as string]: `${(i % 4) * 80}ms`,
-          ['--dur' as string]: `${950 + (i % 3) * 160}ms`,
-          ['--spin' as string]: `${i % 2 ? 18 : -18}deg`,
-          ['--end' as string]: `${28 + (i % 3) * 4}vh`,
-        }}>{glyph}</span>
-      ))}
-    </div>
+    <>
+      {falls.map(fall => {
+        const glyph = SOUNDBITES[fall.id]?.glyph;
+        if (!glyph) return null;
+        return (
+          // Keyed on the nonce so the same soundbite twice in a row is two
+          // layers rather than one that restarts. Same trick the race flash uses
+          // on its own `at`, but a counter rather than a clock - see `lastSound`
+          // in the store for why that distinction is load bearing.
+          <div className="sound-rain" key={fall.seq} aria-hidden="true">
+            {Array.from({ length: DROPS }, (_, i) => (
+              <span key={i} className="sound-drop" style={{
+                // Fixed lanes rather than a random scatter: this remounts often,
+                // and a fresh roll every time reads as flicker rather than as
+                // weather. Nudged by the nonce so two falls at once are not one
+                // fall in bold - a whole lane apart would break the lanes.
+                left: `${6 + i * 13.5 + (i % 2 ? 3 : 0) + (fall.seq % 3) * 2}%`,
+                ['--delay' as string]: `${(i % 4) * 80}ms`,
+                ['--dur' as string]: `${950 + (i % 3) * 160}ms`,
+                ['--spin' as string]: `${i % 2 ? 18 : -18}deg`,
+                ['--end' as string]: `${28 + (i % 3) * 4}vh`,
+              }}>{glyph}</span>
+            ))}
+          </div>
+        );
+      })}
+    </>
   );
 }

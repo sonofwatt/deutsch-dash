@@ -136,15 +136,29 @@ export const SOUNDBITES: Record<SoundbiteId, Soundbite> = {
       { kind: 'tone', at: 0, dur: 0.50, gain: 0.35, freq: 150, toFreq: 98, wave: 'sawtooth' },
     ],
   },
-  // A two-note fanfare with a wash of bright noise over the second, which is the
-  // cheapest thing that sounds like more instruments than it is.
+  // A soft chime: three sine partials of one bell, struck once and left to ring.
+  //
+  // This slot WAS a two-note fanfare with a wash of bright noise over the second,
+  // and it was reported as too harsh - which it was, and for two reasons worth
+  // keeping written down. The noise burst was lowpassed at 6kHz, so most of its
+  // energy sat exactly where a phone speaker is most peaky and an ear is most
+  // sensitive; and the top triangle at 1319Hz put a stack of odd harmonics above
+  // that. Sines carry no harmonics at all, and nothing here reaches past 1kHz.
+  //
+  // Still the celebratory one, so it keeps the sparkle glyph, and it keeps the id
+  // `tada` DELIBERATELY: the id is enumerated in `database.rules.json`, so
+  // renaming it would need a rules deploy to go out before any client could send
+  // the new one, and the id is not a thing a player ever sees.
   tada: {
-    id: 'tada', label: 'Ta-da', glyph: '\u{2728}' + EMOJI,
+    id: 'tada', label: 'Nice one', glyph: '\u{2728}' + EMOJI,
     voices: [
-      { kind: 'tone',  at: 0.00, dur: 0.14, gain: 0.45, freq: 659, wave: 'triangle' },
-      { kind: 'tone',  at: 0.12, dur: 0.45, gain: 0.50, freq: 988, wave: 'triangle' },
-      { kind: 'tone',  at: 0.12, dur: 0.45, gain: 0.30, freq: 1319, wave: 'triangle' },
-      { kind: 'noise', at: 0.12, dur: 0.35, gain: 0.18, freq: 6000 },
+      // The strike, and the fifth above it a breath later: two notes of the same
+      // bell rather than two notes of a fanfare.
+      { kind: 'tone', at: 0.00, dur: 0.66, gain: 0.38, freq: 587, wave: 'sine' },
+      { kind: 'tone', at: 0.06, dur: 0.70, gain: 0.30, freq: 880, wave: 'sine' },
+      // The shimmer, well under the other two and decaying first, which is what
+      // makes it read as one struck thing rather than as a third note.
+      { kind: 'tone', at: 0.06, dur: 0.40, gain: 0.12, freq: 1175, wave: 'sine' },
     ],
   },
 };

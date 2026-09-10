@@ -39,8 +39,13 @@ describe('the soundbite catalogue', () => {
   });
 
   it('keeps every clip short enough to be a soundbite', () => {
-    // These are punctuation at a table, not tunes. Anything approaching a second
-    // starts queueing behind itself the moment two people press at once.
+    // These are punctuation at a table, not tunes.
+    //
+    // The reason used to be the queue: a long clip made the next one wait. There
+    // is no queue any more (clips overlap - see engine.ts), so the reason is now
+    // the overlap itself. Pressing a button twice is meant to sound like two
+    // presses, and past about this length the second lands so far inside the
+    // first that they read as one muddled noise instead.
     const long = ALL.filter(b => clipLength(b.voices) > 0.8).map(b => [b.id, clipLength(b.voices)]);
     expect(long).toEqual([]);
   });

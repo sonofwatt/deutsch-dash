@@ -13,26 +13,31 @@
  * an audio device at all.
  */
 
-import { SOUNDBITES, clipLength, type SoundbiteId, type Voice } from '../../game/soundbites';
+import { SOUNDBITES, type SoundbiteId, type Voice } from '../../game/soundbites';
 
 /** Trim under every clip, so the recipes can be written at comfortable peaks. */
 const MASTER = 0.5;
-/** A beat between queued clips, so two in a row are two and not one long one. */
-const GAP_S = 0.06;
+
 /**
- * How far ahead the queue will schedule before it starts dropping clips.
+ * **Clips overlap. There is no queue.**
  *
- * A table that is enjoying itself can press faster than the clips play, and
- * without this the queue simply grows: the noises arrive later and later until
- * they are commentary on a round that finished. Better to drop them. Two seconds
- * is about four clips deep, which is enough that a genuine flurry all lands.
+ * There was one: each clip was scheduled after the last had finished, with a beat
+ * between them, on the reasoning that two clips on top of each other is a noise
+ * rather than two messages. Playing the table found the cost of that, and it was
+ * bigger than the benefit: a player pressing a button twice heard the second
+ * press a clip and a half later, which does not read as a second press at all. It
+ * reads as lag. Reported as "there is a delay when pressing the sound effect
+ * button", along with the ask that pressing repeatedly should simply play
+ * repeatedly.
+ *
+ * So every clip now starts at `currentTime` and they pile up. The limiter in
+ * `audio()` is what makes that safe, and it was always there for exactly this -
+ * it is why the recipes can be careless about stacking.
  */
-const MAX_QUEUE_S = 2;
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 let noise: AudioBuffer | null = null;
-let nextFree = 0;
 let enabled = false;
 
 /**
@@ -73,7 +78,6 @@ function audio(): AudioContext | null {
   master = ctx.createGain();
   master.gain.value = MASTER;
   master.connect(limiter).connect(ctx.destination);
-  nextFree = ctx.currentTime;
   return ctx;
 }
 
@@ -143,21 +147,28 @@ function schedule(c: AudioContext, out: GainNode, v: Voice, start: number): void
   osc.stop(t + v.dur);
 }
 
+/** Every voice of one clip, scheduled from now. Overlapping whatever is playing. */
+function fire(c: AudioContext, out: GainNode, bite: { voices: Voice[] }): void {
+  const start = c.currentTime;
+  for (const v of bite.voices) schedule(c, out, v, start);
+}
+
 /**
- * Play one soundbite, or queue it behind the one already going.
- *
- * They never overlap, which is the whole reason there is a queue: two players
- * pressing at the same moment is common at a table, and two clips on top of each
- * other is a noise rather than two messages.
+ * Play one soundbite, immediately, on top of anything already sounding.
  *
  * **Returns whether the soundbite REACHED this device**, which is a slightly
  * different question from whether a sound came out, and it is the one the caller
  * needs: the emoji rain is keyed off this. A device that is switched off gets
- * neither. A device whose context has not been unlocked yet gets the emoji and
- * misses the noise, which is the right way round - the glyph is the half that
- * still works when the audio does not. A clip dropped for backing the queue up
- * gets neither, so a player leaning on the buttons cannot bury the screen in
- * emoji either.
+ * neither. A device whose context is still waking gets the emoji now and the
+ * noise a moment later, which is the right way round - the glyph is the half that
+ * still works when the audio does not.
+ *
+ * **A suspended context is resumed and then PLAYED, not skipped.** It used to
+ * return here, which was the reported bug: every context starts suspended and is
+ * only allowed to resume inside a real gesture, so the very first press of a
+ * soundbite resumed the device and made no sound, and the second one worked. The
+ * resume is still asynchronous - it has to be - so the clip is fired from its
+ * continuation rather than scheduled against a clock that is not yet moving.
  */
 export function playSoundbite(id: SoundbiteId): boolean {
   if (!enabled) return false;
@@ -165,22 +176,19 @@ export function playSoundbite(id: SoundbiteId): boolean {
   if (!bite) return false;
   const c = audio();
   if (!c || !master) return false;
-  // A context suspended by the OS (a backgrounded tab, or a first tap that never
-  // came) would otherwise accept the schedule against a clock that is not moving
-  // and empty the whole queue at once on resume. Shown, not heard.
-  if (c.state !== 'running') { void unlockAudio(); return true; }
-
-  const now = c.currentTime;
-  if (nextFree < now) nextFree = now;
-  if (nextFree - now > MAX_QUEUE_S) return false;
-
-  const start = nextFree;
-  for (const v of bite.voices) schedule(c, master, v, start);
-  nextFree = start + clipLength(bite.voices) + GAP_S;
+  if (c.state !== 'running') {
+    void unlockAudio().then(() => {
+      // Re-checked on the way back in: the player may have switched sound off, or
+      // the context been torn down and rebuilt, while the resume was in flight.
+      if (enabled && ctx === c && master && c.state === 'running') fire(c, master, bite);
+    });
+    return true;
+  }
+  fire(c, master, bite);
   return true;
 }
 
-/** Tests only: forget the context and the queue between cases. */
+/** Tests only: forget the context between cases. */
 export function resetSoundForTests(): void {
-  ctx = null; master = null; noise = null; nextFree = 0; enabled = false;
+  ctx = null; master = null; noise = null; enabled = false;
 }

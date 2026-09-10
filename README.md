@@ -165,7 +165,7 @@ had played to the middle stay there - other people are building on them.
 
 ## Host options
 
-Four controls in the lobby, all set by the host and all applying to the whole
+Five controls in the lobby, all set by the host and all applying to the whole
 room rather than to one device - everybody should be playing the same game.
 
 **Play to** 25, 50, 75 or 100 points.
@@ -210,6 +210,29 @@ is 4 × players spaces and every player holds one Ace per colour, each colour ha
 exactly as many spaces as there are Aces of it - so an Ace always has somewhere to
 go. (That is only true because the space cap was raised to 32; see the house rules
 below.)
+
+## Soundbites
+
+Eight short noises a player can throw at the table - Cheer, Groan, Hurry up,
+Oops, Laugh, Wow, Boo and Nice one - drawn as a falling emoji on every screen
+that receives them, so they still land on a phone that is face down or silenced.
+They are synthesised at play time rather than loaded, so they add nothing to the
+download.
+
+**Two switches, and both have to be on.** The host decides whether the board has
+soundbites at all (off by default); each player decides whether their own phone
+joins in (also off). They always work in the lobby, whatever the host has set,
+because the lobby is where a table finds out they exist.
+
+**The button sits over the Dash pile, and it takes two gestures:**
+
+- **Tap** it and the menu opens and stays open. Press as many sounds as you like,
+  as often as you like - pressing the same one repeatedly plays it repeatedly and
+  the emoji pile up. Close it by tapping the button again, or by pressing
+  anywhere else on the screen.
+- **Press and hold**, slide onto a sound and let go: it plays once and the menu
+  closes with it. One movement, for mid-round when you want to get straight back
+  to your cards.
 
 ## AI players
 

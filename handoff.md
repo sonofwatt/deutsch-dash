@@ -53,7 +53,7 @@ both directions before releasing: the new client against the rules still live,
 and the PREVIOUS client against the new rules, which is the half this file's own
 warning cannot cover._
 
-_**709 tests** (558 unit and 99 in a real browser; 52 against the emulator, all
+_**726 tests** (575 unit and 99 in a real browser; 52 against the emulator, all
 green). This is the only place in the repo that quotes a count -
 it drifted three separate ways when it lived in four places, so keep it here and
 nowhere else. Both sides of the 2026-09-04 merge rewrote this line, which is the
@@ -920,12 +920,15 @@ comparing the constant to itself would pass however it changed.
 ### The table can make a noise _(2026-09-10)_
 
 Eight canned soundbites a player can throw at the table: Cheer, Groan, Hurry up,
-Oops, Laugh, Wow, Boo and Ta-da. This is the **cheaper alternative** out of
+Oops, Laugh, Wow, Boo and Nice one. This is the **cheaper alternative** out of
 `docs/audio-2026-09-09.md`, built first on that document's own argument. No
 microphone, no permission prompt, no upload, no moderation problem and no
-normalisation problem. It is also not throwaway work: the playback path, the
-one-at-a-time queue and the per-device switch are the same pieces real voice
-clips would need.
+normalisation problem. It is also not throwaway work: the playback path and the
+per-device switch are the same pieces real voice clips would need.
+
+**Read "Six things the first table found" below before changing any of this.** The
+playback path, the menu's gestures and the emoji layer were all reworked the same
+day this shipped, and three of the paragraphs here describe how it used to be.
 
 #### Two switches, and which way each one defaults
 
@@ -1013,11 +1016,12 @@ glyph falling from the top of the screen, stopping about a third of the way down
 
 A soundbite you can only hear misses anybody whose phone is face down, silenced
 by the OS, or simply not being looked at. Which is also why `playSoundbite`
-returns **"reached this device"** rather than "made a noise": a context that has
-not been unlocked yet gets the emoji and misses the sound, and the glyph is the
-half that still works when the audio does not. A clip dropped for backing the
-queue up gets neither, so a player leaning on the buttons cannot bury the screen
-in emoji either.
+returns **"reached this device"** rather than "made a noise": a context that is
+still waking gets the emoji now and the sound a moment later, and the glyph is the
+half that still works when the audio does not.
+
+**Falls stack.** Repeated presses pile up rather than replacing each other, capped
+at six layers with the OLDEST dropped - see "Six things the first table found".
 
 **A third of the way down, not the whole screen.** The dash splash falls the full
 height because it IS the moment and owns the screen for 3.6 seconds; this arrives
@@ -1125,11 +1129,8 @@ the count stops fitting the grid.
   never gets there never allocates an audio device at all. Verified in a real
   browser: a client with sound off reports zero `AudioContext`s after another
   client has pressed a soundbite.
-- **The queue never overlaps two clips.** Two players pressing at the same moment
-  is common at a table, and two clips on top of each other is a noise rather than
-  two messages. It also drops anything that would land more than two seconds out,
-  or a table enjoying itself backs the queue up until the noises are commentary
-  on a round that finished.
+- **There is no queue: clips overlap.** There was one, and it was the first thing
+  the table complained about - see below. Every clip now starts at `currentTime`.
 - **A limiter on the master**, threshold -6, ratio 20, 3ms attack. Same shape as
   the one the research note put on the receiving end of a voice clip, and the
   reason the recipes can be careless about stacking.
@@ -1482,6 +1483,62 @@ became, written by the host in `commitScores` beside the rest of the tally.
   panel says so rather than rendering an empty box.
 - A round with a TOTAL but no DELTA is a round that player sat out. A round with
   no total for them at all is a round they were not in, and it is left out.
+
+### Six things the first table found in the soundbites _(2026-09-10)_
+
+All six came off one message, hours after the feature shipped, and four of them
+were the same mistake in different clothes: **the machinery was built to protect
+the table from too much sound, and the table wanted more.**
+
+**Two bugs.**
+
+- **The first press of a soundbite made no sound.** Every `AudioContext` starts
+  suspended and may only be resumed inside a real gesture, and `playSoundbite`
+  returned at that point - so the first press woke the device and went quiet, and
+  the second one worked. It now resumes and then FIRES, from the resume's own
+  continuation, because the schedule still cannot be written against a clock that
+  is not moving. `engine.test.ts` exists for this: there is no `AudioContext` in
+  node, which is why this half had no test and why the bug got out.
+- **Emoji fell at the start of a round.** `lastSound` is a nonce and is never
+  cleared, so it outlives the screen it was played on, and `SoundRain` mounts once
+  on the lobby and again on the board. A soundbite pressed in the lobby therefore
+  rained over the first board nobody had touched yet. The layer now adopts
+  whatever the store holds AT MOUNT, which is the same "arriving somewhere is not
+  an event" rule the store's own `saidAt` map follows. Reported as random, and it
+  was not: it was every game where somebody pressed one in the lobby.
+
+**Four things that were working as designed and wrong anyway.**
+
+- **The queue is gone.** Clips were scheduled one after another so they would
+  never overlap, on the reasoning that two clips at once is a noise rather than
+  two messages. At a table that reads as lag: press twice and the second arrives a
+  clip and a half later, which does not read as a second press at all. Every clip
+  now starts at `currentTime` and they pile up. **The limiter is what makes that
+  safe, and it was always there for exactly this** - it is why the recipes could
+  be careless about stacking in the first place.
+- **The emoji stack too.** One layer keyed on the nonce meant a second press
+  restarted the first mid-fall, which looks identical to one that was never
+  interrupted - so pressing twice looked like pressing once. Capped at six with
+  the oldest dropped, so the screen always shows the most recent presses.
+- **The menu stays open.** It closed on every soundbite pressed, so a table firing
+  off three in a row reopened it twice. **The auto-close now belongs to the HOLD
+  gesture and to nothing else**, which is the whole difference between the two:
+  a hold is one soundbite and back to the board, a tap is a menu that stays until
+  you put it away. Three things close it - the launch button tapped again (it is a
+  toggle now), a press outside it, or the hold completing.
+- **Ta-da was too harsh**, and it is a soft chime now. Worth knowing WHY, because
+  it is a trap for the next recipe: its noise burst was lowpassed at 6kHz, which
+  puts most of its energy exactly where a phone speaker is peaky and an ear is
+  most sensitive, and the triangle at 1319Hz stacked odd harmonics on top of that.
+  The replacement is three sine partials of one bell, nothing above 1kHz, no
+  noise. **It keeps the id `tada`** - the ids are enumerated in
+  `database.rules.json`, so renaming one needs a rules deploy out in front of any
+  client that sends it, and a player never sees the id. The label is "Nice one".
+
+**Two pure modules came out of the components**, `launchGesture.ts` and
+`soundFalls.ts`, for the reason `hitTest.ts` gives: there is no DOM anywhere in
+this test suite, so behaviour left inside a component cannot be tested at all.
+Both of the bugs above and both of the gesture rules are pinned in them now.
 
 ### A wood turn at half speed, and the gather in the middle of it _(2026-09-10)_
 
@@ -3058,8 +3115,9 @@ clean run: `reconcileTableau` filters post stacks by centre membership and
   - **Sound effects on game events** (Part 2 of the research note), ranked there
     by value. A lost race is the one worth having first: today it is a flash you
     often miss because you were looking at your own hand. The playback path, the
-    one-at-a-time queue and the switch all exist now, so the work is the recipes
-    and the wiring, not the machinery. Watch the frequency: a centre-space land
+    limiter and the switch all exist now, so the work is the recipes and the
+    wiring, not the machinery. Note that the queue does NOT exist any more, so an
+    event sound has nothing holding it back from stacking on itself - Watch the frequency: a centre-space land
     is the most common event in the game and needs to be under 60ms and
     pitch-varied per play, or it is a machine gun.
   - **Quick voice messages** (Part 1). Still the bigger job and still worth doing
@@ -3600,6 +3658,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `4612f2e` | The fire falls only on a run of two or more dashes, and the glyph count stays the same with it or without it |
 | `952ebb5` | The wood cards overlap again, and the gather is 250ms |
 | `951705e` | A drift sweep over this file: createRoom is one write and had been for a while, the wood nonce is woodTurnover, and the lint tally is eight |
+| _pending_ | Six soundbite fixes: the first press, the queue, the sticky menu, the stack, the chime |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
