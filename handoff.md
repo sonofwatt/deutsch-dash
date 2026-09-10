@@ -137,6 +137,15 @@ constructs `TableauView` / `CenterGrid` prop objects as complete literals, so
 props optional, or update that file in the same commit. Half the features below
 hit this.
 
+**It is not only props, and not only that file.** Any test fixture that builds an
+exported type as a complete literal has the same edge on it: adding `dashStreak`
+to `PlayerStats` broke the build through `commentary.test.ts`, which spelled one
+out field by field. The fix each time is the same - build the fixture by
+spreading a constant (`NO_PLAYER_STATS`) or make the field optional - and the
+exception is worth knowing too: `stats.test.ts` still writes that record out in
+full deliberately, because it is the one place pinning what a brand-new player's
+stats ARE, and comparing the constant to itself would pass however it changed.
+
 **There is no DOM anywhere in the test suite.** `vite.config.ts` sets
 `environment: 'node'`, so `localStorage` is undefined. **Any `localStorage` read
 at module scope throws at import time**, and because `src/state/store.ts` builds
@@ -206,10 +215,16 @@ says why. Whoever pressed it will report that soundbites work.
   `npm run dev` and every test point at the emulator and can never write the live
   database. Only a production build reaches the real project. Opt in deliberately
   with `VITE_USE_PROD=1 npm run dev`.
-- `createRoom` performs **two sequential writes, not one atomic `set()`**. The
-  `players/$uid` validate rule cross-references `meta/phase`, and that only
-  resolves reliably when meta is already committed. Collapsing them breaks room
-  creation.
+- `createRoom` performs **one atomic multi-path `update()`**. It was two
+  sequential writes for a long time, and this file said so for longer than it was
+  true, so the note is worth keeping rather than deleting: the reason for the
+  split was that `players/$uid`'s validate read `meta/phase`, which only resolved
+  against data already committed. Nothing reads `meta/phase` from the rules any
+  more - the lobby-only gate went when spectators were admitted mid-round - so
+  the merge is legal, and `root` is evaluated against the PRE-write tree where
+  the room has no players yet, which is the branch `hostId` and `creatorId`'s
+  validates take. Worth a round trip, and worth more because a create can no
+  longer be interrupted halfway and leave a `meta` behind with no players in it.
 - `joinRoom` must write `meta/playerCount` with the `increment(1)` sentinel and
   never `snapshotCount + 1` - two racers reading 7 would both send the literal 8
   and both satisfy the validate. That's a confirmed race that admitted a 9th
@@ -237,10 +252,11 @@ says why. Whoever pressed it will report that soundbites work.
   untouched - `meta/playerCount`'s own validate is what enforces it, which is why
   it is a tracked counter rather than a live child count. Both halves are pinned
   in `rooms.emu.test.ts`: a mid-game join succeeds, a ninth player still fails.
-- `createRoom`'s two sequential writes are kept. The reason given here used to be
-  that `players/$uid`'s validate read `meta/phase`; with that gone, what remains
-  is `meta/hostId`'s validate reading `players`. The shape is what the emulator
-  tests seed against, so leave it alone unless you are prepared to re-prove it.
+- `createRoom`'s two sequential writes are **gone**: it is one atomic write now,
+  for the reasons above. What the emulator tests seed against is still the two-step
+  shape (`seedRoom` writes `meta` and then the players), and that is deliberate -
+  it is the shape a JOIN produces, and proving the rules accept both is worth
+  more than making the fixture match one caller.
 
 ### CI runs the emulator suite - keep it that way
 
@@ -1898,8 +1914,9 @@ TWO face down on both sides of its turn-over, which is exactly the pile the tabl
 was playing when this was built - the first attempt watched that count, and the
 animation never fired once. Reordering is not a giveaway either, because a card
 sunk out of the pile looks identical from outside. `flip` is the one place that
-knows for certain, so it stamps `woodCollectedAt`, and the board plays the move
-once per new value. It is a nonce for an animation, never persisted, never read
+knows for certain, so it stamps `woodTurnover` (`woodCollectedAt` until the
+half-speed deal gave it a card count to carry), and the board plays the move once
+per new value. It is a nonce for an animation, never persisted, never read
 back, and `store.test.ts` pins that an ordinary turn does not stamp it.
 
 Two details worth keeping:
@@ -3463,8 +3480,11 @@ the ledgered pointer-capture re-select check on mouse drags.
 - CI runs on push to `main` only, so it gates the deploy and not the merge, and
   the actions are on floating major tags with no Dependabot. Both are fine for
   one author pushing to main and worth revisiting when a second appears.
-- `oxlint` reports 7 warnings, all `react(only-export-components)` fast-refresh
-  hints plus two pre-existing `RoomScreen` warnings. Zero errors.
+- `oxlint` reports 8 warnings and zero errors: six `react(only-export-components)`
+  fast-refresh hints (`App.tsx` twice, `CenterGrid`, `PileStack`, `ShareInvite`,
+  `TableauView`) and two on `GameRoute` - a `react(purity)` for `Date.now` in
+  render and a `react(set-state-in-effect)`. The count is worth keeping honest,
+  because "no NEW warnings" is the only thing it is useful for.
 - ShareInvite clipboard try/catch; rejection-shake remounts the tableau;
   room-code collision check on create; the bell's hue sits near suit red (the
   kite's near-blue went with the kite); host transfer disabled in lobby

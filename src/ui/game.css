@@ -51,18 +51,19 @@
   user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; overflow: hidden; }
 /* The theme toggle is inside the head's pill on this screen, so nothing is
    floating over the row and no corner needs reserving. */
-/* position: relative so the soundbite tray can hang off it without joining the
-   grid. See .soundbite-pop in ui.css for why it must not take a track. */
 /* `min-width: 0` because .game's single implicit column is `auto`, and a grid
    item's automatic minimum is its MIN-CONTENT width - so a head row that did not
    fit did not shrink, it made the column wider than the phone and pushed its own
    right-hand end off the screen. That is not a hypothetical: a fourth button in
    the island beside the reconnecting pill did exactly that at 393px. Same
-   minmax(0, ...) reasoning as .board's middle column, one level up.
-   position: relative anchors the soundbite tray, which must not join the grid -
-   see .soundbite-pop in ui.css. Measured in gameHeadLayout.test.ts. */
+   minmax(0, ...) reasoning as .board's middle column, one level up. Measured in
+   gameHeadLayout.test.ts.
+   It carried `position: relative` while the soundbite tray hung off it as a
+   popover. The tray moved to the Dash pile (.sb-launch-wrap anchors against
+   .tableau-row now), nothing in this row is positioned any more, and the rule
+   went with the thing it was for. */
 .game-head { display: flex; align-items: center; gap: 8px; font-size: 13px;
-  position: relative; min-width: 0; }
+  min-width: 0; }
 /* The name and score are the one thing in this row allowed to give. Everything
    else is a control or a fixed fact - the round number, the reconnecting pill,
    the button island - and the row must not wrap, because the head is an `auto`
