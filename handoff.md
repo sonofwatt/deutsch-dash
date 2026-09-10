@@ -3728,7 +3728,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `951705e` | A drift sweep over this file: createRoom is one write and had been for a while, the wood nonce is woodTurnover, and the lint tally is eight |
 | `0e1adb7` | Six soundbite fixes: the first press, the queue, the sticky menu, the stack, the chime |
 | `1e1a4d8` | Another 50ms off the wood step, so the cards overlap by 100ms |
-| _pending_ | A finished pile turns over to show whose it was; the bots hesitate |
+| `28f4d70` | A finished pile turns over to show whose it was; the bots hesitate |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
