@@ -3022,7 +3022,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `b10c891` | A two second race window, and a halo for every player who went for the space |
 | `f59bb68` | The haloes arrive one at a time, the first one centred |
 | `55abb9b` | The flick cone down to 20 degrees, in the game and on the bench together |
-| `PENDING` | The near radius down to 25px, which moves the swept band with it |
+| `57d1c1e` | The near radius down to 25px, which moves the swept band with it |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
