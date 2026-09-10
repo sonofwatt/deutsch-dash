@@ -4,7 +4,7 @@ import { depthLayers } from './PileStack';
 import { cardId, type Card, type CenterSpace } from '../../game/types';
 import { EMOJI, type BadgeId } from '../../game/badges';
 import { orderlyColumns } from '../../game/rules';
-import { faceOffset, type RaceFlash } from '../raceFlash';
+import { faceDelay, faceOffset, type RaceFlash } from '../raceFlash';
 import type { Opening } from '../openings';
 
 /** The box the grid has to fill, in CSS pixels. */
@@ -238,14 +238,17 @@ export function CenterGrid(props: {
                     the animation. The element then simply sits at opacity 0 - no
                     timer clears it, which is why nothing here needs a clock. */}
                 {props.races?.[i] && Array.from({ length: props.races[i].n }, (_, f) => (
-                  /* One face per loser, fanned either side of the middle so the
-                     third is not simply hidden under the first. The fan is
-                     centred whatever the count, so a single face sits exactly
-                     where it always did, and --off is a percentage of the SLOT
-                     (the span is inset:0 on it), not of the face. */
+                  /* One face per loser, arriving one at a time and fanned
+                     either side of the middle. The first is centred and undelayed,
+                     so a single face behaves exactly as it always did; --off is a
+                     percentage of the SLOT (the span is inset:0 on it), not of the
+                     face. The base `.race-flash` is opacity 0, which is what keeps
+                     a face invisible until its own delay is up without the
+                     animation needing a backwards fill. */
                   <span key={`${props.races![i].at}:${f}`}
                     className={`race-flash race-${props.races![i].kind}`}
-                    style={{ ['--off' as string]: `${faceOffset(f, props.races![i].n)}%` }}>
+                    style={{ ['--off' as string]: `${faceOffset(f, props.races![i].n)}%`,
+                             animationDelay: `${faceDelay(f)}ms` }}>
                     {(props.races![i].kind === 'angry' ? '😠' : '😇') + EMOJI}
                   </span>
                 ))}

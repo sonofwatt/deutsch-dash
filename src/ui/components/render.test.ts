@@ -9,7 +9,7 @@ import { ScoreRow } from './ScoreRow';
 import { DashSplash } from './DashSplash';
 import { ScoreList } from './ScoreList';
 import { rankRows } from '../scoreRanks';
-import { faceOffset, raceFlashes } from '../raceFlash';
+import { faceOffset, raceFlashes, HALO_CYCLE_MS, HALO_STAGGER_MS } from '../raceFlash';
 import { RACE_GRACE_MS } from '../../state/store';
 import { orderlySpaces } from '../../game/center';
 import { orderlyColumns, spaceCountForPlayers } from '../../game/rules';
@@ -727,21 +727,51 @@ describe('raceFlashes', () => {
       races: { 0: { kind: 'angel' as const, at: 1, n: 3 } },
     }));
     expect(html.split('😇').length - 1).toBe(3);
-    // Symmetric about the slot: one left, one centred, one right.
-    expect(html).toContain('--off:-30%');
+    // The first in the middle, then out to the left and to the right.
     expect(html).toContain('--off:0%');
+    expect(html).toContain('--off:-30%');
     expect(html).toContain('--off:30%');
   });
 
-  it('caps the fan, so a table of eight does not reach across the board', () => {
-    // A face is about 62% of a slot wide. Without a cap, seven losers at 30% a
-    // step would span 180% of a slot and cover the spaces either side.
-    const spread = (n: number) => faceOffset(n - 1, n) - faceOffset(0, n);
-    expect(spread(2)).toBe(30);
-    expect(spread(3)).toBe(60);
-    expect(spread(4)).toBe(90);
-    expect(spread(7)).toBe(90);        // capped from here on
-    expect(faceOffset(0, 1)).toBe(0);  // one face is centred, with nothing to say
+  it('arrives one at a time, the first without waiting', () => {
+    const html = renderToStaticMarkup(createElement(CenterGrid, {
+      spaces: [space('me')], highlight: [],
+      badgeOf: () => 'star' as const, onTap: noop, onSnapTap: noop,
+      races: { 0: { kind: 'angel' as const, at: 1, n: 3 } },
+    }));
+    expect(html).toContain('animation-delay:0ms');
+    expect(html).toContain(`animation-delay:${HALO_STAGGER_MS}ms`);
+    expect(html).toContain(`animation-delay:${HALO_STAGGER_MS * 2}ms`);
+  });
+
+  it('always centres the first face, then goes left and right around it', () => {
+    // Whatever the count, so one halo looks like one halo always did and the fan
+    // grows around it rather than sliding off to one side.
+    for (const n of [1, 2, 3, 4, 7]) expect(faceOffset(0, n)).toBe(0);
+    expect(faceOffset(1, 3)).toBeLessThan(0);     // left first
+    expect(faceOffset(2, 3)).toBeGreaterThan(0);  // then right
+    expect(faceOffset(1, 3)).toBe(-faceOffset(2, 3));
+    expect(faceOffset(3, 5)).toBe(-faceOffset(4, 5));   // and out again, in pairs
+    expect(Math.abs(faceOffset(3, 5))).toBeGreaterThan(Math.abs(faceOffset(1, 5)));
+  });
+
+  it('caps the outermost face, so a table of eight stays on its own space', () => {
+    // A face is about 62% of a slot wide, so the fan is allowed to overlap but not
+    // to reach across the board.
+    for (const n of [2, 3, 4, 5, 7]) {
+      const widest = Math.max(...Array.from({ length: n }, (_, f) => Math.abs(faceOffset(f, n))));
+      expect({ n, widest }).toEqual({ n, widest: expect.any(Number) });
+      expect(widest).toBeLessThanOrEqual(60);
+    }
+  });
+
+  it('starts a new fan from the middle once the cycle has run', () => {
+    // Ten faces at 100ms is the second this counts, which is past anything one
+    // race can produce - so what it really governs is a LATER race on the same
+    // space opening centred rather than carrying on from where the last left off.
+    const perCycle = HALO_CYCLE_MS / HALO_STAGGER_MS;
+    expect(faceOffset(perCycle, 12)).toBe(0);
+    expect(faceOffset(perCycle + 1, 12)).toBe(faceOffset(1, 12));
   });
 
   it('leaves a single face centred, with no offset to explain', () => {

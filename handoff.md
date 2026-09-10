@@ -31,7 +31,7 @@ instead, check both directions before releasing: the new client against the rule
 still live, and the PREVIOUS client against the new rules, which is the half this
 file's own warning cannot cover._
 
-_**536 tests** (462 unit and 27 in a real browser; 47 against the emulator, all
+_**539 tests** (465 unit and 27 in a real browser; 47 against the emulator, all
 green). This is the only place in the repo that quotes a count -
 it drifted three separate ways when it lived in four places, so keep it here and
 nowhere else. Both sides of the 2026-09-04 merge rewrote this line, which is the
@@ -2068,14 +2068,26 @@ their own name to it.
   again. So `raceFlashes` counts only entries within the grace window of the
   latest report. The window is passed in rather than imported, which keeps that
   file a pure function of its arguments.
-- **The faces are fanned, and they overlap on purpose.** A face is about 62% of a
-  slot wide, so laying several out without touching needs a step that big - and at
-  58% three haloes on one slot reached across two others, which is what the first
-  cut did. They overlap like a fanned hand instead, and the spread is CAPPED so
-  seven losers at an eight-player table stay in about the room three take.
-  `faceOffset` is arithmetic, so it is tested - and it lives in `raceFlash.ts`
-  rather than in `CenterGrid.tsx`, because a second non-component export from a
-  component file is a new lint warning and this repo's clean state is seven.
+- **The faces arrive one at a time, and they overlap on purpose.** Each is
+  `HALO_STAGGER_MS` (100ms) behind the one before, so they read as several people
+  rather than as one fanned object. **The first is always centred** and undelayed,
+  which is what keeps a single halo looking exactly like a single halo always did;
+  the rest alternate out to the left and the right around it. The base
+  `.race-flash` is `opacity: 0`, so a face is invisible until its own delay is up
+  without the animation needing a backwards fill.
+- **They overlap because a face is about 62% of a slot wide**, so laying several
+  out without touching needs a step that big - and at 58% three haloes on one slot
+  reached across two others, which is what the first cut did. The OUTERMOST is
+  capped at 60% instead, so seven losers at an eight-player table stay in the room
+  five take.
+- **`HALO_CYCLE_MS` restarts the fan from the middle after a second.** Ten faces
+  at the stagger, which is more than one race can produce, so what it really
+  governs is a LATER race on the same space opening centred rather than carrying
+  on from wherever the last one had got to.
+- `faceOffset` and `faceDelay` are arithmetic, so they are tested - and they live
+  in `raceFlash.ts` rather than in `CenterGrid.tsx`, because a second
+  non-component export from a component file is a new lint warning and this repo's
+  clean state is seven.
 
 The angry face already shook side to side and still does. The angel holds at rest
 until nearly half way through and drifts up over the rest of 1.5s: half as long
@@ -3006,6 +3018,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `4bc468c` | Forty-five shells over the same eight seconds, and what that costs |
 | `dcaaf8e` | The flicker on the white sparks only, which is where the glitter was coming from |
 | `b10c891` | A two second race window, and a halo for every player who went for the space |
+| `PENDING` | The haloes arrive one at a time, the first one centred |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.

@@ -57,18 +57,46 @@ export function raceFlashes(args: {
   return out;
 }
 
+/** How long after the one before each extra face arrives. */
+export const HALO_STAGGER_MS = 100;
+/**
+ * How long a fan runs before the next face starts a new one from the middle.
+ * Ten faces at the stagger above, which is more than an eight-player table can
+ * produce - so in practice this is what makes a LATER race on the same space open
+ * centred rather than carrying on from wherever the last one had got to.
+ */
+export const HALO_CYCLE_MS = 1000;
+
+/** When the f-th face arrives. They come one at a time, not all at once. */
+export function faceDelay(f: number): number {
+  return f * HALO_STAGGER_MS;
+}
+
 /**
  * Where the f-th of n faces sits, as a percentage of the slot.
+ *
+ * **The first is always centred**, and the rest alternate out to the left and the
+ * right - so one halo looks exactly like one halo always did, and the fan grows
+ * symmetrically around it rather than sliding off to one side.
+ *
+ * **The cycle restarts at the middle once `HALO_CYCLE_MS` has passed**, counted in
+ * faces rather than in wall time because the two are the same thing here: face
+ * `f` arrives at `f * HALO_STAGGER_MS`.
  *
  * They overlap on purpose. A face is about 62% of a slot wide, so laying several
  * out without touching would need a step that big and the fan would run over the
  * neighbouring spaces - which it did at 58%, badly enough that three haloes on one
  * slot reached across two others. Overlapping like a fanned hand reads as several
- * faces at a glance, which is the whole message, and the spread is CAPPED so that
- * seven losers at an eight-player table stay in roughly the room three take.
+ * faces at a glance, which is the whole message, and the OUTERMOST is capped so
+ * that seven losers at an eight-player table stay in the room five take.
  */
 export function faceOffset(f: number, n: number): number {
-  if (n <= 1) return 0;
-  const step = Math.min(30, 90 / (n - 1));
-  return (f - (n - 1) / 2) * step;
+  const perCycle = Math.max(1, Math.round(HALO_CYCLE_MS / HALO_STAGGER_MS));
+  const k = f % perCycle;                       // 0 is the middle, and starts each cycle
+  if (k === 0) return 0;
+  const rank = Math.ceil(k / 2);                // how far out: 1, 1, 2, 2, 3, 3 ...
+  const side = k % 2 === 1 ? -1 : 1;            // left first, then right
+  const widest = Math.ceil((Math.min(n, perCycle) - 1) / 2);
+  const step = widest > 0 ? Math.min(30, 60 / widest) : 30;
+  return side * rank * step;
 }
