@@ -330,6 +330,10 @@ export function CenterGrid(props: {
                     over twice instead of sitting there already face down. */}
                 {finishes[i] && (
                   <div className="pile-finish" key={finishes[i].seq} aria-hidden="true">
+                   {/* The turn is its own box. An animated opacity on the same
+                       element flattens `preserve-3d`, which takes the whole flip
+                       with it - see game.css. */}
+                   <div className="pile-finish-turn">
                     <div className="pile-finish-face">
                       <CardView card={finishes[i].card}
                         badgeId={props.badgeOf(finishes[i].card.owner)} />
@@ -340,6 +344,7 @@ export function CenterGrid(props: {
                     <div className="pile-finish-back">
                       <CardBack badgeId={props.badgeOf(finishes[i].card.owner)} />
                     </div>
+                   </div>
                   </div>
                 )}
                 {/* Keyed by the race, so a new one remounts the span and replays

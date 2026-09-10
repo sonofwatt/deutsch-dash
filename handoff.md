@@ -53,7 +53,7 @@ both directions before releasing: the new client against the rules still live,
 and the PREVIOUS client against the new rules, which is the half this file's own
 warning cannot cover._
 
-_**773 tests** (619 unit and 102 in a real browser; 52 against the emulator, all
+_**776 tests** (619 unit and 105 in a real browser; 52 against the emulator, all
 green). This is the only place in the repo that quotes a count -
 it drifted three separate ways when it lived in four places, so keep it here and
 nowhere else. Both sides of the 2026-09-04 merge rewrote this line, which is the
@@ -1483,6 +1483,51 @@ became, written by the host in `commitScores` beside the rest of the tally.
   panel says so rather than rendering an empty box.
 - A round with a TOTAL but no DELTA is a round that player sat out. A round with
   no total for them at all is a round they were not in, and it is left out.
+
+### The pile flip never actually flipped _(2026-09-10)_
+
+The finished-pile turn shipped broken and looked plausible doing it. **The card
+rotated and went on showing its own FACE, mirrored; the badge back never appeared
+at all.** Found by rendering the animation frame by frame after a question about
+whether there was one - not by a test, and the tests are the point of this entry.
+
+Two causes, and the second is the one to remember.
+
+- The `.card` inside each face carries its own `backface-visibility: visible`, so
+  it kept being painted past 90 degrees. Setting it on the face alone is not
+  enough; it has to reach the contents.
+- **`transform-style: preserve-3d` is flattened by a grouping property on the same
+  element, and an animated `opacity` is one.** The turn and the fade were on one
+  element, so the browser silently dropped the whole thing to 2D:
+  `backface-visibility` then means nothing and the front is painted the whole way
+  round. The fade now lives on `.pile-finish` and the turn on `.pile-finish-turn`
+  inside it. **Nothing that groups may ever go on the element that turns.**
+
+**Every computed style read correctly while it was broken**, which is why the
+browser test passed. `transformStyle` reports `preserve-3d` because that IS the
+computed value; the flattening is a used-value decision and is not readable back.
+A test that asserts properties can pass over an animation that does not run at
+all. The test for it is now structural - whatever fades must not be what turns -
+and the honest lesson is that an animation is verified by rendering it.
+
+### The card backs read as cards _(2026-09-10)_
+
+**The finished pile wears the same back as the wood pile.** It was briefly
+enlarged with a stronger ground; side by side the table wanted them matching, and
+they are more useful matching - the emblem on a card back means one thing on this
+board and should not mean it at two different sizes.
+
+**Every card has a thin white edge**, which is the margin a real card has around
+its print and most of what makes a deck read as a deck. An INSET shadow and not a
+border: every pile on this board is positioned against the card's exact size (see
+`.pile-space .card`, which insets by the slot border to cover the slot precisely),
+and a border would move all of it. Scaled off `--card-w` with a 1px floor, so it
+stays a hairline at eight players and never thickens into a frame at two.
+
+It does the most work in a dark theme, where a card is otherwise a dark rectangle
+on a dark ground. In a light theme it is invisible on a card FACE, which is
+correct rather than a bug: the face is already near-white, and the edge is there
+for the backs and for the dark theme.
 
 ### The carousel cycles its remarks _(2026-09-10)_
 
@@ -3822,6 +3867,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `28f4d70` | A finished pile turns over to show whose it was; the bots hesitate |
 | `45c275d` | Genius lies in wait; countdown tones; the race remarks get seen |
 | `83f1979` | The carousel cycles its remarks instead of repeating them |
+| _pending_ | The pile flip never flipped; card backs match, and cards get a white edge |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
