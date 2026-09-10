@@ -2758,7 +2758,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `ef9aa6b` | A second, simpler drawing of the icon for the tab, where the full one is a speck |
 | `ad471e9` | The icon on the home screen, beside the title |
 | `eaac4a3` | A dash rains emoji; the fireworks moved behind the sheet that says who won |
-| `PENDING` | Twice the fireworks over twice as long, and a twinkle that stops when the flight does |
+| `b8f156e` | Twice the fireworks over twice as long, and a twinkle that stops when the flight does |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
