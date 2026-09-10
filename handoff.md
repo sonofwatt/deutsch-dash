@@ -3821,7 +3821,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `1e1a4d8` | Another 50ms off the wood step, so the cards overlap by 100ms |
 | `28f4d70` | A finished pile turns over to show whose it was; the bots hesitate |
 | `45c275d` | Genius lies in wait; countdown tones; the race remarks get seen |
-| _pending_ | The carousel cycles its remarks instead of repeating them |
+| `83f1979` | The carousel cycles its remarks instead of repeating them |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
