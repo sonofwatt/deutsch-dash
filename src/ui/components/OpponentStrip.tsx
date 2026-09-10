@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { badgeFor, EMOJI, type BadgeId } from '../../game/badges';
 import { CardView } from './CardView';
 import type { WoodSide } from '../prefs';
@@ -30,7 +31,18 @@ export function OpponentStrip(props: {
   me: string; players: Record<string, PlayerInfo>; tableaus: Record<string, Tableau>;
   /** Optional: mirrors your own tableau, so a glance across reads the same way. */
   woodSide?: WoodSide;
+  /** The host's kick. Absent for everybody else, which is what hides the button. */
+  onKick?: (uid: string, badgeId: BadgeId) => void;
 }) {
+  // Which opponent the kick is armed for. Two taps on a board being played at
+  // speed, and it disarms itself, exactly like the sit-out button in the head:
+  // removing somebody mid-game cannot be taken back from this side.
+  const [arming, setArming] = useState<string | null>(null);
+  useEffect(() => {
+    if (!arming) return;
+    const t = setTimeout(() => setArming(null), 4000);
+    return () => clearTimeout(t);
+  }, [arming]);
   const rows = Object.entries(props.players)
     .filter(([uid]) => uid !== props.me)
     .sort(([, a], [, b]) => a.joinedAt - b.joinedAt);
@@ -59,6 +71,14 @@ export function OpponentStrip(props: {
                   looking for the difference between them. The bubble wins because
                   it is attached to the thing it describes; a bare number beside a
                   name says nothing about which pile it belongs to. */}
+              {props.onKick && (
+                arming === uid
+                  ? <button className="opp-kick arming"
+                      onClick={() => { setArming(null); props.onKick!(uid, p.badgeId); }}
+                      aria-label={`Confirm removing ${p.name}`}>kick?</button>
+                  : <button className="opp-kick" onClick={() => setArming(uid)}
+                      aria-label={`Remove ${p.name}`} title={`Remove ${p.name}`}>&times;</button>
+              )}
               {p.sittingOut
                 ? <span className="opp-out" title="sitting out">out</span>
                 : p.stuckAt != null && (

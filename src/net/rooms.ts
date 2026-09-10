@@ -306,6 +306,41 @@ export function removeBot(code: string, id: string, badgeId: BadgeId): Promise<v
   return update(roomRef(code), { [`players/${id}`]: null, [`badges/${badgeId}`]: null });
 }
 
+/**
+ * The host removes a HUMAN from the room, in the lobby or mid-game.
+ *
+ * No rules change was needed for this: `players/$uid` has always been writable by
+ * `auth.uid === $uid || hostId === auth.uid`, and so has `round/tableaus/$uid`.
+ * The grant was there for the host's own housekeeping and it covers this.
+ *
+ * **The hand goes with the player**, which is what makes a mid-game kick safe
+ * rather than a slow leak. `scoreRound` walks `tableaus`, not `players`, so a
+ * hand left behind would go on being scored for somebody who is not at the table
+ * any more; deleting it takes them out of the round's arithmetic entirely. The
+ * cards they already played into the MIDDLE stay where they are, still carrying
+ * their uid as owner, because they are on the table in the physical game too and
+ * the player who put them there does not get them back by leaving.
+ *
+ * `round/seats` is deliberately left alone: it is the size the board was DEALT
+ * at, the board cannot reflow under everybody mid-round, and the next
+ * `startRound` builds a fresh one from whoever is still here.
+ *
+ * `meta/playerCount` is left alone too, and cannot be otherwise: its validate
+ * refuses any decrease, which is what stops two racing joins from reusing one
+ * seat. So a kick does not give the seat back on the server, exactly as removing
+ * a bot does not. It only bites at eight players, where the client cap and the
+ * server cap agree anyway, and the alternative is relaxing the rule that makes
+ * the count trustworthy.
+ */
+export function kickPlayer(code: string, uid: string, badgeId: BadgeId): Promise<void> {
+  return update(roomRef(code), {
+    [`players/${uid}`]: null,
+    [`badges/${badgeId}`]: null,
+    [`round/tableaus/${uid}`]: null,
+    [`round/scores/${uid}`]: null,
+  });
+}
+
 export function setTargetScore(code: string, target: number): Promise<void> {
   return set(ref(db, `rooms/${code}/meta/targetScore`), target);
 }
@@ -415,7 +450,7 @@ export function setPaleCards(code: string, on: boolean): Promise<void> {
   return set(ref(db, `rooms/${code}/meta/paleCards`), on);
 }
 
-let stopPresence: (() => void) | null = null;
+let stopPresence: ((silent?: boolean) => void) | null = null;
 
 export function startPresence(code: string, uid: string): () => void {
   stopPresenceNow(); // never leave a zombie presence writer from a previous room/session
@@ -427,17 +462,36 @@ export function startPresence(code: string, uid: string): () => void {
       set(myConnected, true);
     }
   });
-  const teardown = () => {
+  const teardown = (silent?: boolean) => {
     off();
+    // Cancelled either way. Left armed, the SERVER writes connected:false at the
+    // socket's death - which for a kicked player is a ghost record created long
+    // after they left the screen.
     onDisconnect(myConnected).cancel().catch(() => {});
-    set(myConnected, false).catch(() => {});
+    if (!silent) set(myConnected, false).catch(() => {});
   };
   stopPresence = teardown;
-  return teardown;
+  return () => teardown();
 }
 
 export function stopPresenceNow(): void {
   const t = stopPresence;
   stopPresence = null;
   t?.();
+}
+
+/**
+ * Detach the presence writer WITHOUT its parting `connected: false`.
+ *
+ * For a player whose record has just been deleted under them. The normal
+ * teardown writes to `players/$uid/connected`, and writing to a record that is
+ * not there does not fail - it CREATES it, as `{ connected: false }` with no
+ * name, no badge and no score, which then renders as a nameless ghost holding a
+ * seat in the lobby. The kicked client has nothing left to say about its
+ * presence, so it says nothing.
+ */
+export function abandonPresence(): void {
+  const t = stopPresence;
+  stopPresence = null;
+  t?.(true);
 }

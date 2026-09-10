@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useGameStore, isHost, tableReady } from '../../state/store';
 import { badgeFor, BADGES, BADGE_IDS, type BadgeId } from '../../game/badges';
 import { BOT_LABELS, BOT_LEVELS, botLevelOf, type BotLevel } from '../../game/bot';
@@ -42,11 +42,22 @@ export function Lobby({ code }: { code: string }) {
   const setIdentity = useGameStore(s => s.setIdentity);
   const addBot = useGameStore(s => s.addBot);
   const removeBot = useGameStore(s => s.removeBot);
+  const kickPlayer = useGameStore(s => s.kickPlayer);
   const actionError = useGameStore(s => s.actionError);
   const [level, setLevel] = useState<BotLevel>('medium');
   const [woodSide, swapSides] = useWoodSide();
   // Which of my own two fields is open. Both close the moment I ready up.
   const [picking, setPicking] = useState(false);
+  // Which player the Remove button is armed for, and nothing armed by default.
+  // Removing a human is not undoable from this side - they have to be sent the
+  // link again - so it is the same two taps the board asks for before it sits
+  // somebody out, and it disarms itself for the same reason.
+  const [kicking, setKicking] = useState<string | null>(null);
+  useEffect(() => {
+    if (!kicking) return;
+    const t = setTimeout(() => setKicking(null), 4000);
+    return () => clearTimeout(t);
+  }, [kicking]);
   const [draftName, setDraftName] = useState<string | null>(null);
 
   const players = Object.entries(room.players).sort(([, a], [, b]) => a.joinedAt - b.joinedAt);
@@ -147,6 +158,16 @@ export function Lobby({ code }: { code: string }) {
             {p.isBot && host && (
               <button className="btn btn-slim" onClick={() => removeBot(id, p.badgeId)}
                 aria-label={`Remove ${p.name}`}>Remove</button>
+            )}
+            {/* A human, and not the host themselves: kicking yourself would
+                delete the record the room reads its host out of. Bots keep the
+                one-tap Remove above - an AI player costs nothing to add back. */}
+            {!p.isBot && host && !mine && (
+              kicking === id
+                ? <button className="btn btn-slim arming" onClick={() => { setKicking(null); kickPlayer(id, p.badgeId); }}
+                    aria-label={`Confirm removing ${p.name}`}>Remove?</button>
+                : <button className="btn btn-slim" onClick={() => setKicking(id)}
+                    aria-label={`Remove ${p.name}`}>Remove</button>
             )}
           </div>
         );

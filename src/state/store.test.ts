@@ -41,7 +41,9 @@ function fakeDeps(over: Partial<Deps> = {}): Deps {
     claimHost: vi.fn(async () => {}),
     addBot: vi.fn(async () => 'bot_star'),
     removeBot: vi.fn(async () => {}),
+    kickPlayer: vi.fn(async () => {}),
     stopPresence: vi.fn(),
+    abandonPresence: vi.fn(),
     startPresence: vi.fn(() => () => {}),
     ...over,
   };
@@ -271,6 +273,109 @@ describe('the lobby ready gate', () => {
     it('will not start a table of one plus spectators', () => {
       const players = { me: human({ ready: true }), out: human({ sittingOut: true }) };
       expect(tableReady(lobby(players))).toBe(false);
+    });
+  });
+
+  describe('kicking a player', () => {
+    const table = () => lobby({ me: human(), you: human({ badgeId: 'star' }) });
+
+    /** A store already watching a room, with `who` as this client's uid. */
+    const watching = async (who = 'me') => {
+      let cb!: (room: Room | null) => void;
+      const deps = fakeDeps({
+        ensureSignedIn: vi.fn(async () => who),
+        watchRoom: vi.fn((_c: string, f: (room: Room | null) => void) => { cb = f; return () => {}; }),
+      });
+      const store = createGameStore(deps);
+      await store.getState().enterRoom('ABCDEF', 'D', 'tulip');
+      cb(table());
+      return { store, deps, cb };
+    };
+
+    it('the host removes a human by uid and badge', async () => {
+      const { store, deps } = await watching();
+      store.getState().kickPlayer('you', 'star');
+      expect(deps.kickPlayer).toHaveBeenCalledWith('ABCDEF', 'you', 'star');
+    });
+
+    it('takes the badge off the record rather than the caller', async () => {
+      // The screen passes what it rendered, which can be a snapshot old. The room
+      // in the store is newer, and the badge is what frees the colour for the
+      // next player, so a stale one would leave a badge nobody can claim.
+      const { store, deps } = await watching();
+      store.getState().kickPlayer('you', 'tulip');
+      expect(deps.kickPlayer).toHaveBeenCalledWith('ABCDEF', 'you', 'star');
+    });
+
+    it('refuses to kick the host themselves', async () => {
+      // It would delete the record meta/hostId points at, and the room reads its
+      // host out of that. No screen offers it; this is the rule, not the screen.
+      const { store, deps } = await watching();
+      store.getState().kickPlayer('me', 'tulip');
+      expect(deps.kickPlayer).not.toHaveBeenCalled();
+    });
+
+    it('refuses when this client is not the host', async () => {
+      const { store, deps } = await watching('you');
+      store.getState().kickPlayer('me', 'tulip');
+      expect(deps.kickPlayer).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('being kicked', () => {
+    const table = () => lobby({ me: human(), you: human({ badgeId: 'star' }) });
+    const alone = () => lobby({ me: human() });
+
+    const watching = async (who: string) => {
+      let cb!: (room: Room | null) => void;
+      const deps = fakeDeps({
+        ensureSignedIn: vi.fn(async () => who),
+        watchRoom: vi.fn((_c: string, f: (room: Room | null) => void) => { cb = f; return () => {}; }),
+      });
+      const store = createGameStore(deps);
+      await store.getState().enterRoom('ABCDEF', 'D', 'tulip');
+      return { store, deps, cb };
+    };
+
+    it('leaves the room and says why when my record disappears', async () => {
+      const { store, cb } = await watching('you');
+      cb(table());
+      expect(store.getState().room).not.toBeNull();
+      cb(alone());                      // the host has removed me
+      expect(store.getState().room).toBeNull();
+      expect(store.getState().code).toBeNull();
+      expect(store.getState().joinPhase).toBe('idle');
+      expect(store.getState().joinError).toBe('kicked');
+    });
+
+    it('drops presence WITHOUT the parting write', async () => {
+      // The normal teardown writes connected:false, and against a record that has
+      // just been deleted that CREATES it again: a nameless ghost holding a seat.
+      const { deps, cb } = await watching('you');
+      cb(table());
+      cb(alone());
+      expect(deps.abandonPresence).toHaveBeenCalled();
+    });
+
+    it('does not fire on the first snapshot of a room I am not in', async () => {
+      // A spectator gets a player record, so this should not be reachable - but
+      // the check is "I was here and now I am not", and without the first half a
+      // slow first snapshot would evict somebody who had only just arrived.
+      const { store, deps, cb } = await watching('you');
+      cb(alone());
+      expect(deps.abandonPresence).not.toHaveBeenCalled();
+      expect(store.getState().room).not.toBeNull();
+      expect(store.getState().joinError).not.toBe('kicked');
+    });
+
+    it('does not fire when the whole room goes away', async () => {
+      // An expired room swept by another device arrives as null, which is a
+      // different thing from being removed from a room that still exists.
+      const { store, deps, cb } = await watching('you');
+      cb(table());
+      cb(null);
+      expect(deps.abandonPresence).not.toHaveBeenCalled();
+      expect(store.getState().joinError).not.toBe('kicked');
     });
   });
 

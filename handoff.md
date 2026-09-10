@@ -31,7 +31,7 @@ instead, check both directions before releasing: the new client against the rule
 still live, and the PREVIOUS client against the new rules, which is the half this
 file's own warning cannot cover._
 
-_**503 tests** (431 unit and 27 in a real browser; 45 against the emulator, all
+_**513 tests** (440 unit and 27 in a real browser; 46 against the emulator, all
 green). This is the only place in the repo that quotes a count -
 it drifted three separate ways when it lived in four places, so keep it here and
 nowhere else. Both sides of the 2026-09-04 merge rewrote this line, which is the
@@ -1074,6 +1074,71 @@ space it can follow rigged into place:
 | 70px flick aimed 90° away | nothing |
 | the same 70px at 400ms - a reposition, not a throw | nothing |
 | slow drag let go over the opponent strip | lands (signal 3) |
+
+### The host can remove a player
+
+Asked for on 2026-09-09. The host gets a **Remove** in the lobby beside the one
+that removes an AI player, and a small **x** on each opponent in the strip during
+a game. Two taps in both places, armed and self-disarming, the same shape the
+board already uses before it sits somebody out: removing a human cannot be undone
+from this side, and the strip's button sits on a board being played at speed.
+
+**No rules change, and nothing to deploy.** `players/$uid` has always been
+writable by `auth.uid === $uid || hostId === auth.uid`, and so has
+`round/tableaus/$uid`. That grant was there for the host's own housekeeping and it
+covers this exactly. It is a claim about the rules, so it is checked in
+`rooms.emu.test.ts` rather than read off the file - including the half that could
+have quietly broken the whole feature: `badges/$badgeId` carries a `.validate`
+demanding `newData.val() === auth.uid`, which a host cannot satisfy for somebody
+else's badge, and if it applied to a DELETE the multi-path write would fail
+atomically and Remove would do nothing at all. RTDB skips `.validate` for
+deletes. Proven, not believed.
+
+**The hand goes with the player.** `scoreRound` walks `tableaus`, not `players`,
+so a hand left behind would go on being scored for somebody who is not at the
+table; `kickPlayer` deletes it in the same write. The cards they already played
+into the MIDDLE stay there, still carrying their uid - they are on the table in
+the physical game too, and you do not get them back by leaving.
+
+**Two things are deliberately left alone.** `round/seats` is the size the board
+was DEALT at and the board cannot reflow under everybody mid-round, so the seat
+stays empty until the next deal builds a fresh one. `meta/playerCount` cannot be
+decreased at all - its validate refuses it, which is what stops two racing joins
+reusing one seat - so a kick does not hand the seat back on the server, exactly as
+removing a bot does not. It only bites at eight.
+
+**The kicked player's own client is the harder half**, and it is all in the
+snapshot handler. The rule is "I was in this room's players a snapshot ago and I
+am not now": nothing else removes a live human's record, an expired room arrives
+as `room === null`, and leaving unsubscribes first. Three things about it:
+
+- It runs **before the new room lands in state**. The board reads
+  `room.players[uid]`, and one render of a room this player is not in is a crash
+  rather than a flicker.
+- It calls `abandonPresence()` **before** `leave()`. The normal teardown writes
+  `connected: false`, and writing to a record that has just been deleted does not
+  fail - it CREATES it, as a nameless `{ connected: false }` ghost holding a seat
+  in the lobby. `onDisconnect` is cancelled either way, or the server writes that
+  ghost later, when the socket finally dies.
+- **The URL has to move too, and that was found by driving it.** The store leaves
+  the room but never touches `location`; a room route with an idle store is the
+  JOIN FORM, so the first working build dropped a kicked player onto a form
+  offering to put them straight back in, with the message nowhere in sight. The
+  redirect lives in `App.tsx` beside the other route-versus-store reconciliation.
+  Every unit test passed while this was broken.
+
+**They can come back with the link, and that is the decision.** Knowing the room
+code is the credential everywhere else in this app (see the trust model), so a
+ban list would be the only node in the room that meant anything else - and it
+would cost a rules change, a deploy, and the both-directions release check, to
+deter somebody who can clear site data and mint a fresh anonymous uid anyway.
+
+**Proved by driving two real clients against the emulator**, which is the only
+way the eviction path can be seen at all: the guest lands on the home screen
+reading "The host removed you from the room", `players` holds the host alone with
+no ghost after the socket has had time to die, the freed badge is claimed by the
+next player through the door, and mid-game the kicked hand is gone from
+`round/tableaus` while the host is still on a live board.
 
 ### The icon: two drawings, the PNGs, and the one on the home screen
 
@@ -2782,6 +2847,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `eaac4a3` | A dash rains emoji; the fireworks moved behind the sheet that says who won |
 | `b8f156e` | Twice the fireworks over twice as long, and a twinkle that stops when the flight does |
 | `bdfabce` | Roman candles up the edges of the win, a different instrument from the shells |
+| `PENDING` | The host can remove a player, in the lobby or mid-game, and the removed client leaves cleanly |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.

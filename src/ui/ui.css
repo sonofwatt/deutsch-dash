@@ -128,6 +128,11 @@
 .side-swap.arming { width: auto; padding: 0 10px; font-size: 12px; font-weight: 800;
   border-color: var(--warn); color: var(--warn-ink);
   background: color-mix(in srgb, var(--warn) 14%, transparent); }
+/* The same armed look for the lobby's Remove and the opponent strip's kick. One
+   rule, because a player learning what an armed button looks like once should not
+   have to learn it again on the next screen. */
+.btn-slim.arming, .opp-kick.arming { border-color: var(--warn); color: var(--warn-ink);
+  background: color-mix(in srgb, var(--warn) 14%, transparent); font-weight: 800; }
 
 /* Lives HERE and not in game.css: the corner pill is on the home page, the join
    form, the lobby and the scorepad, none of which import the board's stylesheet.

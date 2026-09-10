@@ -48,12 +48,21 @@ export default function App() {
   // in one place or the other, never both.
   const joinPhase = useGameStore(s => s.joinPhase);
   const phase = useGameStore(s => s.room?.meta.phase);
+  const joinError = useGameStore(s => s.joinError);
   const boardUp = route.screen === 'room' && joinPhase === 'in-room' && phase != null && phase !== 'lobby';
   useEffect(() => {
     const s = gameStore.getState();
     if (route.screen === 'home' && s.joinPhase !== 'idle') s.leave();
     if (route.screen === 'room' && s.code && s.code !== route.code) s.leave();
   }, [route]);
+  // Kicked. The store has already left the room, but the URL still points at it,
+  // and a room route with an idle store is the JOIN FORM - so without this the
+  // host's Remove drops that player onto a form offering to put them straight
+  // back in, with the message about being removed nowhere in sight. Routing lives
+  // here rather than in the store, which touches `location` nowhere.
+  useEffect(() => {
+    if (joinError === 'kicked' && route.screen === 'room') window.location.hash = '#/';
+  }, [joinError, route]);
   // Before the config gate on purpose: the scorepad is pure local arithmetic and
   // works in a deployment with no Firebase at all.
   if (route.screen === 'keeper') {

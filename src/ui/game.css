@@ -303,6 +303,13 @@
   border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line);
   font-size: 12px; white-space: nowrap; }
 .opp-head { display: flex; align-items: center; gap: 6px; }
+/* The host's kick, in the strip. Deliberately small and last in the row: it is
+   the only destructive control on a board being played at speed, so it is not
+   competing for the same thumb as the cards, and it takes two taps besides. */
+.opp-kick { flex: 0 0 auto; margin-left: 2px; min-height: 0; padding: 1px 5px;
+  font: inherit; font-size: 10px; font-weight: 800; line-height: 1.5;
+  border: 1px solid var(--line); border-radius: 999px;
+  background: var(--chip); color: var(--ink-soft); }
 .opp.absent { opacity: .5; }
 .opp-ai { font-size: 9px; font-weight: 800; letter-spacing: .06em; color: var(--ink-soft);
   border: 1px solid var(--line); border-radius: 999px; padding: 0 5px; }

@@ -77,7 +77,10 @@ export interface Deps {
   claimHost(code: string, uid: string): Promise<unknown>;
   addBot(code: string, badgeId: BadgeId, level: BotLevel, name: string): Promise<string>;
   removeBot(code: string, id: string, badgeId: BadgeId): Promise<void>;
+  kickPlayer(code: string, uid: string, badgeId: BadgeId): Promise<void>;
   stopPresence: () => void;
+  /** Drop the presence writer without its parting write. See rooms.ts. */
+  abandonPresence: () => void;
   /** Re-arm the presence writer for a room; the last call wins (see rooms.ts). */
   startPresence(code: string, uid: string): () => void;
 }
@@ -149,6 +152,8 @@ export interface GameStore {
   again(): void;
   addBot(badgeId: BadgeId, level: BotLevel, name: string): void;
   removeBot(id: string, badgeId: BadgeId): void;
+  /** Host only, humans only: bots go through removeBot. Never yourself. */
+  kickPlayer(uid: string, badgeId: BadgeId): void;
 }
 
 export function legalTargets(
@@ -568,6 +573,27 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
           if (!after || (before && cardId(before) === cardId(after))) continue;
           spaceTouched.set(i, { at: Date.now(), by: after.owner, reported: false });
         }
+      }
+      // KICKED: I was in this room's player list a snapshot ago and I am not in
+      // it now. Nothing else removes a live human's record - a bot has no client,
+      // an expired room arrives as `room === null`, and leaving unsubscribes
+      // before it clears anything - so this is the host having done it.
+      //
+      // It runs BEFORE the room lands in state, and that is not tidiness: the
+      // board reads `room.players[uid]` without a guard, so one render of a room
+      // this player is no longer in is a crash rather than a flicker.
+      //
+      // `abandonPresence` first, and the order matters. The normal teardown
+      // inside `leave` writes `connected: false`, which against a deleted record
+      // CREATES it again as a nameless ghost holding a seat. Abandoning clears
+      // the module-level handle, so `leave`'s own `stopPresence` finds nothing to
+      // do. `joinError` is set AFTER `leave`, which does not clear it, and the
+      // home screen renders it through JOIN_REASONS.
+      if (room && s.uid && s.room?.players[s.uid] && !room.players[s.uid]) {
+        deps.abandonPresence();
+        get().leave();
+        set({ joinError: 'kicked' });
+        return;
       }
       set(newRound && s.lastRejected ? { room, lastRejected: null } : { room });
       if (!room || !s.uid) return;
@@ -1065,6 +1091,18 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         const code = get().code;
         if (code) hostAction(deps.removeBot(code, id, badgeId), 'remove that AI player');
       },
+      kickPlayer(uid, badgeId) {
+        const { code, room, uid: me } = get();
+        if (!code || !room) return;
+        // Two things this refuses outright rather than trusting the screen not to
+        // offer: kicking yourself, which would delete the host's own record and
+        // leave the room without one, and kicking from a client that is not the
+        // host, which the rules would reject anyway - but a rejection surfaces as
+        // a red banner rather than as nothing happening.
+        if (uid === me || room.meta.hostId !== me) return;
+        hostAction(deps.kickPlayer(code, uid, room.players[uid]?.badgeId ?? badgeId),
+          'remove that player');
+      },
     };
   });
 
@@ -1104,7 +1142,9 @@ const realDeps: Deps = {
   claimHost: netPlays.claimHost,
   addBot: netRooms.addBot,
   removeBot: netRooms.removeBot,
+  kickPlayer: netRooms.kickPlayer,
   stopPresence: netRooms.stopPresenceNow,
+  abandonPresence: netRooms.abandonPresence,
   startPresence: netRooms.startPresence,
 };
 

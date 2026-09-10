@@ -317,6 +317,52 @@ emu('server-side player cap and badge uniqueness (database.rules.json)', () => {
   // exist) and, via the "createRoom still succeeds" test above (meta written
   // before players, same seedRoom/createRoomAs two-step shape this rule must
   // tolerate), the room-creation bootstrap path where no players exist yet.
+  /**
+   * The kick. The whole feature rests on a grant that was already there -
+   * `players/$uid` is writable by `auth.uid === $uid || hostId === auth.uid` -
+   * so nothing in database.rules.json changed for it and nothing had to be
+   * deployed. That is a claim about the rules, and this is where a claim about
+   * the rules gets checked rather than read.
+   *
+   * The badge delete is the half worth proving. `badges/$badgeId` has a
+   * `.validate` demanding `newData.val() === auth.uid`, which the HOST cannot
+   * satisfy for somebody else's badge - and if it applied, the whole multi-path
+   * write would fail atomically and the kick would silently do nothing. It does
+   * not apply, because RTDB skips `.validate` for a delete. Proven here rather
+   * than believed, because believing it wrong is a feature that never works.
+   */
+  it('lets the HOST remove another player, their hand and their badge, and nobody else', async () => {
+    const code = 'KICKABLE';
+    await seedRoom(code, 0); // the HOST alone, wearing the tulip
+    const racer = racerCtx.database();
+    // A real second identity rather than a seeded record, because a badge can
+    // only ever be claimed with the claimer's OWN uid as the value - the same
+    // rule that makes addBot claim a bot's badge under the host's uid.
+    await assertSucceeds(racer.ref(`rooms/${code}`).update({
+      [`players/${RACER}`]: {
+        name: 'Racer', badgeId: 'star', joinedAt: 2, connected: true, stuckAt: null, score: 0,
+      },
+      'badges/star': RACER,
+      'meta/playerCount': 2,
+    }));
+
+    // Not the host: cannot remove somebody else, host or otherwise.
+    await assertFails(racer.ref(`rooms/${code}`).update({
+      [`players/${HOST}`]: null, 'badges/tulip': null,
+    }));
+
+    // The host can, and takes the hand and the badge with them.
+    await assertSucceeds(hostCtx.database().ref(`rooms/${code}`).update({
+      [`players/${RACER}`]: null, 'badges/star': null,
+      [`round/tableaus/${RACER}`]: null, [`round/scores/${RACER}`]: null,
+    }));
+    const left = await hostCtx.database().ref(`rooms/${code}/players`).get();
+    expect(Object.keys(left.val() ?? {})).toEqual([HOST]);
+    // Free again, which is the point of taking it with them: the next player
+    // through the door can wear the star.
+    expect((await hostCtx.database().ref(`rooms/${code}/badges/star`).get()).exists()).toBe(false);
+  });
+
   it('hostId validate: rejects a uid that is not a player in the room, allows an existing one', async () => {
     const code = 'HOSTVALID';
     await seedRoom(code, 1); // HOST + 'seed-0'

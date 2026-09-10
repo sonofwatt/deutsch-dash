@@ -336,6 +336,25 @@ describe('dragging off the wood', () => {
 });
 
 describe('OpponentStrip', () => {
+  const twoPlayers = {
+    me: { name: 'Me', badgeId: 'tulip' as const, joinedAt: 1, connected: true, stuckAt: null, awayAt: null, score: 0 },
+    you: { name: 'You', badgeId: 'star' as const, joinedAt: 2, connected: true, stuckAt: null, awayAt: null, score: 3 },
+  };
+
+  it('offers the kick only when a handler is given, which is only to the host', () => {
+    // `onKick` being absent IS how the button is hidden from everybody else, so
+    // this is the whole access control for the mid-game kick on this screen.
+    const withKick = renderToStaticMarkup(createElement(OpponentStrip, {
+      me: 'me', players: twoPlayers, tableaus: { you: tableau() }, onKick: () => {},
+    }));
+    expect(withKick).toContain('opp-kick');
+    expect(withKick).toContain('Remove You');
+    const without = renderToStaticMarkup(createElement(OpponentStrip, {
+      me: 'me', players: twoPlayers, tableaus: { you: tableau() },
+    }));
+    expect(without).not.toContain('opp-kick');
+  });
+
   it("shows each opponent's face-up cards and never my own row", () => {
     const html = renderToStaticMarkup(createElement(OpponentStrip, {
       me: 'me',

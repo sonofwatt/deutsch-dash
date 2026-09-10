@@ -70,6 +70,7 @@ export function Game() {
   const setSingleFlip = useGameStore(s => s.setSingleFlip);
   const dealMeIn = useGameStore(s => s.dealMeIn);
   const sinkWood = useGameStore(s => s.sinkWood);
+  const kickPlayer = useGameStore(s => s.kickPlayer);
   const [woodSide, swapSides] = useWoodSide();
 
   // The helper hint waits for the player to go quiet, so it never fires under
@@ -117,6 +118,7 @@ export function Game() {
     return () => { clearTimeout(first); clearTimeout(hide); clearInterval(again); };
   }, [hintsOn, activity]);
 
+  const host = isHost({ uid, room });
   const round = room.round;
   // Possibly absent: the host may delete any player record (the lobby's Remove
   // does it for bots), and the record is what every line below reads. The early
@@ -298,7 +300,10 @@ export function Game() {
         /* A player left behind by a forced start keeps the opponent strip: they
            are at this table, not waiting outside it, and the way in is the bar
            where their own cards will be. */
-        : <OpponentStrip me={uid} players={room.players} tableaus={round.tableaus} woodSide={woodSide} />}
+        : <OpponentStrip me={uid} players={room.players} tableaus={round.tableaus} woodSide={woodSide}
+            /* Bots are removed from the lobby, not from here: the strip's kick is
+               for a human who has to leave a game already running. */
+            onKick={host ? (id, badge) => { if (!room.players[id]?.isBot) kickPlayer(id, badge); } : undefined} />}
       <CenterGrid spaces={round.spaces} highlight={targets.spaces} badgeOf={badgeOf} me={uid}
         onTap={i => void playTo({ space: i })} races={races}
         snapping={targets.spaces.length > 0} hint={hint}
