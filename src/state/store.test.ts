@@ -209,6 +209,104 @@ describe('offline guard', () => {
   });
 });
 
+describe('sinking a card out of a stuck hand', () => {
+  /**
+   * A hand that cannot move whatever order its wood is in, so the test is about
+   * the stuck BOOKKEEPING and not about which card happens to come up.
+   *
+   * Every space is empty, so only a 1 can go to the centre and there is no 1
+   * anywhere. The post tops are 9 red, 5 blue and 3 red, so building needs an 8,
+   * a 4 or a 2 from the other face group, and the hand holds none: the wood is
+   * nothing but 9s and 10s in red and blue, and the dash top is a 5 red.
+   */
+  const deadHand = (): Tableau => ({
+    dash: [c(5, 'red')],
+    post: [[c(9, 'red')], [c(5, 'blue')], [c(3, 'red')]],
+    wood: [c(9, 'blue'), c(10, 'red'), c(9, 'red'), c(10, 'blue'), c(10, 'red'), c(9, 'blue')],
+    woodIndex: 0,
+  });
+
+  /** Stuck the way a player gets there: by turning the pile over until it is proven. */
+  const stuckStore = () => {
+    const deps = fakeDeps();
+    const store = createGameStore(deps);
+    const t = deadHand();
+    const room = playingRoom(t);
+    store.setState({ uid: 'me', code: 'ABCDEF', room, tableau: t });
+    // Six cards at three a turn: two turns is the whole cycle, which is what
+    // isStuck asks for before it will believe a hand is dead.
+    store.getState().flip();
+    store.getState().flip();
+    expect(deps.declareStuck).toHaveBeenCalledWith('ABCDEF', 'me');
+    // The declaration has landed, so there is a claim that COULD be withdrawn.
+    room.players.me.stuckAt = 123;
+    return { store, deps };
+  };
+
+  it('leaves a player who is still stuck declared stuck', () => {
+    const { store, deps } = stuckStore();
+    const before = store.getState().tableau!;
+    store.getState().sinkWood();
+    expect(store.getState().tableau).not.toEqual(before);   // a card did move
+    // The whole point: the way out does not un-declare them on the way past.
+    expect(deps.clearStuck).not.toHaveBeenCalled();
+  });
+
+  it('lets the next card go down immediately, with no second lap to prove it', () => {
+    // This is what the reset of `flips` used to cost. One sink moves one card,
+    // and the hand it leaves can be just as dead as the one before it.
+    const { store } = stuckStore();
+    const first = store.getState().tableau!;
+    store.getState().sinkWood();
+    const second = store.getState().tableau!;
+    expect(second.woodIndex).toBe(first.woodIndex - 1);
+    store.getState().sinkWood();
+    const third = store.getState().tableau!;
+    expect(third.woodIndex).toBe(second.woodIndex - 1);     // it went straight down again
+  });
+
+  it('still refuses a sink from a hand that has a move', () => {
+    // The gate is the reason this cannot be used to reshuffle a pile that merely
+    // has nothing good in it this second, and keeping `flips` must not weaken it.
+    const deps = fakeDeps();
+    const store = createGameStore(deps);
+    const t: Tableau = { ...deadHand(), dash: [c(1, 'red')], woodIndex: 3 };
+    store.setState({ uid: 'me', code: 'ABCDEF', room: playingRoom(t), tableau: t });
+    store.getState().sinkWood();
+    expect(store.getState().tableau).toEqual(t);            // untouched
+  });
+
+  it('withdraws the claim when the sink is the one that frees them', () => {
+    // The card UNDER the one being sunk becomes the new top, because the index
+    // steps back with it. That is the mechanic working: a 1 that the cycle could
+    // not reach is playable the moment the card in front of it goes to the
+    // bottom. hasReachableMove is asked first and recomputed on the new pile, so
+    // a high flips count cannot keep somebody pinned once they have a move.
+    const deps = fakeDeps();
+    const store = createGameStore(deps);
+    const t: Tableau = {
+      dash: [c(5, 'red')],
+      post: [[c(9, 'red')], [c(5, 'blue')], [c(3, 'red')]],
+      wood: [c(9, 'blue'), c(10, 'red'), c(9, 'red'), c(10, 'blue'), c(1, 'red'), c(9, 'blue')],
+      woodIndex: 0,
+    };
+    const room = playingRoom(t);
+    store.setState({ uid: 'me', code: 'ABCDEF', room, tableau: t });
+    store.getState().flip();
+    store.getState().flip();
+    // The 1 is in the pile but the cycle cannot reach it, which is the whole
+    // reason this hand is stuck with a playable card in it.
+    expect(deps.declareStuck).toHaveBeenCalledWith('ABCDEF', 'me');
+    room.players.me.stuckAt = 123;
+
+    store.getState().sinkWood();
+
+    expect(store.getState().tableau!.wood[store.getState().tableau!.woodIndex - 1])
+      .toEqual(c(1, 'red'));                                // the 1 is face up now
+    expect(deps.clearStuck).toHaveBeenCalledWith('ABCDEF', 'me');
+  });
+});
+
 describe('all-stuck rotation re-entrancy', () => {
   it('a snapshot raised synchronously by clearStuck/persist rotates wood exactly once', async () => {
     let cb!: (room: Room | null) => void;

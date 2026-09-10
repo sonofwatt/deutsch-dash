@@ -909,6 +909,12 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
        * player does rather than something that happens to them: it costs a card
        * out of the running order. Gated on actually BEING stuck, so it cannot be
        * used to shuffle a pile that simply has nothing good in it right now.
+       *
+       * **It re-checks on the way out, and a player who is still stuck stays
+       * stuck** - which means the button is still there and the next card can go
+       * down immediately. Asked for on 2026-09-10. One sink often is not enough:
+       * it moves a single card, and the hand it leaves behind can be just as dead
+       * as the one before it.
        */
       sinkWood() {
         if (!get().online) return;
@@ -921,9 +927,19 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         noteActivity();
         set({ tableau: next, selection: null });
         void persist(next);
-        // The cycle counts from here: they have changed which cards it reaches, so
-        // the flips that proved them stuck no longer describe this pile.
-        flips.set(uid, 0);
+        // `flips` is deliberately NOT reset. It counts turns since PROGRESS, and
+        // sinking a card is not progress - it is the admission that there is
+        // none. Resetting it here is what made the way out feel like a punishment:
+        // the sink un-declared the player on the spot, whatever the new pile
+        // actually held, and to sink a second card they had to turn the whole pile
+        // over again to re-prove a thing that had not changed.
+        //
+        // Nothing is lost by keeping it, because `isStuck` asks
+        // `hasReachableMove` FIRST and that is recomputed on the NEW pile: a sink
+        // that frees them clears the claim through the line below, and a high
+        // `flips` can only ever bring a declaration forward, never invent one.
+        // `sinkWoodTop` keeps the pile's length, so the threshold it is compared
+        // against does not move either.
         syncStuck(uid, next);
       },
 

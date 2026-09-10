@@ -31,7 +31,7 @@ instead, check both directions before releasing: the new client against the rule
 still live, and the PREVIOUS client against the new rules, which is the half this
 file's own warning cannot cover._
 
-_**524 tests** (451 unit and 27 in a real browser; 46 against the emulator, all
+_**528 tests** (455 unit and 27 in a real browser; 46 against the emulator, all
 green). This is the only place in the repo that quotes a count -
 it drifted three separate ways when it lived in four places, so keep it here and
 nowhere else. Both sides of the 2026-09-04 merge rewrote this line, which is the
@@ -1529,6 +1529,25 @@ in `wood.test.ts` with the worked numbers.
   player should be the one spending it. `sinkWood` is gated on actually being
   stuck, so it cannot be used to reshuffle a pile that merely has nothing good in
   it this second.
+- **One sink is often not enough, and a player who is still stuck stays stuck.**
+  Changed 2026-09-10. `sinkWood` used to reset `flips` to 0 on the way out, on the
+  reasoning that the pile had changed and the turns that proved it dead no longer
+  described it. The effect was that the way out un-declared the player on the
+  spot, whatever the new hand actually held: the note vanished, the button with
+  it, and to send a second card down they had to turn the whole pile over again to
+  re-prove a thing that had not changed. `flips` counts turns since PROGRESS, and
+  sinking a card is not progress - it is the admission that there is none - so it
+  is left alone now. Nothing is lost by keeping it: `isStuck` asks
+  `hasReachableMove` FIRST and that is recomputed on the NEW pile, so a sink that
+  frees them still clears the claim, and a high `flips` can only bring a
+  declaration forward, never invent one. `sinkWoodTop` keeps the pile's length, so
+  the threshold it is measured against does not move either.
+  The visible consequence is that `stuckAt` never changes across a sink, so the
+  three-second offer clock below never restarts and the button is simply still
+  there. **Each sink steps `woodIndex` back by one**, so consecutive sinks walk
+  back through the cards already turned over until the index reaches 0, at which
+  point there is no face-up card to send anywhere and the pile has to be turned
+  again. That is the mechanic, not a limit that was added.
 - **The offer waits three seconds** (`STUCK_OFFER_MS`). A button appearing with
   the bad news reads as the game telling you what to do; three seconds later it
   reads as an offer, and it leaves room for somebody else's play to free you
@@ -2909,6 +2928,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `bdfabce` | Roman candles up the edges of the win, a different instrument from the shells |
 | `facfaf8` | The host can remove a player, in the lobby or mid-game, and the removed client leaves cleanly |
 | `6d89e1b` | Options below the ready button, a rematch that waits, a ready pill that says away, score history behind a total, and fireworks for the winner alone |
+| `PENDING` | A player who is still stuck after sinking a card stays stuck, and can send the next one down at once |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
