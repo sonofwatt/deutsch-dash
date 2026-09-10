@@ -1534,26 +1534,51 @@ browser, because neither is a question markup can answer - and it first proves t
 layer actually reaches the sheet, so a green result cannot come from a layer that
 was never in the way.
 
-**Fifteen shells at forty-six sparks each**, about 690 elements - ten times the
-first cut. It is affordable because it exists for 3.6 seconds and nothing reflows:
-a spark's FLIGHT is transform and opacity. The twinkle alongside it is
-`filter: brightness`, which is paint rather than composite - the one property here
-that is not free. It stays because it cannot move to opacity without fighting the
-flight's own fade on that property, and it is the first thing to look at if the
-celebration ever costs. This paragraph claimed transform and opacity alone until
-2026-09-05; the audit caught it. **Worth re-measuring on a low-end phone before it
-grows again.** Each shell also fires a one-element ignition bloom, which is most of
-why it reads as going OFF rather than as dots appearing, and every sixth spark is
-small and white against the coloured ones - which is what turns a burst into a
-glittery one. The flicker is a `brightness` twinkle running alongside the flight
-on its own offset per spark, not a fade. Each shell is a point; its sparks are
-children that know only a bearing, fly out along it and take a little gravity at
-the end, which is the whole difference between a firework and a starburst.
+**Thirty shells at forty-six sparks each**, about 1410 elements, over eight
+seconds. Doubled from fifteen over four on 2026-09-09, at the table's request.
+`SHELL_GAP_MS` times the length of `SHELLS`, plus the 1500ms a spark takes to
+fly, IS the duration - the per-shell delays used to be a hand-written column and
+are derived from the firing order now, so doubling it again is two numbers.
+
+**Measured before it was allowed to grow**, which is what the note that used to
+sit here asked for. Chromium at 393x851, frame intervals sampled over the burst
+and again once it has finished:
+
+| | during the burst | idle, afterwards |
+|---|---|---|
+| 15 shells, twinkle `infinite` (what shipped) | 33ms | 17ms |
+| 30 shells, twinkle `infinite` | 50ms | **33ms, for ever** |
+| 30 shells, as it ships now | 33ms | 17ms |
+
+The middle row is the one that mattered. **The twinkle was `infinite`**, so a
+`filter: brightness` went on ticking on every spark for as long as the game-over
+sheet was up - which is until somebody presses Rematch, and could be minutes. At
+690 elements that was affordable and rude; at 1410 it halved the frame rate of a
+screen that is doing nothing. It runs SIX iterations now, which covers the 1500ms
+flight and stops. Under a 6x CPU throttle the same three rows idle at 83ms, 183ms
+and 17ms, so the fix leaves the doubled version cheaper at rest than the half-size
+one that shipped before it.
+
+The burst itself costs what it always did: 33ms frames unthrottled at either
+size, and at 6x throttle the median goes 183ms to 233ms for twice the shells.
+**A 6x CPU throttle in headless Chromium is not a low-end phone**, and nothing
+here has been on one. That is still the measurement worth having.
+
+A spark's FLIGHT is transform and opacity, so it composites and nothing reflows.
+The twinkle is `filter: brightness`, which is paint - the one property here that
+is not free, and it stays because it cannot move to opacity without fighting the
+flight's own fade on that property. This paragraph claimed transform and opacity
+alone until 2026-09-05; the audit caught it. Each shell also fires a one-element
+ignition bloom, which is most of why it reads as going OFF rather than as dots
+appearing, and every sixth spark is small and white against the coloured ones -
+which is what turns a burst into a glittery one. Each shell is a point; its sparks
+are children that know only a bearing, fly out along it and take a little gravity
+at the end, which is the whole difference between a firework and a starburst.
 
 **They run ONCE.** The overlay stays up until somebody leaves or rematches, and a
-loop would still be going off behind the numbers a minute later. The shells are
-staggered across three seconds, which is roughly how long it takes to read who
-won.
+loop would still be going off behind the numbers ten minutes later. The shells
+are staggered across eight seconds, which outlasts reading the sheet without
+outlasting the sitting there afterwards.
 
 **Three glyphs (😎🥳🔥) rather than eight**, falling: a celebration reads as one
 thing when the eye takes it in at once, and eight different faces read as a pile
@@ -2180,7 +2205,7 @@ nobody has decided about them rather than because they are hard:
   leader election over `BroadcastChannel`.
 - **Long-session memory was never measured.** The maps in the store are bounded
   and cleared per round, but nothing has a number for the heap after ten rounds of
-  remounting 75 cards, plus the 690 firework elements the final sheet brings once
+  remounting 75 cards, plus the 1410 firework elements the final sheet brings once
   at the end. The layout suite already has the browser wiring a heap reading
   needs.
 - **The board is pointer-only.** No keyboard route, no focusable pile, no
@@ -2733,6 +2758,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `ef9aa6b` | A second, simpler drawing of the icon for the tab, where the full one is a speck |
 | `ad471e9` | The icon on the home screen, beside the title |
 | `eaac4a3` | A dash rains emoji; the fireworks moved behind the sheet that says who won |
+| `PENDING` | Twice the fireworks over twice as long, and a twinkle that stops when the flight does |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
