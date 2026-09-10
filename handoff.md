@@ -912,7 +912,7 @@ Three signals, tried in this order (`useDrag.ts`, then the `nearest` branch of
 **`aimedAt` itself has four rules, and only the last one is a guess.**
 
 1. **It ended ON a space.** That is where they put it; nothing else is weighed.
-2. **It ended within `FLICK_NEAR_PX` (30px) of one**, measured to the space's
+2. **It ended within `FLICK_NEAR_PX` (25px) of one**, measured to the space's
    EDGE, in ANY direction. This is what covers the rest of the circle. The cone
    only looks forward, so a throw that overshoots a space by a hair leaves it
    BEHIND the release point where the cone cannot see it at all - reported from a
@@ -936,7 +936,7 @@ Three signals, tried in this order (`useDrag.ts`, then the `nearest` branch of
    finger passed through. That band is measured properly and not by fattening the
    box - `nearRun` takes the closest approach between the segment and the
    rectangle, so a corner is reached diagonally and a point 35px out on the
-   diagonal stays outside a 30px band.
+   diagonal stays outside a 25px band.
 
    **It is LAST on purpose**, and it was third for a day before a bench session
    said otherwise. A space swept at the START of a flick is the oldest thing the
@@ -946,7 +946,8 @@ Three signals, tried in this order (`useDrag.ts`, then the `nearest` branch of
    the cone catches most throws first, and what is left for the sweep is a throw
    with no legal space ahead of it at all, which is the case it was added for.
 
-**The near radius came down from 45 to 30 when rule 3 arrived.** Proximity had
+**The near radius came down from 45 to 30 when rule 3 arrived**, and to 25 off
+the bench on 2026-09-10. Proximity had
 been carrying the overshoot case alone and had to be generous to do it; the path
 rule takes that job and takes it exactly, so the radius went back to meaning
 "stopped basically on it" rather than a blind circle round the release point. It
@@ -3021,6 +3022,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `b10c891` | A two second race window, and a halo for every player who went for the space |
 | `f59bb68` | The haloes arrive one at a time, the first one centred |
 | `55abb9b` | The flick cone down to 20 degrees, in the game and on the bench together |
+| `PENDING` | The near radius down to 25px, which moves the swept band with it |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.

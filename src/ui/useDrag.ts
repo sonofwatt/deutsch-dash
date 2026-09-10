@@ -143,12 +143,18 @@ const AIM_TIE_DEG = 8;
  * and out of the cone entirely - which read as the space not being playable at
  * all. Proximity does not care which way the throw was pointing.
  *
- * It came down from 45 to 30 when the path rule below arrived. Proximity was
- * carrying the overshoot case on its own and had to be generous about it; the
- * path rule takes that job and takes it exactly, so this can go back to meaning
- * "stopped basically on it" without a big blind circle around the release point.
+ * It came down from 45 to 30 when the path rule below arrived, and to 25 off the
+ * bench on 2026-09-10. Proximity was carrying the overshoot case on its own and
+ * had to be generous about it; the path rule takes that job and takes it exactly,
+ * so this can go back to meaning "stopped basically on it" without a big blind
+ * circle around the release point.
+ *
+ * It is ONE number doing TWO jobs - the circle at the release point here, and the
+ * width of the band swept along the whole path in rule 4 - so moving it moves
+ * both. That is why it is the strongest slider on the bench, and why it is worth
+ * knowing that a change here is never only about where a throw stopped.
  */
-export const FLICK_NEAR_PX = 30;
+export const FLICK_NEAR_PX = 25;
 
 /**
  * The throw a gesture was, or null if it was not one.

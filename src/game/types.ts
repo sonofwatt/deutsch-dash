@@ -179,6 +179,22 @@ export interface RoundState {
   endedAt: number | null;
 }
 
+/**
+ * "I pressed a soundbite." One per player, keyed by uid and OVERWRITTEN rather
+ * than pushed, which is what keeps this node bounded without a sweep: a room has
+ * at most eight of these however long the game runs, and deleting the room takes
+ * them with it. A player leaning on the buttons replaces their own entry and
+ * nobody else's.
+ *
+ * `at` is a NONCE, exactly like `RaceRecord.at`, and for the same reason: two
+ * phones do not agree on the time, so nothing may compare this against a local
+ * clock. Every client remembers the value it last saw per player and plays when
+ * it CHANGES - which also means the values a client holds on its first snapshot
+ * are adopted silently, so joining a room does not replay whatever the table
+ * pressed before you walked in.
+ */
+export interface SoundbiteSay { id: string; at: number }
+
 import type { GameStats } from './stats';
 export interface Room {
   meta: RoomMeta; players: Record<string, PlayerInfo>; round: RoundState | null;
@@ -187,4 +203,12 @@ export interface Room {
   // existed (and ad-hoc test fixtures) simply do not have it. normalizeRoom
   // always sets it, so nothing downstream sees it absent.
   stats?: GameStats | null;
+  /**
+   * The last soundbite each player pressed. Lives on the ROOM and not on the
+   * round, because the lobby is where a table waits for people and is exactly
+   * where they want to make a noise at each other. Survives a round boundary for
+   * the same reason, and costs nothing when it does: an unchanged nonce plays
+   * nothing.
+   */
+  says?: Record<string, SoundbiteSay> | null;
 }
