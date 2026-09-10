@@ -3202,7 +3202,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `55abb9b` | The flick cone down to 20 degrees, in the game and on the bench together |
 | `57d1c1e` | The near radius down to 25px, which moves the swept band with it |
 | `ec976fc` | Bots aim at the lowest open space; Genius cheats four ways |
-| _pending_ | The wood turn at half speed, gather in the middle of the deal |
+| `5657a09` | The wood turn at half speed, gather in the middle of the deal |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
