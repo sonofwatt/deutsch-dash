@@ -5,6 +5,17 @@ export interface PlayerStats {
   lastPlaces: number;
   /** Consecutive rounds finishing bottom, reset the moment they are not. */
   lastStreak: number;
+  /**
+   * Consecutive rounds this player ended by DASHING, reset the moment they do
+   * not. Two or more is what puts the fire in their splash - see splashVariant.
+   *
+   * Everyone else resets, and that includes two cases worth being deliberate
+   * about: a round that stalled with no dasher at all resets the table, because
+   * nobody won it; and a player who sat the round out resets too, because they
+   * did not win it either. `totals` carries every player in the room rather than
+   * only the ones who scored, so both of them are actually reached here.
+   */
+  dashStreak: number;
   racesWon: number;
   racesLost: number;
 }
@@ -50,7 +61,7 @@ export interface GameStats {
 }
 
 export const NO_PLAYER_STATS: PlayerStats =
-  { dashes: 0, lastPlaces: 0, lastStreak: 0, racesWon: 0, racesLost: 0 };
+  { dashes: 0, lastPlaces: 0, lastStreak: 0, dashStreak: 0, racesWon: 0, racesLost: 0 };
 
 export const statsFor = (stats: GameStats | null | undefined, uid: string): PlayerStats =>
   ({ ...NO_PLAYER_STATS, ...stats?.players?.[uid] });
@@ -90,6 +101,13 @@ export function nextStats(prev: GameStats | null, round: RoundOutcome): GameStat
   for (const uid of Object.keys(round.totals)) players[uid] = statsFor(prev, uid);
 
   if (round.dashedBy && players[round.dashedBy]) players[round.dashedBy].dashes += 1;
+
+  // The run of rounds one player has ended. Outside the bottom-of-the-table
+  // block below on purpose: that one is skipped at a single player and skipped
+  // again on a level table, and neither has anything to do with who dashed.
+  for (const [uid, p] of Object.entries(players)) {
+    p.dashStreak = uid === round.dashedBy ? p.dashStreak + 1 : 0;
+  }
 
   // Bottom of the table. Everybody level on the lowest total wears it, rather than
   // the sort order picking a scapegoat.

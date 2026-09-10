@@ -3,12 +3,23 @@ import { EMOJI } from '../../game/badges';
 import type { Splash, SplashBase } from '../splashVariant';
 
 /**
- * Three glyphs, not eight. Sunglasses, party and fire: pleased with yourself, in
- * that order. A celebration reads as one thing when the eye can take it in at
- * once, and eight different faces at twenty-six copies read as a pile of
- * stickers.
+ * Two glyphs, not eight. Sunglasses and party: pleased with yourself. A
+ * celebration reads as one thing when the eye can take it in at once, and eight
+ * different faces at twenty-six copies read as a pile of stickers.
+ *
+ * 🔥 used to be a third one here, every single dash. That made it wallpaper: it
+ * said "you dashed" beside two glyphs already saying that. It joins these only
+ * on a run of two or more rounds now, where it says something the board does
+ * not - see `splashVariant`.
  */
-const CHEERS = ['😎', '🥳', '🔥'];
+const CHEERS = ['😎', '🥳'];
+/**
+ * How many fall, whatever they are. Fixed rather than per-glyph, so the fire
+ * arriving CHANGES THE MIX AND NOT THE AMOUNT: 26 either way, thirteen of each
+ * without it and about nine of each with it. A count that grew with the glyph
+ * list would make a streak literally heavier weather than an ordinary dash, and
+ * the trophy would have done the same thing to a losing round.
+ */
 const FALLERS = 26;
 
 /** What falls on somebody who did not dash. The trophy falls with it. */
@@ -42,12 +53,16 @@ function Rain({ glyphs }: { glyphs: string[] }) {
  * dasher used to get fireworks and a burst of emoji radiating from the middle,
  * which made a round win look like the end of the game. The fireworks are the
  * GAME's celebration now and go off behind the final score sheet; a dash rains
- * 😎🥳🔥 the way a bad round rains 💩, so the two are the same gesture carrying
+ * 😎🥳 the way a bad round rains 💩, so the two are the same gesture carrying
  * different news.
  */
 export function DashSplash({ name, splash }: { name: string; splash: Splash }) {
   const glyphs = splash.base === 'glitter' ? [...CHEERS] : [GLYPHS[splash.base]];
-  // splashVariant never hands the dasher a trophy: they already dashed.
+  // Two glyphs that ride along with whatever you got, and they are mutually
+  // exclusive by construction rather than by a check here: splashVariant never
+  // hands the dasher a trophy (they already dashed) and never hands anybody else
+  // a fire (only the dasher can be on a run at the moment they dash).
+  if (splash.fire) glyphs.push('🔥');
   if (splash.trophy) glyphs.push('🏆');
   return (
     <div className="dash-splash">

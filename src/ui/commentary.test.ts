@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { BADGE_IDS } from '../game/badges';
 import { commentary, type CommentaryInput } from './commentary';
-import type { GameStats } from '../game/stats';
+import { NO_PLAYER_STATS, type GameStats, type PlayerStats } from '../game/stats';
 import type { CenterSpace, PlayerInfo, RoundScore, Suit } from '../game/types';
 
 const player = (name: string, score: number, extra: Partial<PlayerInfo> = {}): PlayerInfo => ({
@@ -184,8 +184,11 @@ describe('commentary', () => {
     rounds: 4, players: {}, fastest: null, best: null, worst: null, allStuck: 0, races: 0,
     history: {}, ...over,
   });
-  const pStats = (over = {}) =>
-    ({ dashes: 0, lastPlaces: 0, lastStreak: 0, racesWon: 0, racesLost: 0, ...over });
+  // Built off NO_PLAYER_STATS rather than spelled out, so a field added to
+  // PlayerStats does not break this file's build. It is a complete literal that
+  // `tsc -b` typechecks, which is the same trap render.test.ts carries.
+  const pStats = (over: Partial<PlayerStats> = {}): PlayerStats =>
+    ({ ...NO_PLAYER_STATS, ...over });
 
   it('notices a losing streak, which one round on its own cannot see', () => {
     const input = base({ stats: stats({ players: { bo: pStats({ lastStreak: 3 }) } }) });

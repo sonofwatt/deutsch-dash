@@ -15,7 +15,8 @@ import { faceOffset, raceFlashes, HALO_CYCLE_MS, HALO_STAGGER_MS } from '../race
 import { RACE_GRACE_MS } from '../../state/store';
 import { orderlySpaces } from '../../game/center';
 import { orderlyColumns, spaceCountForPlayers } from '../../game/rules';
-import { splashVariant, type Splash } from '../splashVariant';
+import { splashVariant, type Splash, type SplashBase } from '../splashVariant';
+import { NO_PLAYER_STATS, type GameStats } from '../../game/stats';
 import type { Card, CenterSpace, PlayerInfo, PlaySource, RoundScore, Suit, Tableau } from '../../game/types';
 
 const c = (v: number, suit: Suit, owner = 'me'): Card => ({ v, suit, owner });
@@ -483,7 +484,8 @@ describe('DashSplash', () => {
     splashVariant(t, dasher, uid).base;
 
   it('gives the dasher glitter and never a trophy - they have the glitter', () => {
-    expect(splashVariant(table(10, 20, 30), 'p1', 'p1')).toEqual({ base: 'glitter', trophy: false });
+    expect(splashVariant(table(10, 20, 30), 'p1', 'p1'))
+      .toEqual({ base: 'glitter', trophy: false, fire: false });
   });
   it('never poos on a two-player game', () => {
     // Heads-up, the loser is always last. Rubbing it in is a group activity.
@@ -524,7 +526,7 @@ describe('DashSplash', () => {
     // p1 is on 20 and p2 on 18; p2 plays nine cards and goes past them.
     const t = table(40, 20, 18);
     const r = board('p2', 9);
-    expect(splashVariant(t, 'p0', 'p1', r)).toEqual({ base: 'toilet', trophy: false });
+    expect(splashVariant(t, 'p0', 'p1', r)).toEqual({ base: 'toilet', trophy: false, fire: false });
   });
   it('gives relief to somebody who has just climbed out of it', () => {
     const t = table(40, 20, 18);
@@ -533,16 +535,53 @@ describe('DashSplash', () => {
   it('sends the trophy down with whatever else is falling', () => {
     // p1 leads after the round and did not dash: tears and a trophy.
     const t = table(10, 30, 12);
-    expect(splashVariant(t, 'p0', 'p1', board('p0', 3))).toEqual({ base: 'crying', trophy: true });
+    expect(splashVariant(t, 'p0', 'p1', board('p0', 3)))
+      .toEqual({ base: 'crying', trophy: true, fire: false });
   });
   it('hands nobody a trophy on a level table', () => {
     expect(splashVariant(table(10, 10, 10), 'p0', 'p1').trophy).toBe(false);
   });
 
-  const render = (splash: Splash) =>
-    renderToStaticMarkup(createElement(DashSplash, { name: 'Dave', splash }));
+  /**
+   * Stats as the SPLASH sees them: the run banked before this dash, because the
+   * host has not committed the round yet when the splash fires.
+   */
+  const withStreak = (uid: string, dashStreak: number): GameStats => ({
+    rounds: 3, players: { [uid]: { ...NO_PLAYER_STATS, dashStreak } },
+    fastest: null, best: null, worst: null, allStuck: 0, races: 0, history: {},
+  });
+  const fireFor = (uid: string, dashStreak: number) =>
+    splashVariant(table(10, 20, 30), uid, uid, null, withStreak(uid, dashStreak)).fire;
+
+  it('lights a dasher who has just made it two in a row', () => {
+    // The offset is the whole subtlety: the dash on screen is not in the stored
+    // run yet, so ONE banked plus this one is the two the fire is looking for.
+    expect(fireFor('p1', 0)).toBe(false);  // first dash of a run
+    expect(fireFor('p1', 1)).toBe(true);   // this one makes it two
+    expect(fireFor('p1', 5)).toBe(true);
+  });
+
+  it('lights nobody when there are no stats to read', () => {
+    // A game whose first round has not been committed, or a stats write that was
+    // swallowed. Both mean "no run known", and neither may throw.
+    expect(splashVariant(table(10, 20, 30), 'p1', 'p1').fire).toBe(false);
+    expect(splashVariant(table(10, 20, 30), 'p1', 'p1', null, null).fire).toBe(false);
+  });
+
+  it('never lights anybody who did not dash, however hot they are', () => {
+    // Every glyph here is about the VIEWER. The fire is your run, so it cannot
+    // fall on somebody watching another player's celebration.
+    const hot = withStreak('p0', 4);
+    expect(splashVariant(table(10, 20, 30), 'p0', 'p1', null, hot).fire).toBe(false);
+    expect(splashVariant(table(10, 20, 30), 'p0', 'p2', null, hot).fire).toBe(false);
+    expect(splashVariant(table(10, 20, 30), 'p0', null, null, hot).fire).toBe(false);
+  });
+
+  const render = (splash: Partial<Splash> & { base: SplashBase }) =>
+    renderToStaticMarkup(createElement(DashSplash,
+      { name: 'Dave', splash: { trophy: false, fire: false, ...splash } }));
   it('throws exactly one kind of thing at a viewer', () => {
-    const glitter = render({ base: 'glitter', trophy: false });
+    const glitter = render({ base: 'glitter' });
     expect(glitter).toContain('🥳');
     expect(glitter).toContain('😎');
     expect(glitter).not.toContain('😢');
@@ -551,13 +590,43 @@ describe('DashSplash', () => {
     // win that looked like the end of the game is what they were doing wrong.
     expect(glitter).toContain('faller');
     expect(glitter).not.toContain('fireworks');
-    const poo = render({ base: 'poo', trophy: false });
+    const poo = render({ base: 'poo' });
     expect(poo).toContain('💩');
     expect(poo).not.toContain('🥳');
     expect(poo).not.toContain('🏆');
     expect(render({ base: 'crying', trophy: true })).toContain('🏆');
-    expect(render({ base: 'toilet', trophy: false })).toContain('🚽');
-    expect(render({ base: 'relief', trophy: false })).toContain('🥹');
+    expect(render({ base: 'toilet' })).toContain('🚽');
+    expect(render({ base: 'relief' })).toContain('🥹');
+  });
+
+  /** How many glyphs actually fall, and which ones. */
+  const rained = (splash: Partial<Splash> & { base: SplashBase }) => {
+    const html = render(splash);
+    return {
+      count: (html.match(/class="faller"/g) ?? []).length,
+      fire: html.includes('\u{1F525}'),
+    };
+  };
+
+  it('keeps the fire out of an ordinary dash', () => {
+    // It used to be a third of every celebration, which made it wallpaper: it
+    // said "you dashed" beside two glyphs already saying that.
+    expect(rained({ base: 'glitter' }).fire).toBe(false);
+  });
+
+  it('rains fire on a dasher who is on a run', () => {
+    expect(rained({ base: 'glitter', fire: true }).fire).toBe(true);
+  });
+
+  it('throws the SAME NUMBER of glyphs with the fire and without it', () => {
+    // The fire changes the mix, not the amount: a streak must not be literally
+    // heavier weather than an ordinary dash. A count that grew with the glyph
+    // list would do exactly that, and would have done it to the trophy too.
+    const plain = rained({ base: 'glitter' }).count;
+    expect(plain).toBeGreaterThan(0);
+    expect(rained({ base: 'glitter', fire: true }).count).toBe(plain);
+    expect(rained({ base: 'crying' }).count).toBe(plain);
+    expect(rained({ base: 'crying', trophy: true }).count).toBe(plain);
   });
 });
 

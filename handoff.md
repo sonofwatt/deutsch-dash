@@ -53,7 +53,7 @@ both directions before releasing: the new client against the rules still live,
 and the PREVIOUS client against the new rules, which is the half this file's own
 warning cannot cover._
 
-_**695 tests** (544 unit and 99 in a real browser; 52 against the emulator, all
+_**706 tests** (555 unit and 99 in a real browser; 52 against the emulator, all
 green). This is the only place in the repo that quotes a count -
 it drifted three separate ways when it lived in four places, so keep it here and
 nowhere else. Both sides of the 2026-09-04 merge rewrote this line, which is the
@@ -851,6 +851,55 @@ why each thing is shaped the way it is, not to track work. The playtest requests
 were numbered #1-#23 as they were asked for; all are built except **#1 (retired)**
 and **#4 (deferred, below)**. The numbers are kept in the headings so older notes
 and commit messages still resolve.
+
+### The fire is for a run, not for every dash _(2026-09-10)_
+
+🔥 used to be one of three glyphs in every dash celebration. That made it
+wallpaper: beside 😎 and 🥳 it said "you dashed" for the third time, to somebody
+who could already see they had dashed. It now falls only when the dasher has
+ended **two or more rounds in a row**, where it says something the board does
+not.
+
+**Every glyph in a splash is about the VIEWER**, and that is what decides who
+sees the fire. The glitter is you dashing, the toilet is you dropping into last,
+the trophy is you leading the table - so the fire is YOUR run and nobody else's.
+Only the dasher can be on one at the moment they dash, so it never leaves the
+celebration and never lands in a losing player's rain.
+
+**The count does not change with it.** `FALLERS` is 26 whatever the glyph list
+holds, so the fire changes the MIX and not the amount: thirteen of each without
+it, about nine of each with it. A count that grew with the list would make a
+streak literally heavier weather than an ordinary dash, and would have been doing
+the same thing to the trophy on a losing round all along. Pinned by a test that
+compares the plain dash, the fire dash and the trophy round to each other.
+
+**`stats.dashStreak` is the run**, alongside the `lastStreak` that already
+counted rounds finishing bottom. It increments for the dasher and resets to zero
+for everybody else, which deliberately reaches two cases: a round that stalled
+with no dasher resets the table, because nobody won it; and a player who sat the
+round out resets too, because they did not win it either. `totals` carries every
+player in the room rather than only the ones who scored, which is what makes both
+of them reachable. It is counted OUTSIDE the bottom-of-the-table block, which is
+skipped at a single player and skipped again on a level table - neither has
+anything to do with who dashed.
+
+**The streak is read one short, and that is the whole subtlety.** The splash
+fires the moment dash is announced, before the host has committed anything, so
+the stored `dashStreak` is the run BEFORE this dash. The test is therefore `>= 1`
+and not `>= 2`: one already banked plus the one happening now. Exactly the same
+offset the projected standings live with, for exactly the same reason.
+
+A lost stats write shows the fire a round late or not at all, because stats are a
+best-effort second write whose failure is swallowed (see `commitScores`). That is
+the right way for this to fail: it decorates a celebration, and nothing that only
+decorates a round may cost it anything.
+
+**Adding a required field to `PlayerStats` breaks the build**, not just the
+tests, the same way a required prop on `TableauView` does: `commentary.test.ts`
+built one as a complete literal. It builds off `NO_PLAYER_STATS` now, so the next
+field costs nothing. `stats.test.ts` still spells the whole record out in one
+place on purpose - it is what pins what a brand-new player's stats ARE, and
+comparing the constant to itself would pass however it changed.
 
 ### The table can make a noise _(2026-09-10)_
 
@@ -2072,7 +2121,7 @@ that did not happen. Same reasoning as `basement` in the commentary.
 **Everybody gets the same weather now, and only the glyphs differ.** Asked for on
 2026-09-09. The dasher used to get fifteen firework shells and a burst of emoji
 radiating out of the middle while everybody else got falling emoji, which made a
-round win look like the end of the game. A dash now rains 😎🥳🔥 down the same
+round win look like the end of the game. A dash now rains 😎🥳 down the same
 lanes a bad round rains 💩 down, and the fireworks belong to the sheet that says
 who WON. `DashSplash` is one `Rain` with a name over it; `Fireworks` moved into
 its own file on the way, because its one caller is no longer the splash. The
@@ -2193,11 +2242,15 @@ loop would still be going off behind the numbers ten minutes later. The shells
 are staggered across eight seconds, which outlasts reading the sheet without
 outlasting the sitting there afterwards.
 
-**Three glyphs (😎🥳🔥) rather than eight**, falling: a celebration reads as one
+**Two glyphs (😎🥳) rather than eight**, falling: a celebration reads as one
 thing when the eye takes it in at once, and eight different faces read as a pile
 of stickers. Under reduced motion on a phone the fallers park where they are and
 the fireworks are dropped entirely - a still firework is a smear of dots, and the
 sheet they go off behind already says who won.
+
+🔥 was a third one until 2026-09-10, on every dash, which is what made it
+wallpaper: it said "you dashed" beside two glyphs already saying that. It is kept
+back for a run of two or more now - see "The fire is for a run" below.
 
 ### The wood flip stopped being watchable _(#59)_
 

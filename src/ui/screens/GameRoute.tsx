@@ -42,8 +42,11 @@ export default function GameRoute() {
     // wants the totals as they stood AT THE DASH, and must not re-run when they
     // change a moment later. Taking them as deps would do exactly that.
     const at = gameStore.getState();
+    // Stats come from the same sampled snapshot as everything else here, so the
+    // dash streak is the run BEFORE this dash - which is exactly what
+    // splashVariant expects and offsets by one.
     if (at.room) setSplash({ until: Date.now() + SPLASH_MS,
-      variant: splashVariant(at.room.players, dashedBy, at.uid, at.room.round) });
+      variant: splashVariant(at.room.players, dashedBy, at.uid, at.room.round, at.room.stats) });
   }, [phase, dashedBy]);
   const [, force] = useState(0);
   useEffect(() => {

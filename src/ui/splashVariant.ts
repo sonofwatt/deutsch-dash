@@ -1,9 +1,10 @@
 import { scoreRound } from '../game/scoring';
+import { statsFor, type GameStats } from '../game/stats';
 import type { CenterSpace, PlayerInfo, Tableau } from '../game/types';
 
-/** What falls on this particular viewer, and whether a trophy falls with it. */
+/** What falls on this particular viewer, and what falls alongside it. */
 export type SplashBase = 'glitter' | 'poo' | 'crying' | 'relief' | 'toilet';
-export interface Splash { base: SplashBase; trophy: boolean }
+export interface Splash { base: SplashBase; trophy: boolean; fire: boolean }
 
 /**
  * The dasher gets the celebration. Everyone else gets told what the round just
@@ -23,20 +24,43 @@ export interface Splash { base: SplashBase; trophy: boolean }
  * round, because leading and not dashing is a real thing to feel two ways about.
  * The dasher never needs it: they already have the glitter.
  *
- * The standings are PROJECTED. The splash fires the moment dash is announced,
- * which is before the host has committed anything, so `player.score` is still
- * last round's total - and "dropped into last" is a question about this round.
- * `scoreRound` is the same pure function the host is about to run on the same
- * board, so the projection is the host's arithmetic done early rather than a
- * guess. It can differ only where a play is still being reconciled.
+ * **🔥 falls with the glitter** when the dasher has now ended two or more rounds
+ * in a row. It used to be a third of the celebration every single time, which
+ * made it wallpaper - it said "you dashed" alongside two glyphs already saying
+ * that. Kept back for a run, it says something the board does not.
+ *
+ * Every glyph here is about the VIEWER, which is what decides who sees the fire:
+ * the glitter is you dashing, the toilet is you dropping, the trophy is you
+ * leading, so the fire is YOUR run and nobody else's. Only the dasher can be on
+ * one at the moment they dash, so it never leaves the celebration.
+ *
+ * **Both the standings and the streak are PROJECTED**, for the same reason: the
+ * splash fires the moment dash is announced, which is before the host has
+ * committed anything. So `player.score` is still last round's total while
+ * "dropped into last" is a question about THIS round, and `dashStreak` is the
+ * run as it stood BEFORE this dash. `scoreRound` is the same pure function the
+ * host is about to run on the same board, so the standings are the host's
+ * arithmetic done early rather than a guess; the streak needs no arithmetic at
+ * all, only the offset by one that the test below spells out. Either can differ
+ * only where a play is still being reconciled.
+ *
+ * Stats are a best-effort write whose failure is swallowed (see `commitScores`),
+ * so a lost one shows a fire a round late or not at all. That is the right way
+ * for this to fail: it decorates a celebration, and nothing that only decorates
+ * a round may cost it anything.
  */
 export function splashVariant(
   players: Record<string, PlayerInfo>, dashedBy: string, uid: string | null,
   round?: { spaces: CenterSpace[]; tableaus: Record<string, Tableau> } | null,
+  stats?: GameStats | null,
 ): Splash {
-  if (uid === dashedBy) return { base: 'glitter', trophy: false };
+  if (uid === dashedBy) {
+    // >= 1 and not >= 2: the dash on screen is not in the stored run yet.
+    const fire = statsFor(stats, dashedBy).dashStreak >= 1;
+    return { base: 'glitter', trophy: false, fire };
+  }
   const me = uid ? players[uid] : undefined;
-  if (!me) return { base: 'crying', trophy: false };
+  if (!me) return { base: 'crying', trophy: false, fire: false };
 
   const ids = Object.keys(players);
   const deltas = round ? scoreRound(round.spaces, round.tableaus) : {};
@@ -56,8 +80,8 @@ export function splashVariant(
 
   const wasLast = isLast(before);
   const nowLast = isLast(after);
-  if (nowLast && !wasLast) return { base: 'toilet', trophy };
-  if (wasLast && !nowLast) return { base: 'relief', trophy };
-  if (nowLast && ids.length > 2) return { base: 'poo', trophy };
-  return { base: 'crying', trophy };
+  if (nowLast && !wasLast) return { base: 'toilet', trophy, fire: false };
+  if (wasLast && !nowLast) return { base: 'relief', trophy, fire: false };
+  if (nowLast && ids.length > 2) return { base: 'poo', trophy, fire: false };
+  return { base: 'crying', trophy, fire: false };
 }

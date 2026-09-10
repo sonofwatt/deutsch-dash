@@ -133,10 +133,60 @@ describe('nextStats', () => {
     expect(one).toEqual(snapshot);
   });
 
+  it('counts the run of rounds one player has ended', () => {
+    const one = nextStats(null, round({ dashedBy: 'ann' }));
+    expect(statsFor(one, 'ann').dashStreak).toBe(1);
+    expect(statsFor(one, 'bo').dashStreak).toBe(0);
+    const two = nextStats(one, round({ roundNumber: 2, dashedBy: 'ann', totals: { ann: 18, bo: -8 } }));
+    expect(statsFor(two, 'ann').dashStreak).toBe(2);
+  });
+
+  it('resets the run the moment somebody else dashes', () => {
+    const two = nextStats(nextStats(null, round({ dashedBy: 'ann' })),
+      round({ roundNumber: 2, dashedBy: 'ann', totals: { ann: 18, bo: -8 } }));
+    const three = nextStats(two, round({ roundNumber: 3, dashedBy: 'bo', totals: { ann: 14, bo: 1 } }));
+    expect(statsFor(three, 'ann').dashStreak).toBe(0);
+    expect(statsFor(three, 'bo').dashStreak).toBe(1);
+    // The lifetime count is untouched by the reset - that is what `dashes` is for.
+    expect(statsFor(three, 'ann').dashes).toBe(2);
+  });
+
+  it('resets the whole table on a round that stalled with no dasher', () => {
+    // Nobody won it, so nobody is on a run through it.
+    const one = nextStats(null, round({ dashedBy: 'ann' }));
+    const stalled = nextStats(one, round({ roundNumber: 2, dashedBy: null, totals: { ann: 9, bo: -4 } }));
+    expect(statsFor(stalled, 'ann').dashStreak).toBe(0);
+  });
+
+  it('resets a run for somebody who sat the round out', () => {
+    // They did not win it either. `totals` carries every player in the room and
+    // not only the ones who scored, which is what makes them reachable here.
+    const one = nextStats(null, round({ dashedBy: 'ann' }));
+    const out = nextStats(one, round({
+      roundNumber: 2, dashedBy: 'bo', scores: { bo: sc(5) }, totals: { ann: 9, bo: 1 },
+    }));
+    expect(statsFor(out, 'ann').dashStreak).toBe(0);
+    expect(statsFor(out, 'bo').dashStreak).toBe(1);
+  });
+
+  it('counts a run at a single player, where the last-place block does not', () => {
+    // The bottom-of-the-table block is skipped at one player and skipped again on
+    // a level table. Neither has anything to do with who dashed, which is why the
+    // streak is counted outside it.
+    const solo = nextStats(null, round({ scores: { ann: sc(9) }, totals: { ann: 9 } }));
+    expect(statsFor(solo, 'ann').dashStreak).toBe(1);
+    const level = nextStats(null, round({ dashedBy: 'ann', totals: { ann: 5, bo: 5 } }));
+    expect(statsFor(level, 'ann').dashStreak).toBe(1);
+    expect(statsFor(level, 'bo').dashStreak).toBe(0);
+  });
+
   it('reads a room that has never had stats written to it', () => {
     expect(normalizeStats(undefined)).toBeNull();
+    // Spelled out rather than compared to NO_PLAYER_STATS, deliberately: this is
+    // the one place that pins what a brand-new player's stats ARE, and comparing
+    // the constant to itself would pass however it changed.
     expect(statsFor(null, 'ann')).toEqual(
-      { dashes: 0, lastPlaces: 0, lastStreak: 0, racesWon: 0, racesLost: 0 });
+      { dashes: 0, lastPlaces: 0, lastStreak: 0, dashStreak: 0, racesWon: 0, racesLost: 0 });
     // RTDB gives back only what was written, so partial objects have to be safe.
     expect(normalizeStats({ rounds: 4 })!.players).toEqual({});
     expect(normalizeStats({ rounds: 4 })!.races).toBe(0);
