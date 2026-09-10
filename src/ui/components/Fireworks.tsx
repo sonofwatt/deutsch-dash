@@ -22,6 +22,13 @@
  * Pure CSS: each spark is one element flung along its own bearing and dropped by
  * gravity at the end, which is the whole difference between a firework and a
  * starburst.
+ *
+ * **Five roman candles** fire up the same sky, added 2026-09-09. They are a
+ * different instrument on purpose: a shell is one burst that fills its patch of
+ * sky at once, and a candle is a slow file of single stars leaving one spot,
+ * which gives the display a pulse between bursts rather than thirty of the same
+ * event. Fifty elements against the shells' 1410, and measured at no cost at all,
+ * so what they buy is rhythm and what they spend is nothing.
  */
 
 /**
@@ -55,6 +62,33 @@ const SHELLS = [
 ];
 const SHELL_SPARKS = 46;
 
+/**
+ * How fast one candle files its stars off, and how many. A candle is a rhythm,
+ * not a burst: at 520ms and eight it fired too slowly to read as a stream, and
+ * a lone star every half second among a couple of hundred shell sparks read as
+ * more confetti rather than as a tube going off.
+ */
+const CANDLE_GAP_MS = 360;
+const CANDLE_STARS = 10;
+/**
+ * The tubes, along the bottom edge. `start` is deliberately NOT a formula and
+ * deliberately not in order across the screen: candles going off in step read as
+ * one machine, and the point of them is to punctuate the shells rather than march
+ * with them. Each runs 8 x 520ms plus a star's 1200ms flight, so the last one
+ * lit at 2800ms finishes at 7240ms, inside the shells' own eight seconds.
+ *
+ * They sit OUT at the edges rather than spread evenly, because the sheet is in
+ * the middle: a tube at 31% spends most of its climb behind the scores. The one
+ * at 50% is deliberate, and passing behind the sheet is what it is for.
+ */
+const CANDLES = [
+  { x: 6, hue: 45, start: 400 },
+  { x: 24, hue: 200, start: 2100 },
+  { x: 50, hue: 330, start: 900 },
+  { x: 76, hue: 110, start: 2800 },
+  { x: 94, hue: 20, start: 1600 },
+];
+
 export function Fireworks() {
   return (
     <div className="fireworks" aria-hidden="true">
@@ -76,6 +110,21 @@ export function Fireworks() {
               ['--sz' as string]: i % 6 === 0 ? '4px' : `${5 + (i % 3) * 2}px`,
               ['--lit' as string]: i % 6 === 0 ? '96%' : '58%',
               ['--tw' as string]: `${(i % 7) * 90}ms`,
+            }} />
+          ))}
+        </span>
+      ))}
+      {CANDLES.map((c, ci) => (
+        <span key={`c${ci}`} className="candle" style={{ left: `${c.x}%`, top: '98%' }}>
+          {Array.from({ length: CANDLE_STARS }, (_, i) => (
+            <i key={i} style={{
+              ['--delay' as string]: `${c.start + i * CANDLE_GAP_MS}ms`,
+              // Four heights and a little sideways drift, so a tube does not fire
+              // the same star eight times up the same line.
+              ['--rise' as string]: `-${40 + (i % 4) * 7}vh`,
+              ['--dx' as string]: `${((i % 3) - 1) * 2.5}vw`,
+              ['--hue' as string]: String(c.hue + (i % 3) * 8),
+              ['--sz' as string]: i % 3 === 0 ? '13px' : '11px',
             }} />
           ))}
         </span>

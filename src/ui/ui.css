@@ -314,6 +314,41 @@
   100% { transform: rotate(var(--a)) translateX(var(--r)) translateY(4.5vmin) scale(.45);
          opacity: 0; }
 }
+/* ROMAN CANDLES, which are a different instrument from the shells above and are
+   there to be one: a shell is a single burst that fills its patch of sky, and a
+   candle is a slow file of single stars going up from one spot. Five tubes along
+   the bottom edge, ten stars each, so 50 elements against the shells' 1410, and
+   measured at no cost at all - the rhythm is what they buy, not the count.
+   The star: fast off the tube and slowing all the way, which is the whole read.
+   No arc: it fades at the top of its climb rather than falling back, which costs
+   one element per star instead of two and is what a candle looks like from far
+   enough away to be watching it. */
+.candle { position: absolute; width: 0; height: 0; }
+/* A near-white core inside a coloured glow, and BIGGER than a shell spark (12px
+   against 4 to 11). A candle star has to be picked out of a sky with up to a
+   couple of hundred sparks in it, and the first cut was the same size and the
+   same lightness as the things it had to be distinguished from: it read as more
+   confetti. */
+.candle i { position: absolute; left: 0; top: 0;
+  width: var(--sz, 12px); height: var(--sz, 12px); border-radius: 999px;
+  background: hsl(var(--hue) 100% 88%);
+  box-shadow: 0 0 12px 5px hsl(var(--hue) 98% 62% / .9),
+              0 0 28px 10px hsl(var(--hue) 98% 58% / .45);
+  animation: candle-star 1200ms cubic-bezier(.1, .72, .32, 1) var(--delay, 0ms) both; }
+/* The tail, as a pseudo-element: no DOM node, no `filter`, and it fades with the
+   star because it is inside the element the opacity is animating. A gradient
+   rather than a blur on purpose - blur is paint, and paint is the one thing this
+   whole display has to keep spending carefully. */
+.candle i::before { content: ''; position: absolute; left: 50%; top: 55%;
+  width: 3px; height: 44px; transform: translateX(-50%); border-radius: 999px;
+  background: linear-gradient(hsl(var(--hue) 98% 70% / .75), transparent); }
+@keyframes candle-star {
+  0%   { transform: translate(0, 0) scale(.35); opacity: 0; }
+  8%   { opacity: 1; }
+  72%  { opacity: 1; }
+  100% { transform: translate(var(--dx, 0), var(--rise, -46vh)) scale(.9); opacity: 0; }
+}
+
 /* Both of these are read against whatever the splash is raining past them, in
    either theme, so they carry their own contrast rather than borrowing the
    page's: a hard black outline, drawn with -webkit-text-stroke where it is
@@ -349,11 +384,12 @@
    same glyphs, same message, parked instead of moving. */
 @media (prefers-reduced-motion: reduce) {
   [data-platform] .faller { animation: none; opacity: .9; top: 16vh; }
-  /* The fireworks were missed when this block was written: 1410 flying, flickering
+  /* The fireworks were missed when this block was written: 1460 flying, flickering
      elements on a phone that had asked for stillness. Gone entirely rather than
      parked - a still firework is a smear of dots, and the sheet they go off
      behind already says who won. */
-  [data-platform] .shell b, [data-platform] .shell i { animation: none; opacity: 0; }
+  [data-platform] .shell b, [data-platform] .shell i,
+  [data-platform] .candle i { animation: none; opacity: 0; }
 }
 
 /* The build, at the foot of the home and lobby screens. Deliberately the

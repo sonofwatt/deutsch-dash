@@ -27,13 +27,19 @@ const ANIMATED = [
   // and the computed name lists both.
   ['.shell b', 'shell-flash'],
   ['.shell i', 'firework, twinkle'],
+  // A roman candle's star. Same block, and it was worth adding to this list on
+  // the day rather than after: the fireworks themselves were missed when that
+  // block was first written and ran on 705 elements a phone had asked to hold
+  // still.
+  ['.candle i', 'candle-star'],
 ] as const;
 
 const PAGE = `<!doctype html><html><head><style>${CSS}</style></head><body>
   <div class="wood-deal"><div class="card">7</div></div>
   <div class="wood-collect"></div>
   <div class="faller">X</div>
-  <div class="fireworks"><span class="shell"><b></b><i></i></span></div>
+  <div class="fireworks"><span class="shell"><b></b><i></i></span>
+    <span class="candle"><i></i></span></div>
 </body></html>`;
 
 describe.runIf(process.env.LAYOUT === '1')('the reduced-motion override', () => {

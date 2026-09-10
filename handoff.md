@@ -1575,6 +1575,28 @@ which is what turns a burst into a glittery one. Each shell is a point; its spar
 are children that know only a bearing, fly out along it and take a little gravity
 at the end, which is the whole difference between a firework and a starburst.
 
+**Five roman candles fire up the same sky**, added 2026-09-09. They are a
+different instrument on purpose: a shell is one burst filling its patch of sky at
+once, and a candle is a slow file of single stars leaving one spot, which gives
+the display a pulse between bursts rather than thirty of the same event. Ten
+stars a tube, 360ms apart, out at the edges because the sheet is in the middle
+and a tube at 31% spends its whole climb behind the scores. The one at 50% is
+deliberate, and passing behind the sheet is what it is for.
+
+**The first cut of them read as more confetti**, which is the thing worth
+remembering if they are ever touched. They were the same size and lightness as a
+shell spark, one every 520ms, and the eye cannot pick eight of those out of a sky
+holding a couple of hundred. What fixed it: 11 to 13px against a spark's 4 to 11,
+a near-white core inside a coloured glow, a gradient TAIL on a `::before` so it
+costs no element and no `filter`, and a faster cadence so a tube reads as a
+stream. A star fades at the top of its climb rather than arcing back down, which
+is one element instead of two and is what a candle looks like from far enough
+away to be watching it.
+
+**They cost nothing measurable**, on the same rig as the table above: 50 elements
+against 1410, frame medians identical at 33ms unthrottled and 133ms under a 6x
+throttle, and idle untouched.
+
 **They run ONCE.** The overlay stays up until somebody leaves or rematches, and a
 loop would still be going off behind the numbers ten minutes later. The shells
 are staggered across eight seconds, which outlasts reading the sheet without
@@ -2205,7 +2227,7 @@ nobody has decided about them rather than because they are hard:
   leader election over `BroadcastChannel`.
 - **Long-session memory was never measured.** The maps in the store are bounded
   and cleared per round, but nothing has a number for the heap after ten rounds of
-  remounting 75 cards, plus the 1410 firework elements the final sheet brings once
+  remounting 75 cards, plus the 1460 firework elements the final sheet brings once
   at the end. The layout suite already has the browser wiring a heap reading
   needs.
 - **The board is pointer-only.** No keyboard route, no focusable pile, no
@@ -2759,6 +2781,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `ad471e9` | The icon on the home screen, beside the title |
 | `eaac4a3` | A dash rains emoji; the fireworks moved behind the sheet that says who won |
 | `b8f156e` | Twice the fireworks over twice as long, and a twinkle that stops when the flight does |
+| `PENDING` | Roman candles up the edges of the win, a different instrument from the shells |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
