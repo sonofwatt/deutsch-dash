@@ -53,7 +53,7 @@ both directions before releasing: the new client against the rules still live,
 and the PREVIOUS client against the new rules, which is the half this file's own
 warning cannot cover._
 
-_**762 tests** (608 unit and 102 in a real browser; 52 against the emulator, all
+_**773 tests** (619 unit and 102 in a real browser; 52 against the emulator, all
 green). This is the only place in the repo that quotes a count -
 it drifted three separate ways when it lived in four places, so keep it here and
 nowhere else. Both sides of the 2026-09-04 merge rewrote this line, which is the
@@ -1483,6 +1483,46 @@ became, written by the host in `commitScores` beside the rest of the tally.
   panel says so rather than rendering an empty box.
 - A round with a TOTAL but no DELTA is a round that player sat out. A round with
   no total for them at all is a round they were not in, and it is left out.
+
+### The carousel cycles its remarks _(2026-09-10)_
+
+"Don't re-use a remark from a previous round unless the others aren't relevant."
+The rules overlap enough that the same handful wins on priority every round, and
+a carousel that says the same six things after every round is one people stop
+reading.
+
+**A strict two-band sort, not a penalty.** Anything shown in the last couple of
+rounds goes behind everything that was not, whatever its priority, and only fills
+a slot the fresh ones could not. A penalty big enough to matter would have been a
+second priority scale to keep in your head, and one small enough not to would not
+have changed anything.
+
+- **`RECALL_ROUNDS` is 2, not "for ever".** With six drawn a round, a whole-game
+  memory goes cold after three or four rounds and every remark is equally stale,
+  which is the same as having no memory at all. Two keeps about a dozen ids warm
+  and lets a good line come back around.
+- **Kept per ROUND and read strictly BACKWARDS.** `remarksForRoom` runs on every
+  render - the carousel re-renders on a timer - so a memory that recorded what it
+  returned and then read it back would answer differently on the second render of
+  one sheet. Recording under the round number and consulting only earlier rounds
+  makes the input to round N fixed once round N exists. `rememberRemarks` keeps
+  the FIRST answer for a round for the same reason.
+- **A rematch needs no telling.** It counts from round 1 again, and reading
+  backwards from 1 finds nothing.
+- **Client-local, deliberately.** Two phones can drift on which lines they have
+  seen - somebody who joined at round four has a shorter memory than the host.
+  The alternative is a database write per round carrying a list of joke ids and a
+  shape in `stats` every client must agree on before the sheet can be drawn, which
+  is a lot of machinery for a decoration.
+- **The cost, which is worth knowing.** A round whose headline repeats - two
+  stalled rounds in a row, say - now leads with something smaller, because
+  `stalled` is stale and six other rules are not. That is the trade the ask makes.
+  If it ever reads badly the lever is the one comparison in the thinning pass and
+  nothing else.
+- **How many survive can change with the order**, and legitimately: `MAX_PER_PLAYER`
+  is applied in order, so re-ordering changes which remarks it reaches first. The
+  tests pin that the sheet is never blank and never repeats itself, not that the
+  count is stable.
 
 ### Genius lies in wait, the countdown has tones, and the sheet got ruder _(2026-09-10)_
 
@@ -3781,6 +3821,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `1e1a4d8` | Another 50ms off the wood step, so the cards overlap by 100ms |
 | `28f4d70` | A finished pile turns over to show whose it was; the bots hesitate |
 | `45c275d` | Genius lies in wait; countdown tones; the race remarks get seen |
+| _pending_ | The carousel cycles its remarks instead of repeating them |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.

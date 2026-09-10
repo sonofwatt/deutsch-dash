@@ -1,4 +1,5 @@
 import { rankRows } from './scoreRanks';
+import { recentRemarks, rememberRemarks } from './remarkMemory';
 import { statsFor, type GameStats } from '../game/stats';
 import type { CenterSpace, PlayerInfo, Room, RoundScore } from '../game/types';
 
@@ -23,6 +24,13 @@ export interface CommentaryInput {
   stats: GameStats | null;
   /** The game-over sheet, which gets to be ruder. */
   final?: boolean;
+  /**
+   * Remark ids the carousel has shown in the last couple of rounds, which this
+   * round will avoid repeating unless it runs out of anything else to say. See
+   * `remarkMemory.ts`. Absent means no memory, which is what the keeper's own
+   * sheet and every test that does not care about it get.
+   */
+  recent?: string[];
 }
 
 /**
@@ -647,9 +655,26 @@ export function commentary(input: CommentaryInput): Remark[] {
   // fan club. A remark is dropped only when EVERY player it is about has already
   // had their say - so a rivalry still lands on the strength of the other party,
   // which is the whole point of a rivalry.
+  /**
+   * Anything shown in the last couple of rounds goes to the BACK, whatever its
+   * priority, and only fills a slot the fresh ones could not.
+   *
+   * Asked for as "don't re-use a remark from a previous round unless the others
+   * aren't relevant", and that is what this is: a strict two-band sort rather
+   * than a penalty, because a penalty large enough to matter would have been a
+   * second priority scale to keep in your head, and one small enough not to
+   * would not have changed anything.
+   *
+   * **The cost is worth knowing.** A round whose headline repeats - two stalled
+   * rounds in a row, say - now leads with something smaller, because `stalled` is
+   * stale and six other rules are not. That is the trade the ask makes, and the
+   * lever if it reads badly is this comparison and nothing else.
+   */
+  const stale = new Set(input.recent ?? []);
   const counts: Record<string, number> = {};
   const kept: Remark[] = [];
-  for (const remark of out.sort((a, b) => b.priority - a.priority)) {
+  const order = (r: Remark) => (stale.has(r.id) ? 1 : 0);
+  for (const remark of out.sort((a, b) => order(a) - order(b) || b.priority - a.priority)) {
     const subjects = remark.about;
     if (subjects.length && subjects.every(id => (counts[id] ?? 0) >= MAX_PER_PLAYER)) continue;
     subjects.forEach(id => { counts[id] = (counts[id] ?? 0) + 1; });
@@ -659,24 +684,37 @@ export function commentary(input: CommentaryInput): Remark[] {
   return kept;
 }
 
-/** The sheets' entry point: everything the rules need, pulled off one room. */
-export function remarksForRoom(room: Room, final = false): Remark[] {
+/**
+ * The sheets' entry point: everything the rules need, pulled off one room.
+ *
+ * `code` is what the remark memory is keyed on, so a different room starts with a
+ * clean sheet. Optional, because `render.test.ts` and the keeper build these
+ * calls themselves and neither has a room code to give.
+ */
+export function remarksForRoom(room: Room, final = false, code: string | null = null): Remark[] {
   const round = room.round;
   const started = round?.startedAt ?? 0;
   const ended = round?.endedAt ?? 0;
-  return commentary({
+  const roundNumber = room.meta.roundNumber;
+  const remarks = commentary({
+    recent: recentRemarks(code, roundNumber),
     players: room.players,
     scores: round?.scores ?? null,
     spaces: round?.spaces ?? [],
     duels: round?.duels ?? null,
     dashedBy: round?.dashedBy ?? null,
-    roundNumber: room.meta.roundNumber,
-    targetScore: room.meta.targetScore,
     // Both are server timestamps, so the difference is honest even though the two
     // clients' own clocks are not.
     durationMs: started > 0 && ended > started ? ended - started : null,
     stuckRounds: round?.stuckRounds ?? 0,
     stats: room.stats ?? null,
     final,
+    roundNumber,
+    targetScore: room.meta.targetScore,
   });
+  // The game-over sheet is drawn over the same round number as the last round-end
+  // sheet and says different things, so it must not be what that round is
+  // remembered by - and there is no round after it to protect anyway.
+  if (!final) rememberRemarks(code, roundNumber, remarks.map(r => r.id));
+  return remarks;
 }

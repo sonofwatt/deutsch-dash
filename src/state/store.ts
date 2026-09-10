@@ -13,6 +13,7 @@ import * as netRooms from '../net/rooms';
 import * as netPlays from '../net/plays';
 import type { PlayResult } from '../net/plays';
 import { pickNextHost, allConnectedStuck } from '../net/plays';
+import { forgetRemarks } from '../ui/remarkMemory';
 import { ensureSignedIn, reconnect, watchConnected } from '../net/firebase';
 import { playCountdown, playSoundbite } from '../ui/sound/engine';
 import type { JoinResult } from '../net/rooms';
@@ -1087,6 +1088,8 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         flips.clear();
         woodLaps.clear();
         spaceTouched.clear();
+        // The jokes this table has already heard mean nothing in the next room.
+        forgetRemarks();
         forcedCountdown = false;
         commitFailedFor = null;
         deps.stopPresence();

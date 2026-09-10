@@ -5,6 +5,8 @@ import { remarksForRoom } from '../commentary';
 
 export function RoundEndOverlay() {
   const room = useGameStore(s => s.room)!;
+  // Keys the remark memory, so a different room starts on a clean sheet.
+  const code = useGameStore(s => s.code);
   const uid = useGameStore(s => s.uid);
   const next = useGameStore(s => s.next);
   const startAnyway = useGameStore(s => s.startAnyway);
@@ -38,7 +40,7 @@ export function RoundEndOverlay() {
         <h2 style={{ margin: 0 }}>{dasher ? `${dasher} dashed!` : 'Round over (all stuck)'}</h2>
         <ScoreList players={room.players} scores={scores} dashedBy={room.round?.dashedBy} showReady
           history={room.stats?.history} />
-        <Commentary remarks={remarksForRoom(room)} />
+        <Commentary remarks={remarksForRoom(room, false, code)} />
         {actionError && <p className="error" style={{ margin: 0 }}>{actionError}</p>}
         {me && !me.sittingOut && (
           <button className={`btn ready-btn${iAmReady ? ' on' : ''}`} onClick={toggleReady}>

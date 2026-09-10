@@ -92,6 +92,43 @@ describe('commentary', () => {
     expect(got).toContain('unlucky');    // Ann lost three
   });
 
+  it('puts anything shown recently behind everything that was not', () => {
+    // "Don't re-use a remark from a previous round unless the others aren't
+    // relevant." A strict two-band sort, not a penalty: stale goes to the back
+    // whatever its priority, and only fills a slot nothing fresh could.
+    const duels = { ann: { bo: 3 } };
+    const fresh = commentary(base({ duels }));
+    const first = fresh[0].id;
+    const after = commentary(base({ duels, recent: [first] }));
+    expect(after[0].id).not.toBe(first);
+    // Demoting it can cost it its slot outright, because the per-player cap then
+    // reaches it before it comes up. That is the ask working, not failing: it was
+    // re-used only if the others were not relevant, and here they were.
+    expect(after.length).toBeGreaterThan(0);
+  });
+
+  it('shows a stale remark anyway when nothing fresh is left to say', () => {
+    // The "unless the others aren't relevant" half. Mark everything as seen and
+    // the sheet still has to say something.
+    const duels = { ann: { bo: 3 } };
+    const all = commentary(base({ duels })).map(r => r.id);
+    const again = commentary(base({ duels, recent: all }));
+    // The sheet is never blank, and never says the same thing twice.
+    expect(again.length).toBeGreaterThan(0);
+    expect(new Set(again.map(r => r.id)).size).toBe(again.length);
+    // How MANY survive can differ, and legitimately: the per-player cap is
+    // applied in order, so re-ordering changes which remarks it reaches. That is
+    // the existing thinning doing its job on a new order, not this losing lines.
+  });
+
+  it('still orders by priority inside each band', () => {
+    const out = commentary(base({ duels: { ann: { bo: 3 } }, recent: ['bully'] }));
+    const stale = out.findIndex(r => r.id === 'bully');
+    const freshOnes = out.slice(0, stale === -1 ? out.length : stale);
+    expect(freshOnes.map(r => r.priority))
+      .toEqual([...freshOnes.map(r => r.priority)].sort((a, b) => b - a));
+  });
+
   it('ignores duels involving somebody who has left the room', () => {
     // A player removed between the race and the sheet must not become "undefined".
     const remarks = commentary(base({ duels: { ann: { ghost: 5 } } }));

@@ -10,6 +10,7 @@ import { remarksForRoom } from '../commentary';
 export const REMATCH_WAIT_S = 3;
 
 export function GameOverOverlay() {
+  const code = useGameStore(s => s.code);
   const room = useGameStore(s => s.room)!;
   const uid = useGameStore(s => s.uid);
   const again = useGameStore(s => s.again);
@@ -57,7 +58,7 @@ export function GameOverOverlay() {
             and this is the only sheet anybody sees for it. */}
         <ScoreList players={room.players} scores={scores} dashedBy={room.round?.dashedBy}
           history={room.stats?.history} />
-        <Commentary remarks={remarksForRoom(room, true)} />
+        <Commentary remarks={remarksForRoom(room, true, code)} />
         {actionError && <p className="error" style={{ margin: 0 }}>{actionError}</p>}
         {host
           ? <button className="btn btn-primary" onClick={again} disabled={wait > 0}>
