@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { TableauView } from './TableauView';
 import { CenterGrid, gridColumns } from './CenterGrid';
 import { OpponentStrip } from './OpponentStrip';
+import { ScoreHistory } from './ScoreHistory';
 import { ScoreRow } from './ScoreRow';
 import { DashSplash } from './DashSplash';
 import { ScoreList } from './ScoreList';
@@ -332,6 +333,63 @@ describe('dragging off the wood', () => {
   it('is unmoved by a drag from anywhere else', () => {
     expect(view(hand(3), { kind: 'dash' })).toContain('>3<');
     expect(view(hand(3), { kind: 'post', index: 0 })).toContain('>3<');
+  });
+});
+
+describe('the round-end sheet says who it is waiting on', () => {
+  const p = (over: Partial<PlayerInfo> = {}): PlayerInfo => ({
+    name: 'Dave', badgeId: 'tulip', joinedAt: 1, connected: true, stuckAt: null, awayAt: null,
+    score: 12, ...over,
+  });
+  const row = (player: PlayerInfo, showReady = true) =>
+    renderToStaticMarkup(createElement(ScoreRow, { player, showReady }));
+
+  it('draws the state around the name, in four states', () => {
+    expect(row(p({ ready: true }))).toContain('name-state on');
+    expect(row(p())).toContain('name-state ');                    // not ready: no modifier
+    expect(row(p({ ready: true, awayAt: 5 }))).toContain('name-state away');
+    expect(row(p({ sittingOut: true }))).toContain('name-state out');
+  });
+
+  it('lets away outrank ready, because the table is still waiting on them', () => {
+    // A player who readied and then put their phone down is not somebody the
+    // sheet should be reporting as done. tableReady agrees.
+    expect(row(p({ ready: true, awayAt: 5 }))).not.toContain('name-state on');
+  });
+
+  it('says nothing about a bot, or on a sheet that is not a gate', () => {
+    expect(row(p({ isBot: true, ready: true }))).not.toContain('name-state');
+    expect(row(p({ ready: true }), false)).not.toContain('name-state');
+  });
+});
+
+describe('ScoreHistory', () => {
+  const history = {
+    // No total for `you` at all: they were not in the game for this round.
+    '2': { delta: { me: -4 }, total: { me: 5 } },
+    '1': { delta: { me: 9, you: 2 }, total: { me: 9, you: 2 } },
+    '3': { delta: { you: 6 }, total: { me: 5, you: 26 } },
+  };
+  const render = (uid: string) =>
+    renderToStaticMarkup(createElement(ScoreHistory, { history, uid, name: 'Dave' }))
+      .replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+
+  it('reads oldest first, whatever order the keys arrived in', () => {
+    expect(render('me')).toBe('Round 1 +9 9 Round 2 -4 5 Round 3 sat out 5');
+  });
+
+  it('shows a round with no delta as a round that was sat out', () => {
+    expect(render('me')).toContain('sat out');
+  });
+
+  it('leaves out a round this player was not in the game for', () => {
+    // `you` has no total in round 2's line, so that round is not their history.
+    expect(render('you')).toBe('Round 1 +2 2 Round 3 +6 26');
+  });
+
+  it('says so plainly when there is nothing recorded', () => {
+    const empty = renderToStaticMarkup(createElement(ScoreHistory, { history: {}, uid: 'me', name: 'Dave' }));
+    expect(empty).toContain('No rounds recorded yet.');
   });
 });
 

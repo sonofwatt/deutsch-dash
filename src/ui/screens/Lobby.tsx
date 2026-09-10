@@ -193,43 +193,6 @@ export function Lobby({ code }: { code: string }) {
           {[25, 50, 75, 100].map(n => <option key={n} value={n}>{n} points</option>)}
         </select>
       </div>
-      <div className="row">
-        {/* Room-wide, not a device preference: hints are an advantage, and bot
-            difficulty was tuned against a human without them. One switch covers
-            both of them - the stalled-player hint and the just-opened glow. */}
-        <label className="muted" htmlFor="hints">Helper hints</label>
-        <span className="spacer" />
-        <input id="hints" type="checkbox" className="toggle" disabled={!host}
-          checked={room.meta.hintsOn ?? false} onChange={e => setHints(e.target.checked)} />
-      </div>
-      <div className="row">
-        {/* Read at startRound, so it settles for a whole round at a time and the
-            board cannot change shape under a hand somebody is holding. */}
-        <label className="muted" htmlFor="orderly">Orderly grid</label>
-        <span className="spacer" />
-        <input id="orderly" type="checkbox" className="toggle" disabled={!host}
-          checked={room.meta.orderlyGrid ?? false} onChange={e => setOrderly(e.target.checked)} />
-      </div>
-      <div className="row">
-        {/* Host-wide rather than per-device, unlike the theme toggle in the
-            corner: it changes how the CARDS read, and two players describing the
-            same board to each other should be looking at the same thing. Does
-            nothing for a player already in a light theme.
-            Defaults ON (normalizeRoom), which is why the fallback here is true. */}
-        <label className="muted" htmlFor="pale">White cards in dark mode</label>
-        <span className="spacer" />
-        <input id="pale" type="checkbox" className="toggle" disabled={!host}
-          checked={room.meta.paleCards ?? true} onChange={e => setPaleCards(e.target.checked)} />
-      </div>
-      <div className="row">
-        {/* Also on by default: flinging is simply the faster way to play, and
-            carrying a card into the drop area still works either way. Off is for
-            a table that finds cards leaving their hand unbidden. */}
-        <label className="muted" htmlFor="fling">Fling cards at the board</label>
-        <span className="spacer" />
-        <input id="fling" type="checkbox" className="toggle" disabled={!host}
-          checked={room.meta.flingOn ?? true} onChange={e => setFling(e.target.checked)} />
-      </div>
       {/* Not a host option and not disabled for anybody: this one is about the
           phone in your hand, so every player sets their own (see prefs.ts). The
           same ⇄ is on the board mid-game; this is only the chance to get it
@@ -277,6 +240,50 @@ export function Lobby({ code }: { code: string }) {
           Sit out the next rounds
         </button>
       )}
+
+      {/* The four host options live DOWN HERE, under the buttons that actually
+          start a game. Asked for on 2026-09-09: they are set once by one person
+          and then never touched again, and sitting above the ready button they
+          were four rows of furniture between the room code and the only thing
+          most players come to this screen to press. Below the ready button and
+          the sit-out beneath it, so that pair still reads as one block. */}
+      <div className="row">
+        {/* Room-wide, not a device preference: hints are an advantage, and bot
+            difficulty was tuned against a human without them. One switch covers
+            both of them - the stalled-player hint and the just-opened glow. */}
+        <label className="muted" htmlFor="hints">Helper hints</label>
+        <span className="spacer" />
+        <input id="hints" type="checkbox" className="toggle" disabled={!host}
+          checked={room.meta.hintsOn ?? false} onChange={e => setHints(e.target.checked)} />
+      </div>
+      <div className="row">
+        {/* Read at startRound, so it settles for a whole round at a time and the
+            board cannot change shape under a hand somebody is holding. */}
+        <label className="muted" htmlFor="orderly">Orderly grid</label>
+        <span className="spacer" />
+        <input id="orderly" type="checkbox" className="toggle" disabled={!host}
+          checked={room.meta.orderlyGrid ?? false} onChange={e => setOrderly(e.target.checked)} />
+      </div>
+      <div className="row">
+        {/* Host-wide rather than per-device, unlike the theme toggle in the
+            corner: it changes how the CARDS read, and two players describing the
+            same board to each other should be looking at the same thing. Does
+            nothing for a player already in a light theme.
+            Defaults ON (normalizeRoom), which is why the fallback here is true. */}
+        <label className="muted" htmlFor="pale">White cards in dark mode</label>
+        <span className="spacer" />
+        <input id="pale" type="checkbox" className="toggle" disabled={!host}
+          checked={room.meta.paleCards ?? true} onChange={e => setPaleCards(e.target.checked)} />
+      </div>
+      <div className="row">
+        {/* Also on by default: flinging is simply the faster way to play, and
+            carrying a card into the drop area still works either way. Off is for
+            a table that finds cards leaving their hand unbidden. */}
+        <label className="muted" htmlFor="fling">Fling cards at the board</label>
+        <span className="spacer" />
+        <input id="fling" type="checkbox" className="toggle" disabled={!host}
+          checked={room.meta.flingOn ?? true} onChange={e => setFling(e.target.checked)} />
+      </div>
 
       {/* The host keeps a way past a phone that has died: the ready gate must not
           be able to strand a table. It is gone entirely once everyone is ready,

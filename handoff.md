@@ -31,7 +31,7 @@ instead, check both directions before releasing: the new client against the rule
 still live, and the PREVIOUS client against the new rules, which is the half this
 file's own warning cannot cover._
 
-_**513 tests** (440 unit and 27 in a real browser; 46 against the emulator, all
+_**524 tests** (451 unit and 27 in a real browser; 46 against the emulator, all
 green). This is the only place in the repo that quotes a count -
 it drifted three separate ways when it lived in four places, so keep it here and
 nowhere else. Both sides of the 2026-09-04 merge rewrote this line, which is the
@@ -1074,6 +1074,55 @@ space it can follow rigged into place:
 | 70px flick aimed 90° away | nothing |
 | the same 70px at 400ms - a reposition, not a throw | nothing |
 | slow drag let go over the opponent strip | lands (signal 3) |
+
+### Five things off one list _(2026-09-09)_
+
+**The four host options moved below the ready button.** They are set once by one
+person and never touched again, and above the ready button they were four rows of
+furniture between the room code and the only control most players come to that
+screen to press. They sit under the sit-out button rather than immediately under
+Start anyway, so that the ready button and the quiet sit-out beneath it still read
+as one block.
+
+**Rematch waits three seconds**, and says so: `Rematch in 3...`. It arrives under
+a celebration, in the same spot the ready button occupied on the round-end sheet a
+moment earlier, so a host still tapping through the last round would deal a whole
+new game before anybody had read who won. Counted down out loud rather than only
+greyed, because a button that does nothing and does not say why reads as broken.
+
+**Only the winner gets the fireworks.** A dash rains emoji on everybody, because a
+round is a thing that happened to the table; winning the game happened to one
+player, and eight seconds of fireworks fired at the people who just lost reads as
+gloating.
+
+**The ready dot became a pill around the name**, and it now says AWAY as well. The
+dot was 8px in a 10px column carrying four meanings, which is not readable on a
+phone at a glance; the name is the thing an eye lands on, so the name is what
+carries the state. Four states in the lobby's own colours - white not ready, green
+ready, yellow away, grey sitting out - as literals in both themes, for the reason
+the ready button gives: two phones at one table set to different themes have to be
+showing each other the same thing. **Away outranks ready**, deliberately: a player
+who readied and then put their phone down is still somebody the table is waiting
+for, and `tableReady` already agreed.
+
+**A total on either score sheet opens that player's game so far.** The data is new:
+`GameStats.history` keeps a line per round of who scored what and what their total
+became, written by the host in `commitScores` beside the rest of the tally.
+
+- **Keyed by round number, not appended to an array.** `nextStats` is idempotent
+  because it computes from the pre-write snapshot, and a history that appended
+  would have grown by a line every time two hosts raced. The key makes re-writing
+  a round a no-op.
+- **No rules change.** `stats` is host-writable with no child validates at all, so
+  a new shape underneath it needed nothing deployed.
+- **It can be missing, and that is not a bug.** The tally is the commit's SECOND
+  write and its failure is swallowed on purpose, so that a decoration can never
+  take a round's scoring down with it again (see the first iPhone playtest). A
+  round can be absent from the history while its score is perfectly real on the
+  sheet above, and a game that started before this shipped has none at all. The
+  panel says so rather than rendering an empty box.
+- A round with a TOTAL but no DELTA is a round that player sat out. A round with
+  no total for them at all is a round they were not in, and it is left out.
 
 ### The host can remove a player
 
@@ -2361,6 +2410,17 @@ clean run: `reconcileTableau` filters post stacks by centre membership and
 - **Your own wood still shows an empty slot** under the face-down pile before the
   first flip, where an opponent's empty slots are gone. Arguably a target rather
   than a gap - it is where the turned-over card lands.
+- **Audio: quick voice messages, and sound effects.** Researched on 2026-09-09 and
+  written up in `docs/audio-2026-09-09.md`. Nothing built, on purpose. The short
+  version: push-to-talk clips fit this app as base64 in the room (about 8 kB for
+  three seconds of Opus) rather than as WebRTC or as another Firebase product, and
+  the levelling the table asked for wants three mechanisms rather than one -
+  the browser's own AGC, a `DynamicsCompressorNode` in the capture graph BEFORE
+  the encoder, and a stored gain applied through a limiter at playback. The doc
+  also lists the sound-effect events worth having, ranked. **The decision both
+  are waiting on is the same one**: this is a game people play sitting together,
+  and four phones at one table playing the same sound a beat apart is worse than
+  silence. Settle that once, for voice and effects together.
 
 ---
 
@@ -2848,6 +2908,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `b8f156e` | Twice the fireworks over twice as long, and a twinkle that stops when the flight does |
 | `bdfabce` | Roman candles up the edges of the win, a different instrument from the shells |
 | `facfaf8` | The host can remove a player, in the lobby or mid-game, and the removed client leaves cleanly |
+| `PENDING` | Options below the ready button, a rematch that waits, a ready pill that says away, score history behind a total, and fireworks for the winner alone |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.

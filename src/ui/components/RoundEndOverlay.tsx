@@ -36,7 +36,8 @@ export function RoundEndOverlay() {
     <div className="overlay">
       <div className="sheet">
         <h2 style={{ margin: 0 }}>{dasher ? `${dasher} dashed!` : 'Round over (all stuck)'}</h2>
-        <ScoreList players={room.players} scores={scores} dashedBy={room.round?.dashedBy} showReady />
+        <ScoreList players={room.players} scores={scores} dashedBy={room.round?.dashedBy} showReady
+          history={room.stats?.history} />
         <Commentary remarks={remarksForRoom(room)} />
         {actionError && <p className="error" style={{ margin: 0 }}>{actionError}</p>}
         {me && !me.sittingOut && (

@@ -10,6 +10,23 @@ export interface PlayerStats {
 }
 
 export interface DashRecord { uid: string; ms: number; round: number }
+
+/**
+ * One round's line in the game's history, kept so a player can open their own
+ * total and see how it got there.
+ *
+ * Keyed by ROUND NUMBER in `GameStats.history`, which is what makes it idempotent
+ * the same way the rest of `nextStats` is: two hosts committing the same round off
+ * the same snapshot write the same key with the same values.
+ *
+ * `delta` holds only the players the round actually scored - somebody sitting a
+ * round out has a total that did not move and no arithmetic to show for it - and
+ * `total` holds everybody, because the running total is the interesting column.
+ */
+export interface RoundHistory {
+  delta: Record<string, number>;
+  total: Record<string, number>;
+}
 export interface RoundRecord { uid: string; delta: number; round: number }
 
 /**
@@ -28,6 +45,8 @@ export interface GameStats {
   /** Wood rotations forced by everybody being stuck at once, summed over rounds. */
   allStuck: number;
   races: number;
+  /** Round number (as a string key) to what that round did. See RoundHistory. */
+  history: Record<string, RoundHistory>;
 }
 
 export const NO_PLAYER_STATS: PlayerStats =
@@ -47,6 +66,9 @@ export function normalizeStats(raw: unknown): GameStats | null {
     worst: s.worst ?? null,
     allStuck: s.allStuck ?? 0,
     races: s.races ?? 0,
+    // Absent in every game that started before this was added, and in a room
+    // where nobody has finished a round yet. Both are "no history", not an error.
+    history: s.history ?? {},
   };
 }
 
@@ -108,10 +130,16 @@ export function nextStats(prev: GameStats | null, round: RoundOutcome): GameStat
     fastest = { uid: round.dashedBy, ms: round.durationMs, round: round.roundNumber };
   }
 
+  const delta: Record<string, number> = {};
+  for (const [uid, sc] of Object.entries(round.scores)) delta[uid] = sc.delta;
+
   return {
     rounds: Math.max(round.roundNumber, prev?.rounds ?? 0),
     players, fastest, best, worst,
     allStuck: (prev?.allStuck ?? 0) + round.stuckRounds,
     races,
+    // Keyed by round, so re-committing a round overwrites its own line rather
+    // than appending a second one. An array would have grown by one every time.
+    history: { ...prev?.history, [String(round.roundNumber)]: { delta, total: { ...round.totals } } },
   };
 }

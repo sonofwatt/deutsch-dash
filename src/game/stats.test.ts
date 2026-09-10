@@ -12,6 +12,39 @@ const round = (over: Partial<RoundOutcome> = {}): RoundOutcome => ({
   ...over,
 });
 
+describe('the round history', () => {
+  it('keeps a line per round, with the deltas and the totals as they stood', () => {
+    const one = nextStats(null, round());
+    expect(one.history['1']).toEqual({ delta: { ann: 9, bo: -4 }, total: { ann: 9, bo: -4 } });
+    const two = nextStats(one, round({ roundNumber: 2, scores: { ann: sc(3), bo: sc(1) },
+      totals: { ann: 12, bo: -3 } }));
+    expect(Object.keys(two.history).sort()).toEqual(['1', '2']);
+    expect(two.history['1'].total.ann).toBe(9);   // round 1 is not rewritten
+    expect(two.history['2'].total.ann).toBe(12);
+  });
+
+  it('is keyed by round, so committing the same round twice writes one line', () => {
+    // commitScores is idempotent by computing from the pre-write snapshot, and
+    // this has to be idempotent the same way: an array would have appended.
+    const one = nextStats(null, round());
+    const again = nextStats(one, round());
+    expect(Object.keys(again.history)).toEqual(['1']);
+    expect(again.history['1'].delta).toEqual({ ann: 9, bo: -4 });
+  });
+
+  it('records a total with no delta for somebody who sat the round out', () => {
+    // scoreRound leaves them out entirely; their total is carried and unmoved.
+    const s = nextStats(null, round({ scores: { ann: sc(9) }, totals: { ann: 9, bo: -4 } }));
+    expect(s.history['1'].delta).toEqual({ ann: 9 });
+    expect(s.history['1'].total).toEqual({ ann: 9, bo: -4 });
+  });
+
+  it('reads a game that predates it as no history rather than as broken', () => {
+    const old = normalizeStats({ rounds: 3, players: {}, allStuck: 0, races: 0 });
+    expect(old!.history).toEqual({});
+  });
+});
+
 describe('nextStats', () => {
   it('counts a dash and a bottom finish', () => {
     const s = nextStats(null, round());

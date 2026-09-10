@@ -181,7 +181,8 @@ describe('commentary', () => {
   });
 
   const stats = (over: Partial<GameStats> = {}): GameStats => ({
-    rounds: 4, players: {}, fastest: null, best: null, worst: null, allStuck: 0, races: 0, ...over,
+    rounds: 4, players: {}, fastest: null, best: null, worst: null, allStuck: 0, races: 0,
+    history: {}, ...over,
   });
   const pStats = (over = {}) =>
     ({ dashes: 0, lastPlaces: 0, lastStreak: 0, racesWon: 0, racesLost: 0, ...over });

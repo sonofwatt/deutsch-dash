@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { ScoreRow } from './ScoreRow';
+import { ScoreHistory } from './ScoreHistory';
 import { rankRows } from '../scoreRanks';
+import type { RoundHistory } from '../../game/stats';
 import type { PlayerInfo, RoundScore } from '../../game/types';
 
 /**
@@ -15,11 +17,17 @@ import type { PlayerInfo, RoundScore } from '../../game/types';
  * correct still frame of this animation rather than a broken one.
  */
 export function ScoreList(
-  { players, scores, dashedBy, showReady }:
+  { players, scores, dashedBy, showReady, history }:
   { players: Record<string, PlayerInfo>; scores?: Record<string, RoundScore> | null;
-    dashedBy?: string | null; showReady?: boolean },
+    dashedBy?: string | null; showReady?: boolean;
+    /** The game so far. Absent means no total is a button. */
+    history?: Record<string, RoundHistory> | null },
 ) {
   const { previous, current, move } = rankRows(players, scores);
+  // Whose history is open, and only ever one: two of them open at once turns the
+  // sheet into a wall of numbers, and the question being asked is about one
+  // player. Tapping the same total again closes it.
+  const [open, setOpen] = useState<string | null>(null);
   // Reduced motion starts settled: the final order at once, still tinted, no slide.
   // The guard matters - there is no DOM in the test environment, and an unguarded
   // matchMedia would throw the moment this module is imported there.
@@ -36,8 +44,16 @@ export function ScoreList(
   return (
     <>
       {order.map(id => (
-        <ScoreRow key={id} player={players[id]} score={scores?.[id] ?? undefined}
-          move={settled ? move[id] : null} dashed={id === dashedBy} showReady={showReady} />
+        <Fragment key={id}>
+          <ScoreRow player={players[id]} score={scores?.[id] ?? undefined}
+            move={settled ? move[id] : null} dashed={id === dashedBy} showReady={showReady}
+            open={open === id}
+            onPick={history ? () => setOpen(o => (o === id ? null : id)) : undefined} />
+          {/* Under the row it belongs to, so it stays attached to its player while
+              the rows above are still sliding into their new order. */}
+          {history && open === id &&
+            <ScoreHistory history={history} uid={id} name={players[id].name} />}
+        </Fragment>
       ))}
     </>
   );

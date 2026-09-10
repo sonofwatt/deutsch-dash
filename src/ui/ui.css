@@ -159,7 +159,7 @@
   /* badge | name | penalty | played | = | round | TOTAL | dash bolt. The last
      column is reserved whether or not a bolt is in it, so the totals stay in a
      line down the sheet instead of the dasher's row shunting left. */
-  grid-template-columns: 28px minmax(0, 1fr) 10px repeat(2, minmax(3ch, auto)) auto
+  grid-template-columns: 28px minmax(0, 1fr) repeat(2, minmax(3ch, auto)) auto
                          repeat(2, minmax(3ch, auto)) 16px;
   padding: 8px 10px; border-radius: var(--radius);
   background: var(--surface); border: 1px solid var(--line); font-size: 14px; }
@@ -180,14 +180,34 @@
   border-left: 2px solid color-mix(in srgb, var(--ink) 28%, transparent);
   align-self: stretch; display: flex; align-items: center; justify-content: flex-end; }
 .score-dash { font-size: 13px; line-height: 1; text-align: right; }
-/* Who the table is waiting on, in the lobby's three colours at dot size. The
-   column is reserved whether or not a dot is in it, so the arithmetic stays in a
-   line down the sheet on the game-over sheet too. */
-.score-ready { display: flex; align-items: center; }
-.score-ready .dot { width: 8px; height: 8px; border-radius: 999px; display: block;
-  background: #ffffff; border: 1.5px solid #111111; }
-.score-ready .dot.on { background: #22c55e; border-color: #15803d; }
-.score-ready .dot.out { background: #d8d5cc; border-color: #a8a49a; }
+/* The total, as the handle for this player's history. It has to keep the total's
+   own weight and alignment - it is still the number being read, not a link - so
+   it borrows them rather than looking like a button until it is touched. */
+.score-total-btn { font: inherit; font-weight: 800; font-variant-numeric: tabular-nums;
+  background: none; border: none; padding: 2px 4px; margin: -2px -4px; color: inherit;
+  border-radius: 6px; cursor: pointer; }
+.score-total-btn.open { background: color-mix(in srgb, var(--ink) 12%, transparent); }
+/* One player's game so far, under their row. Indented past the badge column so it
+   reads as belonging to the row above rather than as another player. */
+.score-history { display: flex; flex-direction: column; gap: 2px;
+  margin: -6px 0 2px 34px; padding: 8px 10px; border-radius: var(--radius);
+  background: color-mix(in srgb, var(--ink) 5%, transparent); font-size: 13px; }
+.score-history p { margin: 0; }
+.score-history-row { display: grid; grid-template-columns: 1fr minmax(4ch, auto) minmax(3ch, auto);
+  gap: 10px; align-items: baseline; }
+.score-total-plain { text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }
+/* Who the table is waiting on, drawn around the NAME. Four states in the lobby's
+   own colours, and the colours are LITERALS in both themes for the reason the
+   ready button gives: two phones at one table, set to different themes, have to
+   be showing each other the same thing.
+   The pill is only ever on the round-end sheet, which is a gate. The game-over
+   sheet passes no showReady and its names are plain. */
+.score-name.name-state { justify-self: start; max-width: 100%;
+  padding: 2px 9px; border-radius: 999px; font-weight: 700;
+  background: #ffffff; color: #111111; border: 1.5px solid #111111; }
+.score-name.name-state.on { background: #22c55e; border-color: #15803d; }
+.score-name.name-state.away { background: #facc15; border-color: #ca8a04; }
+.score-name.name-state.out { background: #d8d5cc; border-color: #a8a49a; }
 .error { color: var(--danger-ink); }
 /* A row that changed place holds its colour through the slide, then lets go. The
    animation carries the fade so no second timer has to clear the class. */
