@@ -3599,6 +3599,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `4a289a2` | Eight canned soundbites, a host switch and a player switch, a launcher over the Dash pile with tap and hold-to-slide, and the emoji falling down the top third of the screen |
 | `4612f2e` | The fire falls only on a run of two or more dashes, and the glyph count stays the same with it or without it |
 | `952ebb5` | The wood cards overlap again, and the gather is 250ms |
+| `951705e` | A drift sweep over this file: createRoom is one write and had been for a while, the wood nonce is woodTurnover, and the lint tally is eight |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
