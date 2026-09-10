@@ -3553,6 +3553,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `ec976fc` | Bots aim at the lowest open space; Genius cheats four ways |
 | `5657a09` | The wood turn at half speed, gather in the middle of the deal |
 | `4a289a2` | Eight canned soundbites, a host switch and a player switch, a launcher over the Dash pile with tap and hold-to-slide, and the emoji falling down the top third of the screen |
+| `4612f2e` | The fire falls only on a run of two or more dashes, and the glyph count stays the same with it or without it |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
