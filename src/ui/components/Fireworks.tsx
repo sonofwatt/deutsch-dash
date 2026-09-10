@@ -6,10 +6,9 @@
  * what a WON GAME gets, behind the final score sheet. It moved into its own file
  * on the way, because it now has one caller and that caller is not the splash.
  *
- * **Thirty shells at forty-six sparks each**, about 1410 elements, over eight
- * seconds. Doubled from fifteen over four on 2026-09-09, at the table's request
- * and after measuring: the display is what it costs, and the handoff's own note
- * said to measure before letting it grow again.
+ * **Forty-five shells at forty-six sparks each**, about 2115 elements, over
+ * eight seconds. Fifteen over four until 2026-09-09, thirty until 2026-09-10,
+ * and every step measured before it was allowed: the display is what it costs.
  *
  * A spark's FLIGHT is transform and opacity, so it composites and nothing here
  * reflows. The twinkle running alongside it is `filter: brightness`, which is
@@ -36,29 +35,42 @@
  * count, plus the 1500ms a spark takes to fly, so doubling the duration is this
  * number and the length of the list below and nothing else.
  */
-const SHELL_GAP_MS = 225;
+const SHELL_GAP_MS = 148;
 
 /**
- * Where each shell goes off, as a percentage across and down its container. The
- * order is the firing order, and the two halves are INTERLEAVED so consecutive
- * shells land far apart: a list in reading order marches across the screen.
+ * Where each shell goes off, as a percentage across and down its container.
+ *
+ * The order is the FIRING order and it is scattered on purpose: a list in reading
+ * order marches across the screen. These sit on a jittered 5 x 9 grid walked 19
+ * cells at a time - 19 is coprime with 45, so the walk visits every position
+ * exactly once while consecutive shells land rows and columns apart. No two in a
+ * row are closer than 37 units of the 100 the canvas is wide, and the hues step
+ * 128 degrees with them, so neighbours in time differ in colour as well as place.
  */
 const SHELLS = [
-  { x: 22, y: 30, hue: 42 },  { x: 48, y: 12, hue: 0 },
-  { x: 76, y: 22, hue: 320 }, { x: 18, y: 74, hue: 225 },
-  { x: 50, y: 46, hue: 190 }, { x: 66, y: 10, hue: 60 },
-  { x: 16, y: 58, hue: 96 },  { x: 90, y: 60, hue: 270 },
-  { x: 84, y: 54, hue: 12 },  { x: 8, y: 20, hue: 130 },
-  { x: 34, y: 16, hue: 265 }, { x: 56, y: 80, hue: 350 },
-  { x: 64, y: 66, hue: 55 },  { x: 30, y: 84, hue: 80 },
-  { x: 12, y: 38, hue: 150 }, { x: 74, y: 76, hue: 180 },
-  { x: 88, y: 36, hue: 340 }, { x: 40, y: 36, hue: 300 },
-  { x: 44, y: 72, hue: 200 }, { x: 60, y: 56, hue: 20 },
-  { x: 70, y: 44, hue: 30 },  { x: 24, y: 44, hue: 160 },
-  { x: 28, y: 52, hue: 285 }, { x: 92, y: 14, hue: 45 },
-  { x: 58, y: 26, hue: 110 }, { x: 6, y: 66, hue: 310 },
-  { x: 80, y: 68, hue: 15 },  { x: 52, y: 68, hue: 90 },
-  { x: 38, y: 62, hue: 175 }, { x: 82, y: 28, hue: 240 },
+  { x: 10, y: 13, hue: 0 }, { x: 91, y: 35, hue: 128 },
+  { x: 74, y: 73, hue: 256 }, { x: 54, y: 25, hue: 24 },
+  { x: 24, y: 63, hue: 152 }, { x: 5, y: 19, hue: 280 },
+  { x: 95, y: 45, hue: 48 }, { x: 69, y: 81, hue: 176 },
+  { x: 49, y: 37, hue: 304 }, { x: 31, y: 71, hue: 72 },
+  { x: 9, y: 26, hue: 200 }, { x: 93, y: 55, hue: 328 },
+  { x: 68, y: 8, hue: 96 }, { x: 54, y: 45, hue: 224 },
+  { x: 26, y: 84, hue: 352 }, { x: 5, y: 36, hue: 120 },
+  { x: 95, y: 62, hue: 248 }, { x: 73, y: 18, hue: 16 },
+  { x: 45, y: 52, hue: 144 }, { x: 25, y: 8, hue: 272 },
+  { x: 8, y: 46, hue: 40 }, { x: 90, y: 71, hue: 168 },
+  { x: 68, y: 26, hue: 296 }, { x: 52, y: 66, hue: 64 },
+  { x: 33, y: 23, hue: 192 }, { x: 5, y: 59, hue: 320 },
+  { x: 95, y: 85, hue: 88 }, { x: 75, y: 40, hue: 216 },
+  { x: 47, y: 75, hue: 344 }, { x: 27, y: 30, hue: 112 },
+  { x: 10, y: 69, hue: 240 }, { x: 95, y: 12, hue: 8 },
+  { x: 70, y: 48, hue: 136 }, { x: 55, y: 86, hue: 264 },
+  { x: 29, y: 41, hue: 32 }, { x: 5, y: 76, hue: 160 },
+  { x: 89, y: 22, hue: 288 }, { x: 75, y: 57, hue: 56 },
+  { x: 52, y: 12, hue: 184 }, { x: 24, y: 51, hue: 312 },
+  { x: 10, y: 86, hue: 80 }, { x: 95, y: 29, hue: 208 },
+  { x: 70, y: 70, hue: 336 }, { x: 47, y: 22, hue: 104 },
+  { x: 29, y: 58, hue: 232 },
 ];
 const SHELL_SPARKS = 46;
 

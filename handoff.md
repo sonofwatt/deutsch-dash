@@ -1667,11 +1667,14 @@ browser, because neither is a question markup can answer - and it first proves t
 layer actually reaches the sheet, so a green result cannot come from a layer that
 was never in the way.
 
-**Thirty shells at forty-six sparks each**, about 1410 elements, over eight
-seconds. Doubled from fifteen over four on 2026-09-09, at the table's request.
-`SHELL_GAP_MS` times the length of `SHELLS`, plus the 1500ms a spark takes to
-fly, IS the duration - the per-shell delays used to be a hand-written column and
-are derived from the firing order now, so doubling it again is two numbers.
+**Forty-five shells at forty-six sparks each**, about 2115 elements, over eight
+seconds. Fifteen over four until 2026-09-09, thirty until 2026-09-10, each step
+asked for by the table. `SHELL_GAP_MS` times the length of `SHELLS`, plus the
+1500ms a spark takes to fly, IS the duration, so holding eight seconds while the
+count goes up means the GAP comes down: 225ms at thirty, 148ms at forty-five.
+The positions sit on a jittered 5 x 9 grid walked 19 cells at a time - coprime
+with 45, so it visits every one while consecutive shells land rows and columns
+apart, none closer than 37 units of the canvas's 100.
 
 **Measured before it was allowed to grow**, which is what the note that used to
 sit here asked for. Chromium at 393x851, frame intervals sampled over the burst
@@ -1679,9 +1682,10 @@ and again once it has finished:
 
 | | during the burst | idle, afterwards |
 |---|---|---|
-| 15 shells, twinkle `infinite` (what shipped) | 33ms | 17ms |
+| 15 shells, twinkle `infinite` (the first version) | 33ms | 17ms |
 | 30 shells, twinkle `infinite` | 50ms | **33ms, for ever** |
-| 30 shells, as it ships now | 33ms | 17ms |
+| 30 shells, twinkle stopped with the flight | 33ms | 17ms |
+| **45 shells, as it ships now** | **67ms** | 17ms |
 
 The middle row is the one that mattered. **The twinkle was `infinite`**, so a
 `filter: brightness` went on ticking on every spark for as long as the game-over
@@ -1692,8 +1696,31 @@ flight and stops. Under a 6x CPU throttle the same three rows idle at 83ms, 183m
 and 17ms, so the fix leaves the doubled version cheaper at rest than the half-size
 one that shipped before it.
 
-The burst itself costs what it always did: 33ms frames unthrottled at either
-size, and at 6x throttle the median goes 183ms to 233ms for twice the shells.
+**Forty-five is where it started to cost, and the reason is concurrency rather
+than count.** A spark flies for 1500ms, so the number in the air at once is the
+flight over the gap: 6.7 shells at thirty, 10.1 at forty-five. Fifteen to thirty
+was free because the gap grew with the count; thirty to forty-five was not,
+because it did not. Frames during the burst went 33ms to 67ms unthrottled, and
+150ms to 317ms under a 6x throttle.
+
+**The twinkle is the whole of that cost, exactly as this file has said since the
+first version.** Measured at 45 shells, unthrottled, during the burst:
+
+| | median | p95 |
+|---|---|---|
+| as it ships | 67ms | 250ms |
+| twinkle off entirely | 33ms | 50ms |
+| twinkle on the white sparks only | 33ms | 67ms |
+
+So restricting the flicker to the one-in-six white sparks - the ones that make a
+coloured burst read as a glittery one in the first place - buys back every frame
+and leaves 45 shells costing what 30 did. It is NOT applied, because it changes
+the look and the look is the table's to choose. It is the lever, it is measured,
+and it is one line.
+
+The burst used to cost what it always did: 33ms frames unthrottled at fifteen and
+at thirty, and at 6x throttle the median went 183ms to 233ms for twice the
+shells.
 **A 6x CPU throttle in headless Chromium is not a low-end phone**, and nothing
 here has been on one. That is still the measurement worth having.
 
@@ -2360,7 +2387,7 @@ nobody has decided about them rather than because they are hard:
   leader election over `BroadcastChannel`.
 - **Long-session memory was never measured.** The maps in the store are bounded
   and cleared per round, but nothing has a number for the heap after ten rounds of
-  remounting 75 cards, plus the 1460 firework elements the final sheet brings once
+  remounting 75 cards, plus the 2165 firework elements the final sheet brings once
   at the end. The layout suite already has the browser wiring a heap reading
   needs.
 - **The board is pointer-only.** No keyboard route, no focusable pile, no
@@ -2929,6 +2956,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `facfaf8` | The host can remove a player, in the lobby or mid-game, and the removed client leaves cleanly |
 | `6d89e1b` | Options below the ready button, a rematch that waits, a ready pill that says away, score history behind a total, and fireworks for the winner alone |
 | `00b145d` | A player who is still stuck after sinking a card stays stuck, and can send the next one down at once |
+| `PENDING` | Forty-five shells over the same eight seconds, and what that costs |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
