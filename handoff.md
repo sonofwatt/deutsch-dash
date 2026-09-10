@@ -2965,7 +2965,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `6d89e1b` | Options below the ready button, a rematch that waits, a ready pill that says away, score history behind a total, and fireworks for the winner alone |
 | `00b145d` | A player who is still stuck after sinking a card stays stuck, and can send the next one down at once |
 | `4bc468c` | Forty-five shells over the same eight seconds, and what that costs |
-| `PENDING` | The flicker on the white sparks only, which is where the glitter was coming from |
+| `dcaaf8e` | The flicker on the white sparks only, which is where the glitter was coming from |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
