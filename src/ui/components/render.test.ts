@@ -9,7 +9,8 @@ import { ScoreRow } from './ScoreRow';
 import { DashSplash } from './DashSplash';
 import { ScoreList } from './ScoreList';
 import { rankRows } from '../scoreRanks';
-import { raceFlashes } from '../raceFlash';
+import { faceOffset, raceFlashes } from '../raceFlash';
+import { RACE_GRACE_MS } from '../../state/store';
 import { orderlySpaces } from '../../game/center';
 import { orderlyColumns, spaceCountForPlayers } from '../../game/rules';
 import { splashVariant, type Splash } from '../splashVariant';
@@ -629,12 +630,14 @@ describe('raceFlashes', () => {
   const space = (...owners: string[]): CenterSpace => ({
     stack: owners.map((owner, i) => c(i + 1, 'red', owner)), history: [],
   });
+  /** Every call passes the store's own grace window, which is what groups `lost`. */
+  const flash = (args: Omit<Parameters<typeof raceFlashes>[0], 'window'>) =>
+    raceFlashes({ ...args, window: RACE_GRACE_MS });
 
   it('haloes the player whose card is on top of a space someone lost', () => {
-    const flashes = raceFlashes({
+    expect(flash({
       races: { 1: { by: 'bo', at: 99 } }, spaces: [space('me'), space('me', 'me')], uid: 'me',
-    });
-    expect(flashes).toEqual({ 1: { kind: 'angel', at: 99 } });
+    })).toEqual({ 1: { kind: 'angel', at: 99, n: 1 } });
   });
   it('haloes the player whose card FINISHED the pile, which clears the space', () => {
     // A 10 is the most contested card in a pile and the one that leaves nothing on
@@ -643,49 +646,112 @@ describe('raceFlashes', () => {
     const finished: CenterSpace = {
       stack: [], history: [Array.from({ length: 10 }, (_, i) => c(i + 1, 'blue', i === 9 ? 'me' : 'ann'))],
     };
-    expect(raceFlashes({ races: { 0: { by: 'bo', at: 5 } }, spaces: [finished], uid: 'me' }))
-      .toEqual({ 0: { kind: 'angel', at: 5 } });
+    expect(flash({ races: { 0: { by: 'bo', at: 5 } }, spaces: [finished], uid: 'me' }))
+      .toEqual({ 0: { kind: 'angel', at: 5, n: 1 } });
   });
   it('haloes nobody when the winner was somebody else', () => {
     // ann won that race. From my seat it never happened.
-    expect(raceFlashes({
+    expect(flash({
       races: { 1: { by: 'bo', at: 99 } }, spaces: [space('me'), space('ann')], uid: 'me',
     })).toEqual({});
   });
   it('never haloes the loser for their own report', () => {
-    expect(raceFlashes({
+    expect(flash({
       races: { 0: { by: 'me', at: 99 } }, spaces: [space('me')], uid: 'me',
     })).toEqual({});
   });
   it('scowls at the space this client just lost, from local state', () => {
     // No record needed: the loser knows, and it must land even if the write fails.
-    expect(raceFlashes({
+    expect(flash({
       races: null, spaces: [space('ann')], uid: 'me', lastRejected: { space: 0, at: 7 },
-    })).toEqual({ 0: { kind: 'angry', at: 7 } });
+    })).toEqual({ 0: { kind: 'angry', at: 7, n: 1 } });
   });
   it('prefers the scowl when this client both won and later lost the same space', () => {
-    expect(raceFlashes({
+    expect(flash({
       races: { 0: { by: 'bo', at: 1 } }, spaces: [space('me')], uid: 'me',
       lastRejected: { space: 0, at: 2 },
-    })).toEqual({ 0: { kind: 'angry', at: 2 } });
+    })).toEqual({ 0: { kind: 'angry', at: 2, n: 1 } });
   });
   it('shows a spectator with no uid nothing at all', () => {
-    expect(raceFlashes({
+    expect(flash({
       races: { 0: { by: 'bo', at: 1 } }, spaces: [space('me')], uid: null,
     })).toEqual({});
+  });
+
+  it('haloes ONCE PER LOSER when several went for the same space', () => {
+    const at = 1_000_000;
+    expect(flash({
+      races: { 0: { by: 'cy', at, lost: { bo: at - 300, cy: at, di: at - 120 } } },
+      spaces: [space('me')], uid: 'me',
+    })).toEqual({ 0: { kind: 'angel', at, n: 3 } });
+  });
+  it('leaves out losers from an earlier scrap over the same space', () => {
+    // A pile finishing on a 10 empties the space and the fight starts again, so
+    // `lost` outlives the race it was written for. Only this one counts.
+    const at = 1_000_000;
+    expect(flash({
+      races: { 0: { by: 'cy', at, lost: { bo: at - RACE_GRACE_MS - 1, cy: at } } },
+      spaces: [space('me')], uid: 'me',
+    })).toEqual({ 0: { kind: 'angel', at, n: 1 } });
+  });
+  it('never counts the winner among the losers, even if they are in there', () => {
+    // Losing a space and later taking it is an ordinary thing to do.
+    const at = 1_000_000;
+    expect(flash({
+      races: { 0: { by: 'bo', at, lost: { me: at - 50, bo: at } } },
+      spaces: [space('me')], uid: 'me',
+    })).toEqual({ 0: { kind: 'angel', at, n: 1 } });
+  });
+  it('still shows one halo for a room that predates the loser list', () => {
+    expect(flash({ races: { 0: { by: 'bo', at: 4 } }, spaces: [space('me')], uid: 'me' }))
+      .toEqual({ 0: { kind: 'angel', at: 4, n: 1 } });
   });
 
   it('puts the face over the space it belongs to', () => {
     const html = renderToStaticMarkup(createElement(CenterGrid, {
       spaces: [space('me'), space('ann'), space()], highlight: [],
       badgeOf: () => 'star' as const, onTap: noop, onSnapTap: noop,
-      races: { 0: { kind: 'angel' as const, at: 1 }, 1: { kind: 'angry' as const, at: 2 } },
+      races: { 0: { kind: 'angel' as const, at: 1, n: 1 }, 1: { kind: 'angry' as const, at: 2, n: 1 } },
     }));
     expect(html).toContain('😇');
     expect(html).toContain('😠');
     expect(html).toContain('race-angel');  // the two faces move differently
     expect(html).toContain('race-angry');
     expect(html.indexOf('😇')).toBeLessThan(html.indexOf('😠')); // space 0 before space 1
+  });
+
+  it('draws one halo per loser, spread either side of the middle', () => {
+    const html = renderToStaticMarkup(createElement(CenterGrid, {
+      spaces: [space('me')], highlight: [],
+      badgeOf: () => 'star' as const, onTap: noop, onSnapTap: noop,
+      races: { 0: { kind: 'angel' as const, at: 1, n: 3 } },
+    }));
+    expect(html.split('😇').length - 1).toBe(3);
+    // Symmetric about the slot: one left, one centred, one right.
+    expect(html).toContain('--off:-30%');
+    expect(html).toContain('--off:0%');
+    expect(html).toContain('--off:30%');
+  });
+
+  it('caps the fan, so a table of eight does not reach across the board', () => {
+    // A face is about 62% of a slot wide. Without a cap, seven losers at 30% a
+    // step would span 180% of a slot and cover the spaces either side.
+    const spread = (n: number) => faceOffset(n - 1, n) - faceOffset(0, n);
+    expect(spread(2)).toBe(30);
+    expect(spread(3)).toBe(60);
+    expect(spread(4)).toBe(90);
+    expect(spread(7)).toBe(90);        // capped from here on
+    expect(faceOffset(0, 1)).toBe(0);  // one face is centred, with nothing to say
+  });
+
+  it('leaves a single face centred, with no offset to explain', () => {
+    const html = renderToStaticMarkup(createElement(CenterGrid, {
+      spaces: [space('me')], highlight: [],
+      badgeOf: () => 'star' as const, onTap: noop, onSnapTap: noop,
+      races: { 0: { kind: 'angel' as const, at: 1, n: 1 } },
+    }));
+    expect(html.split('😇').length - 1).toBe(1);
+    expect(html).toContain('--off:0%');
   });
 });
 

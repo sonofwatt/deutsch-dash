@@ -31,7 +31,7 @@ instead, check both directions before releasing: the new client against the rule
 still live, and the PREVIOUS client against the new rules, which is the half this
 file's own warning cannot cover._
 
-_**528 tests** (455 unit and 27 in a real browser; 46 against the emulator, all
+_**536 tests** (462 unit and 27 in a real browser; 47 against the emulator, all
 green). This is the only place in the repo that quotes a count -
 it drifted three separate ways when it lived in four places, so keep it here and
 nowhere else. Both sides of the 2026-09-04 merge rewrote this line, which is the
@@ -2036,14 +2036,53 @@ the table complained about, because it is the one that feels most unfair.
 The store keeps `spaceTouched`: when each centre space last changed hands and to
 whom, taken from snapshots because the board only ever says who owns a space *now*
 and never when they took it. A play aimed at a space somebody took within
-`RACE_GRACE_MS` (1s) is treated as the race it was - the scowl and the shake for
-the slower player, and the race reported **once** (`reported`) so jabbing at a
-space that has just filled does not report it repeatedly.
+`RACE_GRACE_MS` is treated as the race it was - the scowl and the shake for the
+slower player, and the race reported **once per client** (`reported`) so jabbing
+at a space that has just filled does not report it repeatedly.
+
+**The earn window is 2s**, doubled from 1s on 2026-09-10. It is the one number
+that decides whether a refused play was a race or simply a wrong card, and it is
+the table's to set: longer means more of the near misses read as the losses they
+were, at the cost of calling the occasional genuinely late play a race.
+
+**Every loser gets the scowl, and always did** - `lastRejected` is local state, set
+on each losing client independently, so it lands even if the report never does.
+What was missing was the other side of it.
+
+**The winner gets a halo PER LOSER**, since 2026-09-10. `races/$space` now carries
+`lost`, a map of loser uid to the millisecond they said so, and each loser adds
+their own name to it.
+
+- **The write had to become three leaves rather than one object.** Writing
+  `races/$space` as an object REPLACES the node, so the second loser to report
+  used to wipe the first, which is exactly why the winner only ever saw one halo.
+  `by` and `at` are still written and still have to be: the rules demand that node
+  have both children, and `lost` rides alongside them under a node with no
+  validate of its own. **That is what let this ship with no rules change and no
+  deploy**, and `rooms.emu.test.ts` proves it rather than assuming it - a validate
+  that rejected the shape would have failed the whole multi-path write and taken
+  the flash with it, silently, because `reportRace`'s rejection is swallowed so a
+  decoration can never cost a play.
+- **`lost` outlives the race it was written for**, because a space is contested
+  more than once a round: a pile finishing on a 10 empties it and the fight starts
+  again. So `raceFlashes` counts only entries within the grace window of the
+  latest report. The window is passed in rather than imported, which keeps that
+  file a pure function of its arguments.
+- **The faces are fanned, and they overlap on purpose.** A face is about 62% of a
+  slot wide, so laying several out without touching needs a step that big - and at
+  58% three haloes on one slot reached across two others, which is what the first
+  cut did. They overlap like a fanned hand instead, and the spread is CAPPED so
+  seven losers at an eight-player table stay in about the room three take.
+  `faceOffset` is arithmetic, so it is tested - and it lives in `raceFlash.ts`
+  rather than in `CenterGrid.tsx`, because a second non-component export from a
+  component file is a new lint warning and this repo's clean state is seven.
 
 The angry face already shook side to side and still does. The angel holds at rest
 until nearly half way through and drifts up over the rest of 1.5s: half as long
 again on screen, with the extra going into being readable rather than a longer
-glide.
+glide. Both take their `--off` inside every keyframe rather than as a base
+transform, because a keyframe replaces the whole transform property and would
+drop it.
 
 ### The splash _(#36)_
 
@@ -2966,6 +3005,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `00b145d` | A player who is still stuck after sinking a card stays stuck, and can send the next one down at once |
 | `4bc468c` | Forty-five shells over the same eight seconds, and what that costs |
 | `dcaaf8e` | The flicker on the white sparks only, which is where the glitter was coming from |
+| `PENDING` | A two second race window, and a halo for every player who went for the space |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.

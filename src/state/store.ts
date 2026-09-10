@@ -41,7 +41,7 @@ export const AWAY_MS = 45000;
  * feels most unfair. Inside this window the near miss is treated as the race it
  * was.
  */
-export const RACE_GRACE_MS = 1000;
+export const RACE_GRACE_MS = 2000;
 
 export interface Deps {
   ensureSignedIn(): Promise<string>;

@@ -142,8 +142,22 @@ export async function playToCenter(code: string, spaceIndex: number, card: Card)
 export function reportRace(
   code: string, space: number, loser: string, winner: string | null,
 ): Promise<void> {
+  // Three paths rather than one object, and that is the difference between the
+  // winner seeing one halo and seeing one per player who went for it. Writing
+  // `races/$space` as an object REPLACES the node, so the second loser to report
+  // used to wipe the first; writing the leaves merges, so `lost` accumulates
+  // while `by` and `at` are simply the most recent reporter.
+  //
+  // `by` and `at` are still written, and have to be: the rules require
+  // `races/$space` to have both children, and `lost` rides alongside them under a
+  // node that has no validate of its own. That is what let this ship without a
+  // rules change and without a deploy - proved in rooms.emu.test.ts rather than
+  // assumed, because a validate that rejected it would have failed the whole
+  // multi-path write and taken the flash with it.
   const patch: Record<string, unknown> = {
-    [`round/races/${space}`]: { by: loser, at: serverTimestamp() },
+    [`round/races/${space}/by`]: loser,
+    [`round/races/${space}/at`]: serverTimestamp(),
+    [`round/races/${space}/lost/${loser}`]: serverTimestamp(),
   };
   // The running tally the commentary reads. Same write, so a rivalry can never
   // count a race the flash did not show, or the other way round.

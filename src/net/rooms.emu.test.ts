@@ -205,6 +205,44 @@ emu('server-side player cap and badge uniqueness (database.rules.json)', () => {
     await assertFails(db.ref(`rooms/${code}/round`).set({ races: { 3: { by: RACER, at: 1 } } }));
   });
 
+  /**
+   * The loser list under a raced space, which is what shows the winner one halo
+   * per opponent rather than one halo.
+   *
+   * The whole feature rests on `races/$space` accepting a THIRD child beside `by`
+   * and `at`. That node has a `.validate` demanding `hasChildren(['by', 'at'])`,
+   * and a validate that rejected the merged shape would have failed the entire
+   * multi-path write and taken the flash down with it - silently, because
+   * reportRace's rejection is caught and dropped so a decoration can never cost a
+   * play. So it is checked here rather than reasoned about, and it is checked the
+   * way `reportRace` actually writes: leaves, not an object.
+   */
+  it('takes a loser list beside by and at, and merges a second loser into it', async () => {
+    const code = 'RACELOSERS';
+    await seedRoom(code, 0);
+    const racer = racerCtx.database();
+    await assertSucceeds(racer.ref(`rooms/${code}`).update({
+      [`round/races/3/by`]: RACER,
+      [`round/races/3/at`]: 1000,
+      [`round/races/3/lost/${RACER}`]: 1000,
+    }));
+    // A second loser reports the same space. Writing the leaves is what makes this
+    // a merge: `races/3` as an OBJECT would replace the node and wipe the first.
+    await assertSucceeds(hostCtx.database().ref(`rooms/${code}`).update({
+      [`round/races/3/by`]: HOST,
+      [`round/races/3/at`]: 1200,
+      [`round/races/3/lost/${HOST}`]: 1200,
+    }));
+    const rec = (await hostCtx.database().ref(`rooms/${code}/round/races/3`).get()).val();
+    expect(Object.keys(rec.lost).sort()).toEqual([HOST, RACER].sort());
+    expect(rec.by).toBe(HOST);      // the most recent reporter
+    expect(rec.at).toBe(1200);
+
+    // The validate still bites: a record with no `at` is still refused, so this
+    // has not quietly opened the node up.
+    await assertFails(racer.ref(`rooms/${code}/round/races/4`).set({ by: RACER }));
+  });
+
   it('lets only the host write the game-long stats', async () => {
     const code = 'GAMESTATS';
     await seedRoom(code, 0);

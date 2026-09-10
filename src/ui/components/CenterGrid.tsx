@@ -4,7 +4,7 @@ import { depthLayers } from './PileStack';
 import { cardId, type Card, type CenterSpace } from '../../game/types';
 import { EMOJI, type BadgeId } from '../../game/badges';
 import { orderlyColumns } from '../../game/rules';
-import type { RaceFlash } from '../raceFlash';
+import { faceOffset, type RaceFlash } from '../raceFlash';
 import type { Opening } from '../openings';
 
 /** The box the grid has to fill, in CSS pixels. */
@@ -237,11 +237,18 @@ export function CenterGrid(props: {
                 {/* Keyed by the race, so a new one remounts the span and replays
                     the animation. The element then simply sits at opacity 0 - no
                     timer clears it, which is why nothing here needs a clock. */}
-                {props.races?.[i] && (
-                  <span key={props.races[i].at} className={`race-flash race-${props.races[i].kind}`}>
-                    {(props.races[i].kind === 'angry' ? '😠' : '😇') + EMOJI}
+                {props.races?.[i] && Array.from({ length: props.races[i].n }, (_, f) => (
+                  /* One face per loser, fanned either side of the middle so the
+                     third is not simply hidden under the first. The fan is
+                     centred whatever the count, so a single face sits exactly
+                     where it always did, and --off is a percentage of the SLOT
+                     (the span is inset:0 on it), not of the face. */
+                  <span key={`${props.races![i].at}:${f}`}
+                    className={`race-flash race-${props.races![i].kind}`}
+                    style={{ ['--off' as string]: `${faceOffset(f, props.races![i].n)}%` }}>
+                    {(props.races![i].kind === 'angry' ? '😠' : '😇') + EMOJI}
                   </span>
-                )}
+                ))}
                 {/* Its own element for the same reason the race face is: a class
                     toggled on the slot cannot replay its animation, and a second
                     opening on the same space has to be seen. Keyed by the nonce,

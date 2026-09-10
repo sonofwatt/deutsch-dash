@@ -128,7 +128,13 @@ export interface RoundScore { centerCount: number; dashLeft: number; delta: numb
  * card is on top of that space now. `at` is only ever a nonce - it marks a fresh
  * race, and is never compared across devices, whose clocks do not agree.
  */
-export interface RaceRecord { by: string; at: number }
+/**
+ * One centre space that was raced for. `by` and `at` are the most recent report
+ * on that space; `lost` is every player who went for it and did not get it, to
+ * the millisecond they said so, which is how the winner is shown one halo per
+ * opponent rather than one halo. Absent in a room written before 2026-09-10.
+ */
+export interface RaceRecord { by: string; at: number; lost?: Record<string, number> }
 
 export interface RoundState {
   spaces: CenterSpace[]; tableaus: Record<string, Tableau>;

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { useGameStore, legalTargets, gameStore, isHost } from '../../state/store';
+import { useGameStore, legalTargets, gameStore, isHost, RACE_GRACE_MS } from '../../state/store';
 import { allConnectedStuck } from '../../net/plays';
 import { hasLegalMove } from '../../game/rules';
 import { HINT_DELAY_MS, HINT_REPEAT_MS, HINT_SHOW_MS, hintSpace } from '../../game/hint';
@@ -224,7 +224,8 @@ export function Game() {
     );
   }
 
-  const races = raceFlashes({ races: round.races, spaces: round.spaces, uid, lastRejected });
+  const races = raceFlashes({ races: round.races, spaces: round.spaces, uid, lastRejected,
+                             window: RACE_GRACE_MS });
   const active = drag ? drag.source : selection;
   const targets = hand && active ? legalTargets(hand, active, round.spaces) : { spaces: [], posts: [] };
   const stuckAvailable = hand ? !hasLegalMove(hand, round.spaces) : false;

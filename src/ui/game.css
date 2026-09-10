@@ -348,6 +348,11 @@
    animation's own end state is the timer, so no effect has to clear anything.
    The two faces move differently on purpose - you should know which one you got
    from the corner of your eye, without reading it. */
+/* --off slides a face sideways when there is more than one of them on a slot:
+   the winner gets a halo per opponent who went for the space. It is a percentage
+   of the FACE, applied inside every transform below rather than as a base one,
+   because a keyframe replaces the whole transform property and would drop it.
+   Zero for a single face, so one halo sits exactly where it always did. */
 .race-flash { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center;
   font-size: calc(var(--card-w) * .62); pointer-events: none; opacity: 0; }
 /* Winner: floats off the top of the card. Rise scales with the card so it clears
@@ -358,11 +363,11 @@
    being readable rather than into a longer glide. */
 .race-angel { animation: race-angel 1.5s ease-out forwards; }
 @keyframes race-angel {
-  0%   { opacity: 0; transform: translateY(15%) scale(.7); }
-  12%  { opacity: 1; transform: translateY(0) scale(1.05); }
-  20%  { transform: translateY(0) scale(1); }
-  45%  { opacity: 1; transform: translateY(-6%) scale(1); }
-  100% { opacity: 0; transform: translateY(-55%) scale(1); }
+  0%   { opacity: 0; transform: translate(var(--off, 0%), 15%) scale(.7); }
+  12%  { opacity: 1; transform: translate(var(--off, 0%), 0) scale(1.05); }
+  20%  { transform: translate(var(--off, 0%), 0) scale(1); }
+  45%  { opacity: 1; transform: translate(var(--off, 0%), -6%) scale(1); }
+  100% { opacity: 0; transform: translate(var(--off, 0%), -55%) scale(1); }
 }
 /* Loser: a short sideways shake, then gone. Percentages are of the slot, so the
    shake stays proportional at every card size. */
@@ -381,7 +386,10 @@
    the information here, the moving is only how it carries. */
 @media (prefers-reduced-motion: reduce) {
   [data-platform] .race-angry { animation: race-flash-still 1s ease-out forwards; }
-  [data-platform] .race-angel { animation: race-flash-still 1.5s ease-out forwards; }
+  /* The spread survives stillness: several haloes stacked on one another would be
+     one halo, which is the thing this is trying to say. */
+  [data-platform] .race-angel { animation: race-flash-still 1.5s ease-out forwards;
+    transform: translate(var(--off, 0%), 0); }
   @keyframes race-flash-still { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
 }
 
