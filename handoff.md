@@ -3890,7 +3890,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `45c275d` | Genius lies in wait; countdown tones; the race remarks get seen |
 | `83f1979` | The carousel cycles its remarks instead of repeating them |
 | `f6c8ffd` | The pile flip never flipped; card backs match, and cards get a white edge |
-| _pending_ | The dasher gets the trophy too when they lead on the round |
+| `b953122` | The dasher gets the trophy too when they lead on the round |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
