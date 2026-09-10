@@ -1685,7 +1685,8 @@ and again once it has finished:
 | 15 shells, twinkle `infinite` (the first version) | 33ms | 17ms |
 | 30 shells, twinkle `infinite` | 50ms | **33ms, for ever** |
 | 30 shells, twinkle stopped with the flight | 33ms | 17ms |
-| **45 shells, as it ships now** | **67ms** | 17ms |
+| 45 shells, every spark twinkling | 67ms | 17ms |
+| **45 shells, as it ships now** | **33ms** | 17ms |
 
 The middle row is the one that mattered. **The twinkle was `infinite`**, so a
 `filter: brightness` went on ticking on every spark for as long as the game-over
@@ -1703,20 +1704,27 @@ was free because the gap grew with the count; thirty to forty-five was not,
 because it did not. Frames during the burst went 33ms to 67ms unthrottled, and
 150ms to 317ms under a 6x throttle.
 
-**The twinkle is the whole of that cost, exactly as this file has said since the
-first version.** Measured at 45 shells, unthrottled, during the burst:
+**The twinkle was the whole of that cost, exactly as this file had said since the
+first version, and it is now fixed.** Measured at 45 shells, unthrottled, during
+the burst:
 
 | | median | p95 |
 |---|---|---|
-| as it ships | 67ms | 250ms |
+| every spark twinkling | 67ms | 250ms |
 | twinkle off entirely | 33ms | 50ms |
-| twinkle on the white sparks only | 33ms | 67ms |
+| **twinkle on the white sparks only (shipped 2026-09-10)** | **33ms** | **67ms** |
 
-So restricting the flicker to the one-in-six white sparks - the ones that make a
-coloured burst read as a glittery one in the first place - buys back every frame
-and leaves 45 shells costing what 30 did. It is NOT applied, because it changes
-the look and the look is the table's to choose. It is the lever, it is measured,
-and it is one line.
+**The flicker runs on the white one-in-six only** - `.shell i.glint`, 360 sparks
+of 2070 - and that bought back every frame: 45 shells now cost what 30 did, and
+the p95 is better than 30 shells were with everything twinkling. Under a 6x
+throttle the median came down from 317ms to 217ms in the same change.
+
+Nothing was lost visually, because the white sparks are where the glitter reads
+from in the first place: they are the small bright ones a coloured burst glints
+with, and the coloured ones were flickering at a brightness nobody could pick out
+of a burst anyway. **The class is set by the COMPONENT**, which is the one place
+that decides which sparks are white, rather than by an `:nth-child` count in CSS
+that would silently pick the wrong sparks the moment the ignition bloom moved.
 
 The burst used to cost what it always did: 33ms frames unthrottled at fifteen and
 at thirty, and at 6x throttle the median went 183ms to 233ms for twice the
@@ -2957,6 +2965,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `6d89e1b` | Options below the ready button, a rematch that waits, a ready pill that says away, score history behind a total, and fireworks for the winner alone |
 | `00b145d` | A player who is still stuck after sinking a card stays stuck, and can send the next one down at once |
 | `4bc468c` | Forty-five shells over the same eight seconds, and what that costs |
+| `PENDING` | The flicker on the white sparks only, which is where the glitter was coming from |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.

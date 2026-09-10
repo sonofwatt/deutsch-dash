@@ -12,11 +12,13 @@
  *
  * A spark's FLIGHT is transform and opacity, so it composites and nothing here
  * reflows. The twinkle running alongside it is `filter: brightness`, which is
- * paint rather than composite - the one property in it that is not free. It
- * stays, because it cannot move to opacity without fighting the flight's own fade
- * on that property, but it now STOPS with the flight rather than running
- * `infinite`: at 690 elements a twinkle left ticking behind a sheet nobody has
- * dismissed was affordable and rude, and at 1410 it is neither.
+ * paint rather than composite - the one property in it that is not free, and on
+ * every spark at forty-five shells it stopped being affordable: it was the whole
+ * of the jump from 33ms frames to 67ms. It runs on the WHITE sparks only now, one
+ * in six, which is where the glitter reads from anyway, and that bought the cost
+ * back entirely. It also STOPS with the flight rather than running `infinite`,
+ * which it did until 2026-09-09: a twinkle left ticking behind a sheet nobody had
+ * dismissed halved the frame rate of a screen doing nothing.
  *
  * Pure CSS: each spark is one element flung along its own bearing and dropped by
  * gravity at the end, which is the whole difference between a firework and a
@@ -110,7 +112,12 @@ export function Fireworks() {
               as going OFF rather than as dots appearing. */}
           <b style={{ ['--hue' as string]: String(s.hue), ['--delay' as string]: `${si * SHELL_GAP_MS}ms` }} />
           {Array.from({ length: SHELL_SPARKS }, (_, i) => (
-            <i key={i} style={{
+            <i key={i}
+              // The white one-in-six, named rather than counted in CSS: this is
+              // the one place that decides which sparks are the white ones, and
+              // `.glint` is what carries that decision to the stylesheet.
+              className={i % 6 === 0 ? 'glint' : undefined}
+              style={{
               // Two turns of the circle, so the arms interleave rather than
               // arriving as one rank of spokes.
               ['--a' as string]: `${(i * 720) / SHELL_SPARKS}deg`,
@@ -118,7 +125,9 @@ export function Fireworks() {
               ['--hue' as string]: String(s.hue + (i % 6) * 10),
               ['--delay' as string]: `${si * SHELL_GAP_MS + (i % 4) * 35}ms`,
               // Every sixth spark is a small white one, which is what turns a
-              // coloured burst into a glittery one.
+              // coloured burst into a glittery one - and, since 2026-09-10, the
+              // only one that twinkles. See `.glint` in ui.css for what that
+              // bought back.
               ['--sz' as string]: i % 6 === 0 ? '4px' : `${5 + (i % 3) * 2}px`,
               ['--lit' as string]: i % 6 === 0 ? '96%' : '58%',
               ['--tw' as string]: `${(i % 7) * 90}ms`,

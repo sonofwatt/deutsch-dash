@@ -321,14 +321,22 @@
   background: hsl(var(--hue) 98% var(--lit, 58%));
   box-shadow: 0 0 0 1px hsl(var(--hue) 100% 92% / .95),
               0 0 12px 3px hsl(var(--hue) 98% var(--lit, 58%) / .9);
+  animation: firework 1500ms cubic-bezier(.15, .7, .3, 1) var(--delay, 0ms) both; }
+/* Not a fade - a flicker, running alongside the flight on its own offset per
+   spark, which is the difference between falling dots and glitter.
+   ON THE WHITE SPARKS ONLY, one in six, which is where the glitter reads from
+   anyway: they are the small bright ones a coloured burst glints with.
+   `filter: brightness` is paint rather than composite, the one property in this
+   display that is not free, and on every spark at forty-five shells it was the
+   whole of the jump from 33ms frames to 67ms. On the white sixth it costs nothing
+   measurable and the burst still glitters. The class comes from the component,
+   which is the one place that decides which sparks are white.
+   SIX iterations, not `infinite`: six covers the 1500ms flight and then stops.
+   Infinite kept it ticking for as long as the game-over sheet was up, which is
+   until somebody presses Rematch. */
+.shell i.glint {
   animation: firework 1500ms cubic-bezier(.15, .7, .3, 1) var(--delay, 0ms) both,
              twinkle 260ms ease-in-out var(--tw, 0ms) 6 alternate; }
-/* Not a fade - a flicker. Runs alongside the flight, on its own offset per spark,
-   which is the difference between falling dots and glitter.
-   SIX iterations, not `infinite`: six covers the 1500ms flight and then stops.
-   Infinite kept a `filter: brightness` ticking on every spark for as long as the
-   game-over sheet was up, which is until somebody presses Rematch - affordable
-   and rude at 690 elements, and neither at 1410. */
 @keyframes twinkle { from { filter: brightness(1); } to { filter: brightness(1.9); } }
 /* Out along the bearing, then a little gravity at the end - which is the whole
    difference between a firework and a starburst. */
@@ -413,7 +421,7 @@
      elements on a phone that had asked for stillness. Gone entirely rather than
      parked - a still firework is a smear of dots, and the sheet they go off
      behind already says who won. */
-  [data-platform] .shell b, [data-platform] .shell i,
+  [data-platform] .shell b, [data-platform] .shell i, [data-platform] .shell i.glint,
   [data-platform] .candle i { animation: none; opacity: 0; }
 }
 

@@ -23,10 +23,13 @@ const ANIMATED = [
   // The flipped pile travelling back onto the draw pile at the end of a lap.
   ['.wood-collect', 'wood-collect'],
   ['.faller', 'fall-down'],
-  // The fireworks: the ignition bloom and a spark. A spark runs two animations,
-  // and the computed name lists both.
+  // The fireworks: the ignition bloom, an ordinary spark, and a white one. Only
+  // the white sixth twinkles, so only its computed name lists two animations, and
+  // both are here because the reduced-motion block now has to switch off a rule
+  // that no longer covers every spark with a single selector.
   ['.shell b', 'shell-flash'],
-  ['.shell i', 'firework, twinkle'],
+  ['.shell i', 'firework'],
+  ['.shell i.glint', 'firework, twinkle'],
   // A roman candle's star. Same block, and it was worth adding to this list on
   // the day rather than after: the fireworks themselves were missed when that
   // block was first written and ran on 705 elements a phone had asked to hold
@@ -38,7 +41,7 @@ const PAGE = `<!doctype html><html><head><style>${CSS}</style></head><body>
   <div class="wood-deal"><div class="card">7</div></div>
   <div class="wood-collect"></div>
   <div class="faller">X</div>
-  <div class="fireworks"><span class="shell"><b></b><i></i></span>
+  <div class="fireworks"><span class="shell"><b></b><i></i><i class="glint"></i></span>
     <span class="candle"><i></i></span></div>
 </body></html>`;
 
