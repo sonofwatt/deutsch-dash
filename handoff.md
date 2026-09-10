@@ -2908,7 +2908,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `b8f156e` | Twice the fireworks over twice as long, and a twinkle that stops when the flight does |
 | `bdfabce` | Roman candles up the edges of the win, a different instrument from the shells |
 | `facfaf8` | The host can remove a player, in the lobby or mid-game, and the removed client leaves cleanly |
-| `PENDING` | Options below the ready button, a rematch that waits, a ready pill that says away, score history behind a total, and fireworks for the winner alone |
+| `6d89e1b` | Options below the ready button, a rematch that waits, a ready pill that says away, score history behind a total, and fireworks for the winner alone |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
