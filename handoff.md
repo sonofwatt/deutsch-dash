@@ -2847,7 +2847,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `eaac4a3` | A dash rains emoji; the fireworks moved behind the sheet that says who won |
 | `b8f156e` | Twice the fireworks over twice as long, and a twinkle that stops when the flight does |
 | `bdfabce` | Roman candles up the edges of the win, a different instrument from the shells |
-| `PENDING` | The host can remove a player, in the lobby or mid-game, and the removed client leaves cleanly |
+| `facfaf8` | The host can remove a player, in the lobby or mid-game, and the removed client leaves cleanly |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
