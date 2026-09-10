@@ -41,14 +41,17 @@ caches those separately from the page and a plain reload usually will not move
 it, so a tab still showing the old drawing is not evidence of a bad deploy: hash
 the file on Pages instead._
 
-_**`database.rules.json` and the live database agree.** Last deployed 2026-09-05,
-with the delete grant on `rooms/$code` and `owner` made optional on the cards
-inside a tableau; the audit's bounds went out the day before. Both of those only
-ADD or RELAX, so no client already in a hand could break on them, which is why
-they were safe to release without waiting for anything. When a change RESTRICTS
-instead, check both directions before releasing: the new client against the rules
-still live, and the PREVIOUS client against the new rules, which is the half this
-file's own warning cannot cover._
+_**`database.rules.json` and the live database agree.** Last deployed 2026-09-10,
+with the `says` node the soundbites write to and the `meta/soundsOn` host option;
+`holland-hustle-default-rtdb` reported the release. Before that, 2026-09-05: the
+delete grant on `rooms/$code` and `owner` made optional on the cards inside a
+tableau, with the audit's bounds the day before. Every one of those only ADDS or
+RELAXES, so no client already in a hand could break on them, which is why they
+were safe to release without waiting for anything - a client that predates the
+soundbites simply never writes `says`. When a change RESTRICTS instead, check
+both directions before releasing: the new client against the rules still live,
+and the PREVIOUS client against the new rules, which is the half this file's own
+warning cannot cover._
 
 _**695 tests** (544 unit and 99 in a real browser; 52 against the emulator, all
 green). This is the only place in the repo that quotes a count -
