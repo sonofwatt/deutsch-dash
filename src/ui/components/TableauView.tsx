@@ -16,19 +16,27 @@ import type { WoodTurnover } from '../../state/store';
  * total: a duration living in the stylesheet and a timer living here is exactly
  * the drift `--collect-ms` was introduced to stop.
  *
- * `FLIP_MS` and `DEAL_STEP_MS` were 200 and 200. The table asked for the flipping
- * to take twice as long on 2026-09-10, so both doubled: a card takes 400ms to turn
- * over and the next one starts 400ms after it, which keeps each card clear of the
- * next exactly as before, at half the speed. A full turn of three now runs 1200ms
- * where it used to run 600ms.
+ * Tuned by the table, and the numbers have moved twice in a day:
  *
- * `COLLECT_MS` is deliberately NOT doubled. The gather is not a card turning over,
- * it is the pile travelling back onto the draw slot, and it was not what was asked
- * to be slowed.
+ *  - 200 / 200 / 180 originally, each card clear of the next.
+ *  - 400 / 400 / 180 on 2026-09-10, when the flipping was asked to take twice as
+ *    long.
+ *  - 300 / 250 / 250 the same day, having watched it at half speed.
+ *
+ * **`step` is now SHORTER than `flip`, so the cards overlap by 50ms** - the next
+ * one starts turning while the one before it has a little left to go. Overlap was
+ * tried once before and reported as hard to watch, and that is worth knowing
+ * rather than repeating: the version that failed CROSS-FADED, so two
+ * half-transparent cards sat on top of each other. These are fully opaque, which
+ * is what makes a small overlap read as a dealing hand rather than as a smear.
+ * Asked for in those terms.
+ *
+ * Nothing below assumes any relationship between the three. An earlier cut had
+ * `collectAt` as `before * step`, which is "when the last card ahead of the gather
+ * lands" only while `step` and `flip` are equal - and they no longer are.
  */
-const FLIP_MS = 400;
-const DEAL_STEP_MS = 400;
-const COLLECT_MS = 180;
+export const WOOD_TIMING = { flip: 300, step: 250, collect: 250 } as const;
+const { flip: FLIP_MS, step: DEAL_STEP_MS, collect: COLLECT_MS } = WOOD_TIMING;
 
 /**
  * When each card of a turn starts turning over, and when the gather runs.
@@ -39,12 +47,17 @@ const COLLECT_MS = 180;
  * are gathered up onto the draw pile, then the rest of the turn is dealt off those
  * to complete the three.
  *
- * So the gather sits in the middle of the deal rather than in front of it, and
- * every card after it is pushed back by its length. `before` is how many cards
- * came off the pile first - `WoodTurnover.dealtBefore`, which only the store can
- * know. At zero (a recycle of a pile already all face up, or the host's
- * single-card rescue) this collapses to the old gather-then-deal, which is right:
- * there was nothing left to deal first.
+ * So the gather sits in the middle of the deal rather than in front of it. `before`
+ * is how many cards came off the pile first - `WoodTurnover.dealtBefore`, which
+ * only the store can know. At zero (a recycle of a pile already all face up, or the
+ * host's single-card rescue) this collapses to the old gather-then-deal, which is
+ * right: there was nothing left to deal first.
+ *
+ * The two joins are written out rather than folded into one multiplication,
+ * because they are the two places the move has to be honest about itself: the
+ * gather waits for the last card ahead of it to LAND (not merely to start), and
+ * the cards behind it wait for the gather to FINISH. Cards overlap each other by
+ * design; nothing overlaps the gather.
  */
 export function dealTimeline(count: number, before: number) {
   const first = Math.max(0, Math.min(before, count));
@@ -52,9 +65,16 @@ export function dealTimeline(count: number, before: number) {
   // off a pile that had them. Every card then deals straight through and nothing
   // reads `collectAt`, because the outline is not rendered at all.
   const gathers = first < count;
+  // The cards the pile had left, dealt at the ordinary rate.
+  const ahead = Array.from({ length: first }, (_, i) => i * DEAL_STEP_MS);
+  // The gather starts when the last of them has landed, which is a flip after the
+  // last one started - not a step.
+  const collectAt = first === 0 ? 0 : ahead[first - 1] + FLIP_MS;
+  const resumeAt = collectAt + COLLECT_MS;
   const delays = Array.from({ length: count }, (_, i) =>
-    i * DEAL_STEP_MS + (gathers && i >= first ? COLLECT_MS : 0));
-  const collectAt = first * DEAL_STEP_MS;
+    i < first ? ahead[i]
+      : gathers ? resumeAt + (i - first) * DEAL_STEP_MS
+      : i * DEAL_STEP_MS);
   const lastLands = count > 0 ? delays[count - 1] + FLIP_MS : 0;
   return {
     /** Per card, oldest first: when it starts turning over. */
@@ -68,7 +88,7 @@ export function dealTimeline(count: number, before: number) {
      * length of the gather - the deal never really waited for it except for the
      * first card.
      */
-    total: Math.max(lastLands, gathers ? collectAt + COLLECT_MS : 0, COLLECT_MS),
+    total: Math.max(lastLands, gathers ? resumeAt : 0, COLLECT_MS),
   };
 }
 

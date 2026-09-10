@@ -482,14 +482,20 @@
    turned, and two half-transparent cards overlapping each other three times in a
    row was reported as hard to watch - which it was. A real card does not fade.
 
-   400ms a card, 400ms apart, so a full turn of three runs 1200ms and each card is
-   clear of the next. Both numbers doubled on 2026-09-10, when the table asked for
-   the flipping to take twice as long; they live in TableauView as FLIP_MS and
-   DEAL_STEP_MS, because the delays are arithmetic on them (see dealTimeline) and
-   `--d` arrives here already worked out. Keyed by card in TableauView, so only the
-   cards that just arrived turn over - after a short last turn, or a single-card
-   turn under the host's rescue, the ones already face up hold still and one card
-   lands on them.
+   300ms a card, 250ms apart, so the cards OVERLAP by 50ms and an ordinary turn of
+   three runs 800ms. The numbers live in TableauView as WOOD_TIMING, because the
+   delays are arithmetic on them (see dealTimeline) and `--d` arrives here already
+   worked out; they were 200/200 to begin with, 400/400 when the table asked for
+   the flipping to take twice as long, and 300/250 after watching that.
+
+   Overlap was tried in the first cut and reported as hard to watch. It is back
+   deliberately, and the difference is that the first cut CROSS-FADED - two
+   half-transparent cards on top of each other. These are fully opaque, which is
+   what makes a small overlap read as a hand dealing rather than as a smear.
+
+   Keyed by card in TableauView, so only the cards that just arrived turn over -
+   after a short last turn, or a single-card turn under the host's rescue, the ones
+   already face up hold still and one card lands on them.
 
    The nth-child rules below take each card's delay from `--d0`/`--d1`/`--d2` on
    the PILE, which TableauView sets from dealTimeline, and fall back to the plain
@@ -499,10 +505,10 @@
    style would put a second transformed box between the two. */
 .wood-deal { display: grid; perspective: 800px; }
 .wood-deal > * { grid-area: 1 / 1; transform-origin: 50% 0%; backface-visibility: hidden;
-  animation: wood-flip var(--flip-ms, 400ms) cubic-bezier(.3, 0, .2, 1) var(--d, 0ms) both; }
+  animation: wood-flip var(--flip-ms, 300ms) cubic-bezier(.3, 0, .2, 1) var(--d, 0ms) both; }
 .wood-deal > *:nth-child(1) { --d: var(--d0, 0ms); }
-.wood-deal > *:nth-child(2) { --d: var(--d1, 400ms); }
-.wood-deal > *:nth-child(3) { --d: var(--d2, 800ms); }
+.wood-deal > *:nth-child(2) { --d: var(--d1, 250ms); }
+.wood-deal > *:nth-child(3) { --d: var(--d2, 500ms); }
 /* Down from flat, through edge-on, onto the pile. Hinged at the top edge, which
    is the edge a thumb turns a card over on. */
 @keyframes wood-flip {
@@ -520,13 +526,17 @@
    different cards a frame later. This is that move, drawn as the outline of the
    pile it was, travelling up to the draw slot and fading into it.
 
+   250ms, up from 180ms, because the cards around it slowed down and it started
+   reading as abrupt against them. Unlike the cards, it overlaps NOTHING: it waits
+   for the card ahead of it to land and the cards behind it wait for it to finish.
+
    It sits inside the flipped pile's own stack, so `--pile-step` is in scope and
    the distance is expressed in the same terms the layout is: its own height, plus
    the three steps of peek the stack reserves, plus the column gap. */
 .wood-collect { position: absolute; top: 0; left: 0; width: var(--card-w);
   aspect-ratio: 2.5 / 3.5; border-radius: var(--radius); background: var(--pile-fill);
   border: 2px solid var(--pile-line); pointer-events: none;
-  animation: wood-collect var(--collect-ms, 180ms) cubic-bezier(.4, 0, .2, 1)
+  animation: wood-collect var(--collect-ms, 250ms) cubic-bezier(.4, 0, .2, 1)
     var(--collect-at, 0ms) both; }
 @keyframes wood-collect {
   0%   { transform: translateY(0); opacity: .9; }

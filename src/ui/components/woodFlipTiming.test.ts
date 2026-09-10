@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { chromium, type Browser } from 'playwright';
-import { TableauView, dealTimeline } from './TableauView';
+import { TableauView, dealTimeline, WOOD_TIMING } from './TableauView';
 import type { Card, Suit, Tableau } from '../../game/types';
 
 /**
@@ -92,40 +92,47 @@ describe.runIf(process.env.LAYOUT === '1')('the wood turn a player watches', () 
     }, plan);
   };
 
-  it('turns each card over twice as slowly as it used to', async () => {
+  const { flip, step, collect } = WOOD_TIMING;
+
+  it('runs each card for as long as the tuning says', async () => {
     const { cards } = await timings(null);
     expect(cards).toHaveLength(3);
     expect(cards.every(c2 => c2.name === 'wood-flip')).toBe(true);
-    expect(cards.map(c2 => c2.duration)).toEqual([400, 400, 400]); // was 200
+    expect(cards.map(c2 => c2.duration)).toEqual([flip, flip, flip]);
   });
 
-  it('staggers an ordinary turn by a whole card each time', async () => {
+  it('overlaps the cards in the browser, not just on paper', async () => {
+    // The point of the whole tuning: the next card is turning while the one
+    // before it still has time left to run.
     const { cards } = await timings(null);
-    expect(cards.map(c2 => c2.delay)).toEqual([0, 400, 800]);
+    expect(cards.map(c2 => c2.delay)).toEqual([0, step, 2 * step]);
+    expect(cards[1].delay).toBeLessThan(cards[0].delay + cards[0].duration);
   });
 
   it('deals the two the pile had left, then holds the third for the gather', async () => {
     const { cards, gather } = await timings(2);
-    expect(cards.map(c2 => c2.delay)).toEqual([0, 400, 980]);
-    // the gather runs once those two have landed, and the third card waits it out
-    expect(gather!.delay).toBe(800);
+    expect(cards.map(c2 => c2.delay)).toEqual(dealTimeline(3, 2).delays);
+    // the gather runs once the second has LANDED, and the third waits it out
+    expect(gather!.delay).toBe(cards[1].delay + cards[1].duration);
+    expect(gather!.duration).toBe(collect);
     expect(cards[2].delay).toBe(gather!.delay + gather!.duration);
   });
 
   it('holds two cards back when the pile had only one left', async () => {
     const { cards, gather } = await timings(1);
-    expect(cards.map(c2 => c2.delay)).toEqual([0, 580, 980]);
-    expect(gather!.delay).toBe(400);
+    expect(cards.map(c2 => c2.delay)).toEqual(dealTimeline(3, 1).delays);
+    expect(gather!.delay).toBe(cards[0].delay + cards[0].duration);
     expect(cards[1].delay).toBe(gather!.delay + gather!.duration);
   });
 
   it('reads as deal, then gather, then deal - in that order, every time', async () => {
-    // The shape of the whole request, in one assertion: nothing after the gather
-    // starts before it finishes, and nothing before it waits on it.
+    // The shape of the whole request, measured rather than computed: cards may
+    // overlap each other, and nothing may overlap the gather.
     for (const before of [0, 1, 2]) {
       const { cards, gather } = await timings(before);
       const ends = gather!.delay + gather!.duration;
-      expect(cards.slice(0, before).every(c2 => c2.delay < gather!.delay)).toBe(true);
+      expect(cards.slice(0, before)
+        .every(c2 => c2.delay + c2.duration <= gather!.delay)).toBe(true);
       expect(cards.slice(before).every(c2 => c2.delay >= ends)).toBe(true);
     }
   });

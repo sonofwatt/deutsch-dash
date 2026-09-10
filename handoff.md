@@ -53,7 +53,7 @@ both directions before releasing: the new client against the rules still live,
 and the PREVIOUS client against the new rules, which is the half this file's own
 warning cannot cover._
 
-_**706 tests** (555 unit and 99 in a real browser; 52 against the emulator, all
+_**709 tests** (558 unit and 99 in a real browser; 52 against the emulator, all
 green). This is the only place in the repo that quotes a count -
 it drifted three separate ways when it lived in four places, so keep it here and
 nowhere else. Both sides of the 2026-09-04 merge rewrote this line, which is the
@@ -1471,11 +1471,25 @@ became, written by the host in `commitScores` beside the rest of the tally.
 
 Two things off one message, and the second is the interesting one.
 
-**The flipping takes twice as long.** `FLIP_MS` 200 to 400 and `DEAL_STEP_MS` 200
-to 400, so a card takes 400ms to turn over and the next starts 400ms after it: a
-full turn of three runs 1200ms where it ran 600ms. **Both numbers had to move.**
-Doubling the duration alone would have left the cards 200ms apart and overlapping
-each other, which is exactly the "hard to watch" the opaque cut was made to fix.
+**The flipping slowed down, and then overlapped.** Two passes the same day.
+First 200/200 to 400/400 - both numbers, because doubling the duration alone would
+have left the cards overlapping, and overlap was on the "hard to watch" list. Then,
+having watched it at half speed, **300/250 with the overlap deliberately back**:
+the thing that made the first cut unwatchable was the CROSS-FADE, not the overlap,
+and opaque cards that overlap by 50ms read as a hand dealing. All three values live
+in `WOOD_TIMING`, and `woodTimeline.test.ts` pins them in exactly one test and
+everything else as relationships, because they have now moved twice in a day.
+
+**A shorter step than flip broke a join that had been getting away with it.**
+`collectAt` was `before * step`, which is "when the last card ahead of the gather
+lands" only while `step` and `flip` are equal. They no longer are, and it would
+have started the gather 50ms before that card came down. Both joins are now written
+out: the gather waits for the card ahead of it to LAND, and the cards behind it wait
+for the gather to FINISH. **Cards overlap each other by design; nothing overlaps the
+gather.**
+
+**The gather is 250ms**, up from 180ms - it read as abrupt once the cards around it
+slowed down.
 
 **The gather moved into the middle of the deal.** A turn that runs out of
 face-down cards finishes itself off the ones already face up, and the board used
@@ -2260,12 +2274,17 @@ was. It is **fully opaque** now: hinged at the top edge (`transform-origin: 50%
 0%`), `rotateX(90deg)` to `0` on an ease that front-loads the movement. A real
 card does not fade.
 
-**400ms a card since 2026-09-10**, up from 200ms, because the table asked for the
-flipping to take twice as long. The stagger doubled with it (`DEAL_STEP_MS`), so
-each card is still exactly clear of the next and a full turn of three runs 1200ms
-rather than 600ms. Doubling only the duration would have overlapped them, which is
-the thing the opaque cut was for. The gather was deliberately left at 180ms: it is
-the pile travelling, not a card turning over.
+**300ms a card and 250ms apart since 2026-09-10**, so the cards OVERLAP by 50ms.
+The numbers went 200/200 to 400/400 ("twice as long") to 300/250 the same day,
+after watching the slow one.
+
+**Overlap is back on purpose, and this section is why that is not a regression.**
+What failed the first time was the cross-fade: two HALF-TRANSPARENT cards on top
+of each other. Fully opaque, a card that starts while the one before it is
+finishing reads as a hand dealing rather than as a smear, which is what was asked
+for in those words. If it is ever reported as hard to watch again, the thing to
+reach for is the fade, not the timing - that is the variable that actually
+changed between the two.
 
 ### Away outlived the tab that set it _(#52)_
 
@@ -2443,7 +2462,12 @@ cheats do not touch `rankMove`.
 
 **The test count line and the header date.** The count above the first heading is
 the only place in the repo that quotes one, and it moves with any change that adds
-tests. Two batches took it from 539 to 581.
+tests. It went 539 -> 709 over 2026-09-10, and the last stretch of that arrived as
+a MERGE: the soundbites work and the wood-turn tuning were written against the same
+base and landed on top of each other. Both sides had bumped `SMALL_CHANGES` from 58
+to 59, which git merged silently because the two sides agreed on the value - it
+took a hand count to notice the two changes had become one. Measure this line after
+a merge rather than taking either side of it.
 
 ### A wood turn deals three cards _(#45)_
 
@@ -3554,6 +3578,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `5657a09` | The wood turn at half speed, gather in the middle of the deal |
 | `4a289a2` | Eight canned soundbites, a host switch and a player switch, a launcher over the Dash pile with tap and hold-to-slide, and the emoji falling down the top third of the screen |
 | `4612f2e` | The fire falls only on a run of two or more dashes, and the glyph count stays the same with it or without it |
+| _pending_ | The wood cards overlap again, and the gather is 250ms |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
