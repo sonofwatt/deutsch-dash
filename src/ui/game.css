@@ -466,15 +466,27 @@
    turned, and two half-transparent cards overlapping each other three times in a
    row was reported as hard to watch - which it was. A real card does not fade.
 
-   200ms a card, 200ms apart, so a full turn of three runs 600ms and each card is
-   clear of the next. Keyed by card in TableauView, so only the cards that just
-   arrived turn over - after a short last turn, or a single-card turn under the
-   host's rescue, the ones already face up hold still and one card lands on them. */
+   400ms a card, 400ms apart, so a full turn of three runs 1200ms and each card is
+   clear of the next. Both numbers doubled on 2026-09-10, when the table asked for
+   the flipping to take twice as long; they live in TableauView as FLIP_MS and
+   DEAL_STEP_MS, because the delays are arithmetic on them (see dealTimeline) and
+   `--d` arrives here already worked out. Keyed by card in TableauView, so only the
+   cards that just arrived turn over - after a short last turn, or a single-card
+   turn under the host's rescue, the ones already face up hold still and one card
+   lands on them.
+
+   The nth-child rules below take each card's delay from `--d0`/`--d1`/`--d2` on
+   the PILE, which TableauView sets from dealTimeline, and fall back to the plain
+   stagger when there is none - which is what the drag preview renders. The delays
+   ride on the pile rather than on the cards so that `.wood-deal > *` stays the
+   card itself: it is the element the turn transforms, and a wrapper to carry a
+   style would put a second transformed box between the two. */
 .wood-deal { display: grid; perspective: 800px; }
 .wood-deal > * { grid-area: 1 / 1; transform-origin: 50% 0%; backface-visibility: hidden;
-  animation: wood-flip 200ms cubic-bezier(.3, 0, .2, 1) var(--d, 0ms) both; }
-.wood-deal > *:nth-child(2) { --d: 200ms; }
-.wood-deal > *:nth-child(3) { --d: 400ms; }
+  animation: wood-flip var(--flip-ms, 400ms) cubic-bezier(.3, 0, .2, 1) var(--d, 0ms) both; }
+.wood-deal > *:nth-child(1) { --d: var(--d0, 0ms); }
+.wood-deal > *:nth-child(2) { --d: var(--d1, 400ms); }
+.wood-deal > *:nth-child(3) { --d: var(--d2, 800ms); }
 /* Down from flat, through edge-on, onto the pile. Hinged at the top edge, which
    is the edge a thumb turns a card over on. */
 @keyframes wood-flip {
@@ -498,21 +510,35 @@
 .wood-collect { position: absolute; top: 0; left: 0; width: var(--card-w);
   aspect-ratio: 2.5 / 3.5; border-radius: var(--radius); background: var(--pile-fill);
   border: 2px solid var(--pile-line); pointer-events: none;
-  animation: wood-collect var(--collect-ms, 180ms) cubic-bezier(.4, 0, .2, 1) both; }
+  animation: wood-collect var(--collect-ms, 180ms) cubic-bezier(.4, 0, .2, 1)
+    var(--collect-at, 0ms) both; }
 @keyframes wood-collect {
   0%   { transform: translateY(0); opacity: .9; }
   100% { transform: translateY(calc(-100% - 3 * var(--pile-step) - 4px)); opacity: 0; }
 }
-/* And the turn's three cards wait for it to land, so the turn reads as collect
-   then deal rather than both at once. `--d` is the 0/200/400ms stagger above. */
-.wood-deal.collecting > * { animation-delay: calc(var(--d, 0ms) + var(--collect-ms, 180ms)); }
+/* The gather sits INSIDE the deal rather than in front of it, which is what a
+   hand of real cards does and what the table asked for on 2026-09-10: the draw
+   pile deals out the one or two it has left, those cards are gathered up onto it,
+   and the rest of the turn is dealt off them to complete the three.
+
+   So `--collect-at` waits for the cards ahead of the gather to land, and every
+   card behind it already carries the gather's length in its own `--d`. Both come
+   from dealTimeline in TableauView, which is the only place that can know how many
+   cards came first - the store tells it (WoodTurnover.dealtBefore), because after
+   the turn those cards are simply the front of a reordered pile.
+
+   The old rule here added `--collect-ms` to every card's delay while the
+   `collecting` class was on. That class used to come off after the gather alone,
+   which re-timed the cards still waiting behind it and pulled them forward by its
+   length: the deal never really waited except for its first card. The class now
+   lasts the whole move and carries no timing of its own. */
 
 /* The cards still arrive and still land in order; they just stop turning. And the
    pile going back is not drawn at all rather than sitting there as a still
    outline for the length of a move nobody asked to see. */
 @media (prefers-reduced-motion: reduce) {
   [data-platform] .wood-deal > * { animation-name: none; }
-  [data-platform] .wood-deal.collecting > * { animation-delay: 0ms; }
+  [data-platform] .wood-deal > *, [data-platform] .wood-deal.collecting > * { animation-delay: 0ms; }
   [data-platform] .wood-collect { animation-name: none; display: none; }
 }
 

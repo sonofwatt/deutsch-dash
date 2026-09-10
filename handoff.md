@@ -50,7 +50,7 @@ instead, check both directions before releasing: the new client against the rule
 still live, and the PREVIOUS client against the new rules, which is the half this
 file's own warning cannot cover._
 
-_**567 tests** (493 unit and 27 in a real browser; 47 against the emulator, all
+_**581 tests** (502 unit and 32 in a real browser; 47 against the emulator, all
 green). This is the only place in the repo that quotes a count -
 it drifted three separate ways when it lived in four places, so keep it here and
 nowhere else. Both sides of the 2026-09-04 merge rewrote this line, which is the
@@ -1159,6 +1159,60 @@ became, written by the host in `commitScores` beside the rest of the tally.
 - A round with a TOTAL but no DELTA is a round that player sat out. A round with
   no total for them at all is a round they were not in, and it is left out.
 
+### A wood turn at half speed, and the gather in the middle of it _(2026-09-10)_
+
+Two things off one message, and the second is the interesting one.
+
+**The flipping takes twice as long.** `FLIP_MS` 200 to 400 and `DEAL_STEP_MS` 200
+to 400, so a card takes 400ms to turn over and the next starts 400ms after it: a
+full turn of three runs 1200ms where it ran 600ms. **Both numbers had to move.**
+Doubling the duration alone would have left the cards 200ms apart and overlapping
+each other, which is exactly the "hard to watch" the opaque cut was made to fix.
+
+**The gather moved into the middle of the deal.** A turn that runs out of
+face-down cards finishes itself off the ones already face up, and the board used
+to draw that as: gather, then deal all three. What the table asked for is what a
+hand of real cards does - deal out the one or two the pile has LEFT, gather the
+rest up onto the draw pile, then deal off those to complete the three.
+
+- **`flipWood` did not change.** It already produces exactly that order: the
+  rotation puts the remaining face-down cards at the front and the gathered ones
+  behind them, so `dealt` is already "the last cards of the pile, then the first
+  cards of the pile it became". Only the clock the board draws it on changed.
+- **`dealTimeline` is that clock**, and all of the arithmetic lives in it: each
+  card's delay, when the gather runs, and how long the whole move is. It is
+  exported and unit-tested, because a stagger that is no longer a plain multiple
+  is not something to keep in a stylesheet.
+- **The store had to say how many cards came first.** `woodCollectedAt` became
+  `woodTurnover`, an object carrying the nonce and `dealtBefore` together. That
+  count survives nowhere else - after the turn those cards are indistinguishable
+  from the gathered ones - and it is one value rather than two fields so a board
+  cannot pair this turn's nonce with the last turn's count.
+- **`before` is 0, 1 or 2, never 3**, because a turn-over only happens when fewer
+  cards are face down than a turn deals. At 0 - a recycle of a pile already all
+  face up, and every turn-over under the host's single-card rescue - the timeline
+  collapses to the old gather-then-deal, which is right: there was nothing left to
+  deal first.
+- **The delays ride on the pile, not on the cards.** `--d0`/`--d1`/`--d2` go on
+  `.wood-deal` and the stylesheet's nth-child rules hand them down, falling back to
+  the plain stagger for the drag preview, which renders a bare `.wood-deal`.
+  Wrapping each card to carry its own style would have put a second transformed box
+  between the animation and the card, and `.wood-deal > *` is deliberately the card
+  itself.
+
+**A bug came out with it.** `.wood-deal.collecting > *` added the gather's length
+to every card's delay, and the class was cleared after `COLLECT_MS`. So the class
+came off while the later cards were still sitting in their delay, and they were
+re-timed forward by its length: the deal never really waited for the gather except
+for its first card. The class now lasts the whole move and carries no timing.
+
+**There is a second browser suite now**, `woodFlipTiming.test.ts`. The arithmetic
+is unit-tested, but the numbers have to reach the cards through two CSS hops, and
+a typo in either leaves everything on the fallback stagger with nothing failing.
+It measures `animation-delay` in real Chromium. `tableauLayoutCoverage.test.ts`
+stopped naming one file and now finds every suite that imports playwright, so a
+third cannot arrive without being gated on `LAYOUT` too.
+
 ### The bots aim low, and Genius cheats _(2026-09-10)_
 
 Two requests off one message, and only the first one touches every level.
@@ -1505,8 +1559,15 @@ without fighting the flight's own fade on that property.
 The turn that takes the pile over puts every card already face up back beneath the
 draw pile. That is a real move and it was invisible: the flipped pile simply held
 different cards a frame later. It now takes 180ms - the outline of the pile it was
-travels up onto the draw slot and fades into it, and the three cards of that turn
-wait edge-on until it lands, so the turn reads as collect, then deal.
+travels up onto the draw slot and fades into it.
+
+**The gather sits INSIDE the deal, not in front of it** _(2026-09-10)_. It used to
+collect first and then deal all three. What a hand of real cards does, and what the
+table asked for, is: the draw pile deals out the one or two it has LEFT, those are
+gathered up onto it, and the rest of the turn is dealt off them to complete the
+three. `dealTimeline` in `TableauView` is that clock and the only place the
+arithmetic lives - per-card delays, when the gather runs, and how long the whole
+move is.
 
 **The trigger comes from the store, and it has to.** `TableauView` cannot work out
 that a turn-over happened from what it is given, and the obvious signal is wrong:
@@ -1526,10 +1587,20 @@ Two details worth keeping:
   distance is written in the terms the layout already uses: its own height, plus
   the three steps of peek the stack reserves, plus the column gap. That 4px gap is
   now shared between `.wood-col` and the keyframe, so the two move together.
-- **The duration is defined once**, as `COLLECT_MS` in `TableauView`, handed to
-  the stylesheet as `--collect-ms`. The timer that clears the animation and the
-  animation itself cannot drift apart, and the deal's stagger is pushed back by
-  the same variable.
+- **The durations are defined once**, as `COLLECT_MS`, `FLIP_MS` and
+  `DEAL_STEP_MS` in `TableauView`, handed to the stylesheet as custom properties.
+  The timer that ends the move and the animation itself cannot drift apart,
+  because both add up from the same numbers through `dealTimeline`.
+- **How many cards were dealt before the gather comes from the store too**, as
+  `WoodTurnover.dealtBefore` beside the nonce, and it has to: after the turn those
+  cards are simply the front of a reordered pile and nothing tells them from the
+  gathered ones. One object rather than two fields, so a board cannot pair this
+  turn's nonce with the last turn's count and deal the wrong cards either side.
+- **The `collecting` class now lasts the whole move**, not just the gather. It
+  carries every card's delay, so clearing it after `COLLECT_MS` re-timed the cards
+  still waiting behind the gather and pulled them forward by its length: the deal
+  never actually waited for the gather except for its first card. That was a real
+  bug and it is pinned now (`woodTimeline.test.ts`).
 
 Reduced motion switches both halves off, with the phone guard the whole file
 requires, and `motionOverride.test.ts` covers the new keyframe alongside the rest.
@@ -1874,8 +1945,15 @@ sheet they go off behind already says who won.
 The first cut cross-faded each card in as it turned, so three half-transparent
 cards overlapped each other in a row. It was reported as hard to watch, and it
 was. It is **fully opaque** now: hinged at the top edge (`transform-origin: 50%
-0%`), `rotateX(90deg)` to `0` over 200ms on an ease that front-loads the
-movement. A real card does not fade.
+0%`), `rotateX(90deg)` to `0` on an ease that front-loads the movement. A real
+card does not fade.
+
+**400ms a card since 2026-09-10**, up from 200ms, because the table asked for the
+flipping to take twice as long. The stagger doubled with it (`DEAL_STEP_MS`), so
+each card is still exactly clear of the next and a full turn of three runs 1200ms
+rather than 600ms. Doubling only the duration would have overlapped them, which is
+the thing the opaque cut was for. The gather was deliberately left at 180ms: it is
+the pile travelling, not a card turning over.
 
 ### Away outlived the tab that set it _(#52)_
 
@@ -2053,13 +2131,13 @@ cheats do not touch `rankMove`.
 
 **The test count line and the header date.** The count above the first heading is
 the only place in the repo that quotes one, and it moves with any change that adds
-tests. This batch took it from 539 to 567.
+tests. Two batches took it from 539 to 581.
 
 ### A wood turn deals three cards _(#45)_
 
 It used to be one card flipping (`flipKey` on the top card). A turn brings three
 cards over, so it now looks like three: `dealt` is the last `WOOD_STEP` face-up
-cards, stacked in one grid cell and animated in 70ms apart. **Keyed by card**, so
+cards, stacked in one grid cell and animated in one after another. **Keyed by card**, so
 only the ones that actually just arrived animate - under the host's single-card
 rescue the cards already face up hold still and one card lands on them, and the
 turn that takes the pile over replaces the face-up pile with its own three cards,
@@ -3124,6 +3202,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `55abb9b` | The flick cone down to 20 degrees, in the game and on the bench together |
 | `57d1c1e` | The near radius down to 25px, which moves the swept band with it |
 | `ec976fc` | Bots aim at the lowest open space; Genius cheats four ways |
+| _pending_ | The wood turn at half speed, gather in the middle of the deal |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.

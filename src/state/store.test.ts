@@ -1730,8 +1730,12 @@ describe('a wood turn that takes the pile over', () => {
     store.setState({ uid: 'me', code: 'ABCDEF', room: playingRoom(t), tableau: t });
     expect(store.getState().tableau!.wood.length - store.getState().tableau!.woodIndex).toBe(2);
     store.getState().flip();
-    const marked = store.getState().woodCollectedAt;
+    const marked = store.getState().woodTurnover;
     expect(marked).not.toBeNull();
+    // And how many cards the draw pile had LEFT, which the board deals out before
+    // it gathers the rest up. It survives nowhere else: after the turn those cards
+    // are simply the front of a reordered pile.
+    expect(marked!.dealtBefore).toBe(2);
     // and the count really is the same either side, which is the trap being avoided
     expect(store.getState().tableau!.wood.length - store.getState().tableau!.woodIndex).toBe(2);
 
@@ -1739,7 +1743,7 @@ describe('a wood turn that takes the pile over', () => {
     const t2 = handAt(0);
     store.setState({ tableau: t2, room: playingRoom(t2) });
     store.getState().flip();
-    expect(store.getState().woodCollectedAt).toBe(marked);
+    expect(store.getState().woodTurnover).toBe(marked);
   });
 
   it('still writes the index alone on an ordinary turn', () => {

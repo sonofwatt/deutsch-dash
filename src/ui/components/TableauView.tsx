@@ -6,14 +6,71 @@ import type { BadgeId } from '../../game/badges';
 import type { WoodSide } from '../prefs';
 import { WOOD_STEP } from '../../game/wood';
 
-/**
- * How long the flipped pile takes to travel back onto the draw pile, and how long
- * the three cards of that turn wait before they deal in on top of it. Defined
- * once, here, and handed to the stylesheet as `--collect-ms` so the animation and
- * the timer that clears it cannot drift apart.
- */
-const COLLECT_MS = 180;
 import { cardId, type Card, type PlaySource, type Tableau } from '../../game/types';
+import type { WoodTurnover } from '../../state/store';
+
+/**
+ * The clock of a wood turn, in milliseconds. All of it is defined here and handed
+ * to the stylesheet as custom properties, because the delays below are ARITHMETIC
+ * on these numbers and the timer that ends the move has to add up to the same
+ * total: a duration living in the stylesheet and a timer living here is exactly
+ * the drift `--collect-ms` was introduced to stop.
+ *
+ * `FLIP_MS` and `DEAL_STEP_MS` were 200 and 200. The table asked for the flipping
+ * to take twice as long on 2026-09-10, so both doubled: a card takes 400ms to turn
+ * over and the next one starts 400ms after it, which keeps each card clear of the
+ * next exactly as before, at half the speed. A full turn of three now runs 1200ms
+ * where it used to run 600ms.
+ *
+ * `COLLECT_MS` is deliberately NOT doubled. The gather is not a card turning over,
+ * it is the pile travelling back onto the draw slot, and it was not what was asked
+ * to be slowed.
+ */
+const FLIP_MS = 400;
+const DEAL_STEP_MS = 400;
+const COLLECT_MS = 180;
+
+/**
+ * When each card of a turn starts turning over, and when the gather runs.
+ *
+ * A turn that takes the pile over used to gather first and then deal all three.
+ * The table asked for what actually happens with cards in a hand (2026-09-10):
+ * the draw pile deals out the one or two it has LEFT, then the cards underneath
+ * are gathered up onto the draw pile, then the rest of the turn is dealt off those
+ * to complete the three.
+ *
+ * So the gather sits in the middle of the deal rather than in front of it, and
+ * every card after it is pushed back by its length. `before` is how many cards
+ * came off the pile first - `WoodTurnover.dealtBefore`, which only the store can
+ * know. At zero (a recycle of a pile already all face up, or the host's
+ * single-card rescue) this collapses to the old gather-then-deal, which is right:
+ * there was nothing left to deal first.
+ */
+export function dealTimeline(count: number, before: number) {
+  const first = Math.max(0, Math.min(before, count));
+  // `before >= count` is a turn with NO gather in it - an ordinary turn of three
+  // off a pile that had them. Every card then deals straight through and nothing
+  // reads `collectAt`, because the outline is not rendered at all.
+  const gathers = first < count;
+  const delays = Array.from({ length: count }, (_, i) =>
+    i * DEAL_STEP_MS + (gathers && i >= first ? COLLECT_MS : 0));
+  const collectAt = first * DEAL_STEP_MS;
+  const lastLands = count > 0 ? delays[count - 1] + FLIP_MS : 0;
+  return {
+    /** Per card, oldest first: when it starts turning over. */
+    delays,
+    /** The gather waits for the cards ahead of it to land. */
+    collectAt,
+    /**
+     * The whole move, which is what the `collecting` class has to outlast. It used
+     * to be cleared after COLLECT_MS alone, which took the class off while the
+     * later cards were still sitting in their delay and pulled them forward by the
+     * length of the gather - the deal never really waited for it except for the
+     * first card.
+     */
+    total: Math.max(lastLands, gathers ? collectAt + COLLECT_MS : 0, COLLECT_MS),
+  };
+}
 
 export function TableauView(props: {
   t: Tableau; badgeId: BadgeId; selection: PlaySource | null; postHighlight: number[];
@@ -39,13 +96,14 @@ export function TableauView(props: {
   /** Optional: which end the wood pile sits at. Defaults to the right thumb. */
   woodSide?: WoodSide;
   /**
-   * When the wood pile last turned over, from the store. A nonce: every new value
-   * plays the collect once. It comes from `flip` rather than being worked out
-   * here, because it cannot be worked out here - the face-down count does not
-   * reliably change across a turn-over (a five-card pile reads 2 both sides of
-   * one), and a reordered pile looks exactly like a sunk card from the outside.
+   * The last turn that took the wood pile over, from the store. `at` is a nonce:
+   * every new value plays the move once. It comes from `flip` rather than being
+   * worked out here, because it cannot be worked out here - the face-down count
+   * does not reliably change across a turn-over (a five-card pile reads 2 both
+   * sides of one), a reordered pile looks exactly like a sunk card from the
+   * outside, and `dealtBefore` survives nowhere but the hand as it was.
    */
-  collectedAt?: number | null;
+  turnover?: WoodTurnover | null;
 }) {
   const { t, badgeId } = props;
   const woodTop = t.woodIndex > 0 ? t.wood[t.woodIndex - 1] : null;
@@ -85,16 +143,28 @@ export function TableauView(props: {
   //
   // Driven by `collectedAt` from the store rather than by anything visible here:
   // see the prop.
-  const [collecting, setCollecting] = useState(false);
-  const seen = useRef(props.collectedAt ?? null);
+  //
+  // `turning` holds the whole move, not just the gather: the class carries every
+  // card's delay, so taking it off early re-times the cards still waiting behind
+  // the gather and pulls them forward by its length.
+  const [turning, setTurning] = useState<number>(0);
+  const seen = useRef(props.turnover?.at ?? null);
+  const at = props.turnover?.at ?? null;
   useEffect(() => {
-    const at = props.collectedAt ?? null;
     if (at === null || at === seen.current) return; // nothing new; a remount does not replay it
     seen.current = at;
-    setCollecting(true);
-    const id = setTimeout(() => setCollecting(false), COLLECT_MS);
+    const before = props.turnover?.dealtBefore ?? 0;
+    setTurning(before + 1); // 1-based, so 0 reads as "not turning"
+    const id = setTimeout(() => setTurning(0), dealTimeline(WOOD_STEP, before).total);
     return () => clearTimeout(id);
-  }, [props.collectedAt]);
+    // `at` is the nonce and the only thing that may retrigger this: dealtBefore
+    // travels with it and re-reading props here would replay nothing on its own.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [at]);
+  const collecting = turning > 0;
+  // The timeline this turn is being played on. A hand that is not mid-turn deals
+  // its cards straight in, which is what an ordinary turn of three looks like.
+  const timeline = dealTimeline(dealt.length, collecting ? turning - 1 : dealt.length);
 
   // Wood is the pile a player touches most - every flip of three is another tap -
   // so it sits under a thumb, and which thumb is a preference (see prefs.ts).
@@ -154,7 +224,10 @@ export function TableauView(props: {
 
   const woodGroup = (
       <div key="wood">
-        <div className="wood-col" style={{ '--collect-ms': `${COLLECT_MS}ms` } as React.CSSProperties}>
+        <div className="wood-col" style={{
+          '--collect-ms': `${COLLECT_MS}ms`, '--flip-ms': `${FLIP_MS}ms`,
+          '--collect-at': `${timeline.collectAt}ms`,
+        } as React.CSSProperties}>
           <PileStack layers={depthLayers(faceDown)}>
             {faceDown > 0
               ? <div onClick={props.onFlip}><CardBack badgeId={badgeId} /></div>
@@ -171,7 +244,15 @@ export function TableauView(props: {
                 thumb reaches for, covering .card-badge entirely at every card size,
                 and the empty draw slot beside it already carries the ↻. */}
             {woodTop && !draggingWood ? (
+              /* The three delays ride on the PILE rather than on each card, and
+                 the stylesheet hands them to the nth-child rules that already
+                 stagger a turn. The cards themselves stay exactly the elements
+                 they were: `.wood-deal > *` is the card, its transform is the
+                 turn, and wrapping them to carry a style would have put a second
+                 transformed box between the animation and the card. */
               <div className={`wood-deal${collecting ? ' collecting' : ''}`}
+                style={Object.fromEntries(
+                  timeline.delays.map((ms, i) => [`--d${i}`, `${ms}ms`])) as React.CSSProperties}
                 onClick={() => props.onSelect({ kind: 'wood' })}
                 onPointerDown={e => props.startDrag(e, woodTop, { kind: 'wood' })}>
                 {/* A turn brings three cards over, so it should look like three

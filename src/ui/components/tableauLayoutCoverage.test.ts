@@ -1,6 +1,7 @@
 /// <reference types="node" />
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { execSync } from 'node:child_process';
 
 /**
  * The same guard `emulatorCoverage.test.ts` keeps, for the same reason.
@@ -28,8 +29,18 @@ describe('tableau layout coverage', () => {
     expect(workflow).toContain('playwright install');
   });
 
-  it('the layout suite still gates on LAYOUT, which is what makes this guard necessary', () => {
-    expect(readFileSync('src/ui/components/tableauLayout.test.ts', 'utf8'))
-      .toContain("describe.runIf(process.env.LAYOUT === '1')");
+  it('every suite that launches a browser gates on LAYOUT', () => {
+    // Both halves of the trade. A browser suite that did NOT gate would put a
+    // playwright launch inside the fast loop, which is the thing the gate buys;
+    // and one that gates is invisible without it, which is what the guard above
+    // is for. Found rather than listed, so a second browser suite - there is one
+    // now, woodFlipTiming - cannot arrive without being held to the same rule.
+    const files = execSync('git ls-files "src/**/*.test.ts"', { encoding: 'utf8' })
+      .split('\n').filter(Boolean);
+    const browserSuites = files.filter(f => readFileSync(f, 'utf8').includes("from 'playwright'"));
+    expect(browserSuites.length).toBeGreaterThan(1);
+    for (const f of browserSuites) {
+      expect(readFileSync(f, 'utf8'), f).toContain("describe.runIf(process.env.LAYOUT === '1')");
+    }
   });
 });

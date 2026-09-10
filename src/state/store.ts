@@ -44,6 +44,22 @@ export const AWAY_MS = 45000;
  */
 export const RACE_GRACE_MS = 2000;
 
+/**
+ * The turn that took a player's wood pile over, for the board to animate.
+ *
+ * `at` is a NONCE - a new value means "play the move once", and it is never
+ * compared against a clock or persisted. `dealtBefore` is how many of that turn's
+ * cards came off the draw pile BEFORE it was gathered up: the one or two the pile
+ * had left, which the table asked to see dealt first (2026-09-10). Zero on a
+ * recycle of a pile that was already all face up, and zero under the host's
+ * single-card rescue, where a turn-over can only happen at exactly zero face down.
+ *
+ * ONE value and not two fields, because the two halves describe the same turn and
+ * a board that had `at` from this turn and a count from the last one would deal
+ * the wrong cards on either side of the gather.
+ */
+export interface WoodTurnover { at: number; dealtBefore: number }
+
 export interface Deps {
   ensureSignedIn(): Promise<string>;
   watchRoom(code: string, cb: (room: Room | null) => void): () => void;
@@ -100,7 +116,7 @@ export interface GameStore {
    * the only place that can tell a turn-over from a sunk card - the face-down
    * count does not reliably change across one.
    */
-  woodCollectedAt: number | null;
+  woodTurnover: WoodTurnover | null;
   joinPhase: 'idle' | 'joining' | 'in-room';
   joinError: string | null;
   // Hands of the AI players this client is driving. Only ever populated on the
@@ -834,7 +850,7 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
     return {
       uid: null, code: null, room: null, tableau: null, selection: null,
       lastRejected: null, joinPhase: 'idle', joinError: null, online: true,
-      botTableaus: {}, actionError: null, woodCollectedAt: null,
+      botTableaus: {}, actionError: null, woodTurnover: null,
 
       setOnline(v) {
         set({ online: v });
@@ -1055,7 +1071,13 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
         // across a turn-over (a five-card pile reads 2 before and 2 after), and
         // the pile being reordered looks the same as a card being sunk out of it.
         // This is the one place that knows for certain, so it says so.
-        if (next.wood !== t.wood) set({ woodCollectedAt: Date.now() });
+        //
+        // `dealtBefore` is measured on the hand as it was, which is the only place
+        // it survives: after the turn those cards are simply the front of a
+        // reordered pile and nothing distinguishes them from the gathered ones.
+        if (next.wood !== t.wood) {
+          set({ woodTurnover: { at: Date.now(), dealtBefore: t.wood.length - t.woodIndex } });
+        }
         flips.set(uid, (flips.get(uid) ?? 0) + 1);
         syncStuck(uid, next); // one more flip may be the one that proves it
       },
