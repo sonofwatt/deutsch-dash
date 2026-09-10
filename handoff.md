@@ -3005,7 +3005,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `00b145d` | A player who is still stuck after sinking a card stays stuck, and can send the next one down at once |
 | `4bc468c` | Forty-five shells over the same eight seconds, and what that costs |
 | `dcaaf8e` | The flicker on the white sparks only, which is where the glitter was coming from |
-| `PENDING` | A two second race window, and a halo for every player who went for the space |
+| `b10c891` | A two second race window, and a halo for every player who went for the space |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
