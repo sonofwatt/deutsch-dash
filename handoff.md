@@ -50,7 +50,7 @@ instead, check both directions before releasing: the new client against the rule
 still live, and the PREVIOUS client against the new rules, which is the half this
 file's own warning cannot cover._
 
-_**PENDING tests** (PENDING unit and PENDING in a real browser; PENDING against the emulator, all
+_**695 tests** (544 unit and 99 in a real browser; 52 against the emulator, all
 green). This is the only place in the repo that quotes a count -
 it drifted three separate ways when it lived in four places, so keep it here and
 nowhere else. Both sides of the 2026-09-04 merge rewrote this line, which is the
@@ -3496,7 +3496,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `57d1c1e` | The near radius down to 25px, which moves the swept band with it |
 | `ec976fc` | Bots aim at the lowest open space; Genius cheats four ways |
 | `5657a09` | The wood turn at half speed, gather in the middle of the deal |
-| `PENDING` | Eight canned soundbites, a host switch and a player switch, a launcher over the Dash pile with tap and hold-to-slide, and the emoji falling down the top third of the screen |
+| `4a289a2` | Eight canned soundbites, a host switch and a player switch, a launcher over the Dash pile with tap and hold-to-slide, and the emoji falling down the top third of the screen |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
