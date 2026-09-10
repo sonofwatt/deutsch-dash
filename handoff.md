@@ -3665,7 +3665,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `952ebb5` | The wood cards overlap again, and the gather is 250ms |
 | `951705e` | A drift sweep over this file: createRoom is one write and had been for a while, the wood nonce is woodTurnover, and the lint tally is eight |
 | `0e1adb7` | Six soundbite fixes: the first press, the queue, the sticky menu, the stack, the chime |
-| _pending_ | Another 50ms off the wood step, so the cards overlap by 100ms |
+| `1e1a4d8` | Another 50ms off the wood step, so the cards overlap by 100ms |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
