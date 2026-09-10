@@ -483,11 +483,12 @@
    turned, and two half-transparent cards overlapping each other three times in a
    row was reported as hard to watch - which it was. A real card does not fade.
 
-   300ms a card, 250ms apart, so the cards OVERLAP by 50ms and an ordinary turn of
-   three runs 800ms. The numbers live in TableauView as WOOD_TIMING, because the
-   delays are arithmetic on them (see dealTimeline) and `--d` arrives here already
-   worked out; they were 200/200 to begin with, 400/400 when the table asked for
-   the flipping to take twice as long, and 300/250 after watching that.
+   300ms a card, 200ms apart, so the cards OVERLAP by 100ms and an ordinary turn
+   of three runs 700ms. The numbers live in TableauView as WOOD_TIMING, because
+   the delays are arithmetic on them (see dealTimeline) and `--d` arrives here
+   already worked out; they were 200/200 to begin with, 400/400 when the table
+   asked for the flipping to take twice as long, then 300/250, then 300/200 -
+   each step watched before the next was asked for.
 
    Overlap was tried in the first cut and reported as hard to watch. It is back
    deliberately, and the difference is that the first cut CROSS-FADED - two
@@ -508,8 +509,8 @@
 .wood-deal > * { grid-area: 1 / 1; transform-origin: 50% 0%; backface-visibility: hidden;
   animation: wood-flip var(--flip-ms, 300ms) cubic-bezier(.3, 0, .2, 1) var(--d, 0ms) both; }
 .wood-deal > *:nth-child(1) { --d: var(--d0, 0ms); }
-.wood-deal > *:nth-child(2) { --d: var(--d1, 250ms); }
-.wood-deal > *:nth-child(3) { --d: var(--d2, 500ms); }
+.wood-deal > *:nth-child(2) { --d: var(--d1, 200ms); }
+.wood-deal > *:nth-child(3) { --d: var(--d2, 400ms); }
 /* Down from flat, through edge-on, onto the pile. Hinged at the top edge, which
    is the edge a thumb turns a card over on. */
 @keyframes wood-flip {

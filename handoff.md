@@ -1549,7 +1549,8 @@ First 200/200 to 400/400 - both numbers, because doubling the duration alone wou
 have left the cards overlapping, and overlap was on the "hard to watch" list. Then,
 having watched it at half speed, **300/250 with the overlap deliberately back**:
 the thing that made the first cut unwatchable was the CROSS-FADE, not the overlap,
-and opaque cards that overlap by 50ms read as a hand dealing. All three values live
+and opaque cards that overlap read as a hand dealing. Then 300/200, another 50ms
+off the step, once that had been watched too. All three values live
 in `WOOD_TIMING`, and `woodTimeline.test.ts` pins them in exactly one test and
 everything else as relationships, because they have now moved twice in a day.
 
@@ -2348,9 +2349,14 @@ was. It is **fully opaque** now: hinged at the top edge (`transform-origin: 50%
 0%`), `rotateX(90deg)` to `0` on an ease that front-loads the movement. A real
 card does not fade.
 
-**300ms a card and 250ms apart since 2026-09-10**, so the cards OVERLAP by 50ms.
-The numbers went 200/200 to 400/400 ("twice as long") to 300/250 the same day,
-after watching the slow one.
+**300ms a card and 200ms apart since 2026-09-10**, so the cards OVERLAP by 100ms
+- the next starts a third of the way into the one before it. The numbers went
+200/200 to 400/400 ("twice as long") to 300/250 to 300/200, all in one day, each
+step watched before the next was asked for. An ordinary turn of three runs 700ms.
+
+**The step is the knob that gets asked for**, not the flip: every request after
+the first has been about how soon the NEXT card starts. Worth knowing which one
+to reach for.
 
 **Overlap is back on purpose, and this section is why that is not a regression.**
 What failed the first time was the cross-fade: two HALF-TRANSPARENT cards on top
@@ -3659,6 +3665,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `952ebb5` | The wood cards overlap again, and the gather is 250ms |
 | `951705e` | A drift sweep over this file: createRoom is one write and had been for a while, the wood nonce is woodTurnover, and the lint tally is eight |
 | `0e1adb7` | Six soundbite fixes: the first press, the queue, the sticky menu, the stack, the chime |
+| _pending_ | Another 50ms off the wood step, so the cards overlap by 100ms |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.

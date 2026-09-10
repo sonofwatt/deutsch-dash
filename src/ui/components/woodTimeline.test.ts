@@ -14,13 +14,14 @@ const { flip, step, collect } = WOOD_TIMING;
 describe('dealTimeline', () => {
   it('is tuned to the numbers the table last asked for', () => {
     // The one place the values are written out. 200/200/180 to begin with, then
-    // 400/400/180 ("twice as long"), now 300/250/250 with the cards overlapping.
-    expect(WOOD_TIMING).toEqual({ flip: 300, step: 250, collect: 250 });
+    // 400/400/180 ("twice as long"), then 300/250/250 with the cards overlapping,
+    // now 300/200/250 with 50ms more off the step.
+    expect(WOOD_TIMING).toEqual({ flip: 300, step: 200, collect: 250 });
   });
 
   it('overlaps the cards, which is what a shorter step than flip means', () => {
-    // Asked for directly: a card takes 300ms and the next starts at 250ms, so the
-    // second is already turning while the first has 50ms left to run.
+    // Asked for directly: a card takes 300ms and the next starts at 200ms, so the
+    // second is already turning while the first has 100ms left to run.
     expect(step).toBeLessThan(flip);
     const { delays } = dealTimeline(3, 3);
     expect(delays[1]).toBeLessThan(delays[0] + flip);

@@ -22,9 +22,10 @@ import type { WoodTurnover } from '../../state/store';
  *  - 400 / 400 / 180 on 2026-09-10, when the flipping was asked to take twice as
  *    long.
  *  - 300 / 250 / 250 the same day, having watched it at half speed.
+ *  - 300 / 200 / 250, another 50ms off the step, having watched that.
  *
- * **`step` is now SHORTER than `flip`, so the cards overlap by 50ms** - the next
- * one starts turning while the one before it has a little left to go. Overlap was
+ * **`step` is now SHORTER than `flip`, so the cards overlap by 100ms** - the next
+ * one starts turning a third of the way into the one before it. Overlap was
  * tried once before and reported as hard to watch, and that is worth knowing
  * rather than repeating: the version that failed CROSS-FADED, so two
  * half-transparent cards sat on top of each other. These are fully opaque, which
@@ -35,7 +36,7 @@ import type { WoodTurnover } from '../../state/store';
  * `collectAt` as `before * step`, which is "when the last card ahead of the gather
  * lands" only while `step` and `flip` are equal - and they no longer are.
  */
-export const WOOD_TIMING = { flip: 300, step: 250, collect: 250 } as const;
+export const WOOD_TIMING = { flip: 300, step: 200, collect: 250 } as const;
 const { flip: FLIP_MS, step: DEAL_STEP_MS, collect: COLLECT_MS } = WOOD_TIMING;
 
 /**
