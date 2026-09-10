@@ -3867,7 +3867,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `28f4d70` | A finished pile turns over to show whose it was; the bots hesitate |
 | `45c275d` | Genius lies in wait; countdown tones; the race remarks get seen |
 | `83f1979` | The carousel cycles its remarks instead of repeating them |
-| _pending_ | The pile flip never flipped; card backs match, and cards get a white edge |
+| `f6c8ffd` | The pile flip never flipped; card backs match, and cards get a white edge |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
