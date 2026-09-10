@@ -3018,7 +3018,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `4bc468c` | Forty-five shells over the same eight seconds, and what that costs |
 | `dcaaf8e` | The flicker on the white sparks only, which is where the glitter was coming from |
 | `b10c891` | A two second race window, and a halo for every player who went for the space |
-| `PENDING` | The haloes arrive one at a time, the first one centred |
+| `f59bb68` | The haloes arrive one at a time, the first one centred |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
