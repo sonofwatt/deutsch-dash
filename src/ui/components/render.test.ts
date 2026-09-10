@@ -483,7 +483,8 @@ describe('DashSplash', () => {
   const base = (t: Record<string, PlayerInfo>, dasher: string, uid: string | null) =>
     splashVariant(t, dasher, uid).base;
 
-  it('gives the dasher glitter and never a trophy - they have the glitter', () => {
+  it('gives the dasher glitter, and no trophy when they are not leading', () => {
+    // p1 dashes on 20 with p2 on 30: the glitter is for dashing, and that is all.
     expect(splashVariant(table(10, 20, 30), 'p1', 'p1'))
       .toEqual({ base: 'glitter', trophy: false, fire: false });
   });
@@ -532,6 +533,46 @@ describe('DashSplash', () => {
     const t = table(40, 20, 18);
     expect(splashVariant(t, 'p0', 'p2', board('p2', 9)).base).toBe('relief');
   });
+  it('sends the trophy down with the glitter when the dasher also leads', () => {
+    // Asked for on 2026-09-10. Dashing and leading are two different
+    // achievements, and the round where they land together is the one worth
+    // marking. p0 dashes on 30 and takes five cards, finishing on 35 in front.
+    const t = table(30, 10, 12);
+    expect(splashVariant(t, 'p0', 'p0', board('p0', 5)))
+      .toEqual({ base: 'glitter', trophy: true, fire: false });
+  });
+
+  it('reads the FINAL score of the round, not the standings it started from', () => {
+    // p0 dashes from behind: 10 against p1's 12, and the five cards carry them
+    // past. Last round's total says no trophy; the round's own result says yes.
+    const t = table(10, 12, 8);
+    expect(splashVariant(t, 'p0', 'p0').trophy).toBe(false);          // no board yet
+    expect(splashVariant(t, 'p0', 'p0', board('p0', 5)).trophy).toBe(true);
+  });
+
+  it('withholds it from a dasher who is still propping the table up', () => {
+    const t = table(2, 40, 30);
+    expect(splashVariant(t, 'p0', 'p0', board('p0', 3)))
+      .toEqual({ base: 'glitter', trophy: false, fire: false });
+  });
+
+  it('gives all three to a dasher who leads and is on a run', () => {
+    // The ceiling, and it is hard to reach: only the dasher can be on a run, so
+    // nobody else can ever hold more than two.
+    const t = table(30, 10, 12);
+    const stats = { players: { p0: { dashStreak: 1 } } } as unknown as GameStats;
+    expect(splashVariant(t, 'p0', 'p0', board('p0', 5), stats))
+      .toEqual({ base: 'glitter', trophy: true, fire: true });
+  });
+
+  it('gives nobody a trophy on a table that is level after the round', () => {
+    // Same rule the toilet uses: on a level table nobody leads, and a trophy each
+    // would be a lie about a gap that is not there.
+    const t = table(20, 20, 20);
+    expect(splashVariant(t, 'p0', 'p0').trophy).toBe(false);
+    expect(splashVariant(t, 'p0', 'p1').trophy).toBe(false);
+  });
+
   it('sends the trophy down with whatever else is falling', () => {
     // p1 leads after the round and did not dash: tears and a trophy.
     const t = table(10, 30, 12);

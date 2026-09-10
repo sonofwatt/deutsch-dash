@@ -53,7 +53,7 @@ both directions before releasing: the new client against the rules still live,
 and the PREVIOUS client against the new rules, which is the half this file's own
 warning cannot cover._
 
-_**776 tests** (619 unit and 105 in a real browser; 52 against the emulator, all
+_**781 tests** (624 unit and 105 in a real browser; 52 against the emulator, all
 green). This is the only place in the repo that quotes a count -
 it drifted three separate ways when it lived in four places, so keep it here and
 nowhere else. Both sides of the 2026-09-04 merge rewrote this line, which is the
@@ -1483,6 +1483,28 @@ became, written by the host in `commitScores` beside the rest of the tally.
   panel says so rather than rendering an empty box.
 - A round with a TOTAL but no DELTA is a round that player sat out. A round with
   no total for them at all is a round they were not in, and it is left out.
+
+### The dasher can win the trophy too _(2026-09-10)_
+
+The trophy used to be withheld from the dasher on the reasoning that they already
+had the glitter. The table wanted it there: **dashing and leading are two
+different achievements**, and the round where they land together is the one worth
+marking.
+
+- **It reads the round's FINAL score**, not the standings the round started from,
+  which is the same projection everything else in `splashVariant` uses -
+  `scoreRound` is the host's own arithmetic run early, because the splash fires
+  when the dash is announced and before anything is committed.
+- **The computation moved above the dasher's branch** so it can reach them, and it
+  is guarded on `me`: a viewer with no seat has no standing to lead from, and the
+  short-circuit is what stops `after(uid!)` reading a player who is not there.
+- **A level table gives nobody one**, the same "strictly" rule the toilet uses. A
+  trophy each would be a lie about a gap that is not there.
+- **The fire and the trophy are no longer mutually exclusive.** A dasher who leads
+  AND is on a run gets all three, which is the ceiling and hard to reach - only
+  the dasher can be on a run at the moment they dash, so nobody else can hold more
+  than two. `DashSplash`'s comment said they could never collide; it says the
+  opposite now, because it was load-bearing reasoning rather than a note.
 
 ### The pile flip never actually flipped _(2026-09-10)_
 
@@ -3868,6 +3890,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `45c275d` | Genius lies in wait; countdown tones; the race remarks get seen |
 | `83f1979` | The carousel cycles its remarks instead of repeating them |
 | `f6c8ffd` | The pile flip never flipped; card backs match, and cards get a white edge |
+| _pending_ | The dasher gets the trophy too when they lead on the round |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.

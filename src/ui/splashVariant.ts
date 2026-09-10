@@ -20,9 +20,12 @@ export interface Splash { base: SplashBase; trophy: boolean; fire: boolean }
  *   it is only ever one person's turn to be behind, and rubbing it in is mean.
  * - **😢 crying** - everybody else.
  *
- * **🏆 falls WITH whichever of those you got** if you lead the table after this
- * round, because leading and not dashing is a real thing to feel two ways about.
- * The dasher never needs it: they already have the glitter.
+ * **🏆 falls WITH whatever else you got** if you lead the table after this round.
+ * On a losing face that is a real thing to feel two ways about; on the dasher's
+ * glitter it is the other half of the news, and the table asked for it there on
+ * 2026-09-10. Dashing and leading are two different achievements and the round
+ * where they land together is the one worth marking - a dasher propping up the
+ * table gets the glitter and no trophy, exactly as before.
  *
  * **🔥 falls with the glitter** when the dasher has now ended two or more rounds
  * in a row. It used to be a third of the celebration every single time, which
@@ -32,7 +35,9 @@ export interface Splash { base: SplashBase; trophy: boolean; fire: boolean }
  * Every glyph here is about the VIEWER, which is what decides who sees the fire:
  * the glitter is you dashing, the toilet is you dropping, the trophy is you
  * leading, so the fire is YOUR run and nobody else's. Only the dasher can be on
- * one at the moment they dash, so it never leaves the celebration.
+ * one at the moment they dash, so it never leaves the celebration. The trophy is
+ * the one that can now land on any of them, dasher included - three glyphs is the
+ * most anybody can get, and only by dashing, leading and being on a run at once.
  *
  * **Both the standings and the streak are PROJECTED**, for the same reason: the
  * splash fires the moment dash is announced, which is before the host has
@@ -54,14 +59,7 @@ export function splashVariant(
   round?: { spaces: CenterSpace[]; tableaus: Record<string, Tableau> } | null,
   stats?: GameStats | null,
 ): Splash {
-  if (uid === dashedBy) {
-    // >= 1 and not >= 2: the dash on screen is not in the stored run yet.
-    const fire = statsFor(stats, dashedBy).dashStreak >= 1;
-    return { base: 'glitter', trophy: false, fire };
-  }
   const me = uid ? players[uid] : undefined;
-  if (!me) return { base: 'crying', trophy: false, fire: false };
-
   const ids = Object.keys(players);
   const deltas = round ? scoreRound(round.spaces, round.tableaus) : {};
   const before = (id: string) => players[id].score;
@@ -69,14 +67,36 @@ export function splashVariant(
 
   const lowest = (at: (id: string) => number) => Math.min(...ids.map(at));
   const highest = (at: (id: string) => number) => Math.max(...ids.map(at));
+
+  /**
+   * Leading the table on the round's FINAL score, which is what the table asked
+   * the trophy to mean. Projected like everything else here - the splash fires
+   * when the dash is announced, before the host has committed anything - so this
+   * is the host's own arithmetic run early rather than last round's standings.
+   *
+   * Computed above the dasher's branch so it can reach them too. It needs `me`,
+   * because a viewer with no seat has no standing to lead from; the short-circuit
+   * is what keeps `after(uid!)` from reading a player who is not there.
+   *
+   * `highest > lowest` is the same "strictly" rule the toilet uses below: on a
+   * level table nobody leads, and handing out a trophy each would be a lie about
+   * a gap that does not exist.
+   */
+  const trophy = !!me && ids.length > 1 && after(uid!) === highest(after)
+    && highest(after) > lowest(after);
+
+  if (uid === dashedBy) {
+    // >= 1 and not >= 2: the dash on screen is not in the stored run yet.
+    const fire = statsFor(stats, dashedBy).dashStreak >= 1;
+    return { base: 'glitter', trophy, fire };
+  }
+  if (!me) return { base: 'crying', trophy: false, fire: false };
+
   // "Last" means strictly last: on a level table nobody has dropped anywhere, and
   // handing every tied player a toilet would be a lie about a change that did not
   // happen. Same reasoning as `basement` in the commentary.
   const isLast = (at: (id: string) => number) =>
     at(uid!) === lowest(at) && lowest(at) < highest(at);
-
-  const trophy = ids.length > 1 && after(uid!) === highest(after)
-    && highest(after) > lowest(after);
 
   const wasLast = isLast(before);
   const nowLast = isLast(after);

@@ -58,10 +58,11 @@ function Rain({ glyphs }: { glyphs: string[] }) {
  */
 export function DashSplash({ name, splash }: { name: string; splash: Splash }) {
   const glyphs = splash.base === 'glitter' ? [...CHEERS] : [GLYPHS[splash.base]];
-  // Two glyphs that ride along with whatever you got, and they are mutually
-  // exclusive by construction rather than by a check here: splashVariant never
-  // hands the dasher a trophy (they already dashed) and never hands anybody else
-  // a fire (only the dasher can be on a run at the moment they dash).
+  // Two glyphs that ride along with whatever you got. They are no longer mutually
+  // exclusive: since 2026-09-10 the trophy falls on a dasher who also leads the
+  // table on the round's final score, so a dasher leading AND on a run gets all
+  // three. Nobody else can ever get the fire - only the dasher can be on a run at
+  // the moment they dash - so three is the ceiling and it is hard to reach.
   if (splash.fire) glyphs.push('🔥');
   if (splash.trophy) glyphs.push('🏆');
   return (
