@@ -3020,7 +3020,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `dcaaf8e` | The flicker on the white sparks only, which is where the glitter was coming from |
 | `b10c891` | A two second race window, and a halo for every player who went for the space |
 | `f59bb68` | The haloes arrive one at a time, the first one centred |
-| `PENDING` | The flick cone down to 20 degrees, in the game and on the bench together |
+| `55abb9b` | The flick cone down to 20 degrees, in the game and on the bench together |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
