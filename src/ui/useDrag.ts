@@ -126,9 +126,10 @@ export const FLICK_MIN_TRAVEL = 18;
  * wide cone is only needed while direction is the last thing standing between a
  * throw and nothing at all; with the path rule in front of it, the cone is back
  * to being the FALLBACK it reads as, and a narrower one asks the player to
- * actually point at something.
+ * actually point at something. 20 since 2026-09-10, off the bench: a 40 degree
+ * cone in front of the throw.
  */
-export const FLICK_MAX_AIM_DEG = 30;
+export const FLICK_MAX_AIM_DEG = 20;
 /** Two spaces this close in bearing are both "aimed at"; the nearer one wins. */
 const AIM_TIE_DEG = 8;
 /**

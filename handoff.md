@@ -919,8 +919,9 @@ Three signals, tried in this order (`useDrag.ts`, then the `nearest` branch of
    table as the space simply not being playable. `edgeDistance` is zero anywhere
    inside a space, so one measure covers both rules; a centre-to-centre one would
    call a throw that stopped just inside a big slot "half a card away".
-3. **It was POINTING at one**, within `FLICK_MAX_AIM_DEG`, now **30** (a
-   half-angle, so a 60 degree cone in front). It was 45 while direction was the
+3. **It was POINTING at one**, within `FLICK_MAX_AIM_DEG`, now **20** (a
+   half-angle, so a 40 degree cone in front), narrowed from 30 on 2026-09-10 off
+   the bench. It was 45 while direction was the
    last thing between a throw and nothing at all; rule 4 took that job, so a
    narrower cone can ask the player to point at something.
 4. **And last, its PATH ran over one, or within `FLICK_NEAR_PX` of one**
@@ -3019,6 +3020,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `dcaaf8e` | The flicker on the white sparks only, which is where the glitter was coming from |
 | `b10c891` | A two second race window, and a halo for every player who went for the space |
 | `f59bb68` | The haloes arrive one at a time, the first one centred |
+| `PENDING` | The flick cone down to 20 degrees, in the game and on the bench together |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
