@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { BOT_PROFILES, botDelay, botId, botMoves, botReachStep, botWoodStep, chooseBotAction,
-  dashPlanBonus, hasCenterPlay, isBotId, rankMove, rewindMoves, type BotLevel } from './bot';
+  dashPlanBonus, hasCenterPlay, HESITATE_CHANCE, HESITATE_MS, isBotId, rankMove, rewindMoves,
+  type BotLevel } from './bot';
 import type { Card, CenterSpace, Suit, Tableau } from './types';
 
 const c = (v: number, suit: Suit, owner = 'bot'): Card => ({ v, suit, owner });
@@ -74,10 +75,12 @@ describe('chooseBotAction', () => {
 
 describe('difficulty is mostly speed', () => {
   it('each level draws its delay from its own band, fastest to slowest', () => {
+    // Two rolls now, in this order: the band, then whether to hesitate. A high
+    // second roll is the turn that does NOT hesitate, which is the band on its own.
     for (const level of ['easy', 'medium', 'hard'] as const) {
       const p = BOT_PROFILES[level];
-      expect(botDelay(level, () => 0)).toBe(p.minDelay);
-      expect(botDelay(level, () => 1)).toBe(p.maxDelay);
+      expect(botDelay(level, scripted(0, 1))).toBe(p.minDelay);
+      expect(botDelay(level, scripted(1, 1))).toBe(p.maxDelay);
     }
     expect(BOT_PROFILES.hard.maxDelay).toBeLessThan(BOT_PROFILES.medium.maxDelay);
     expect(BOT_PROFILES.medium.maxDelay).toBeLessThan(BOT_PROFILES.easy.maxDelay);
@@ -100,6 +103,68 @@ describe('difficulty is mostly speed', () => {
     expect(rate('easy')).toBeGreaterThan(4);
     expect(rate('medium')).toBeGreaterThan(2);
     expect(rate('hard')).toBeGreaterThan(1);
+  });
+});
+
+describe('the hesitation', () => {
+  // "I play a 5 from my wood pile, I also have a 6 on one of my middle piles. I
+  // don't have time to go for that 6 before the bot has already placed their 6."
+  // That moment is what the game is about, and a bot answering it instantly takes
+  // it away rather than contesting it.
+  it('adds 800ms to the turn when the roll says hesitate', () => {
+    const p = BOT_PROFILES.hard;
+    expect(botDelay('hard', scripted(0, 0))).toBe(p.minDelay + HESITATE_MS);
+    expect(botDelay('hard', scripted(1, 0))).toBe(p.maxDelay + HESITATE_MS);
+  });
+
+  it('leaves the turn alone when it does not', () => {
+    // "It's fine if they're that fast on occasion" - so a third of the time the
+    // bot is exactly as quick as it always was.
+    const p = BOT_PROFILES.hard;
+    expect(botDelay('hard', scripted(0, 0.99))).toBe(p.minDelay);
+  });
+
+  it('hesitates about two turns in three, over a real run of rolls', () => {
+    // The rate itself, measured rather than read off the constant, so a change to
+    // how the roll is taken cannot quietly move it.
+    //
+    // The BAND roll is pinned to zero and only the hesitation roll varies, which
+    // is what makes the two outcomes tellable apart at all: `min + 800` is still
+    // inside the band for every level, so a delay alone says nothing.
+    let seed = 12345;
+    let call = 0;
+    const rng = () => {
+      call++;
+      if (call % 2 === 1) return 0; // the band: always its floor
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return seed / 2147483648;
+    };
+    const floor = BOT_PROFILES.medium.minDelay;
+    const runs = 4000;
+    let slow = 0;
+    for (let i = 0; i < runs; i++) if (botDelay('medium', rng) > floor) slow++;
+    expect(slow / runs).toBeGreaterThan(HESITATE_CHANCE - 0.05);
+    expect(slow / runs).toBeLessThan(HESITATE_CHANCE + 0.05);
+  });
+
+  it('applies at every level, because it is not a difficulty knob', () => {
+    // The complaint is about a human having time to reach for a card they have
+    // already seen, and that is the same length of time whoever they are playing.
+    for (const level of ['easy', 'medium', 'hard', 'genius'] as const) {
+      const p = BOT_PROFILES[level];
+      expect(botDelay(level, scripted(0, 0))).toBe(p.minDelay + HESITATE_MS);
+    }
+  });
+
+  it('never makes a bot slower than the level below it was already', () => {
+    // The ladder still has to be a ladder: the whole point of a hesitation
+    // everybody gets is that it moves nobody's place in it.
+    const worst = (l: BotLevel) => BOT_PROFILES[l].maxDelay + HESITATE_MS;
+    const best = (l: BotLevel) => BOT_PROFILES[l].minDelay;
+    for (const [faster, slower] of [['genius', 'hard'], ['hard', 'medium'], ['medium', 'easy']] as const) {
+      expect(worst(faster)).toBeLessThan(worst(slower));
+      expect(best(faster)).toBeLessThan(best(slower));
+    }
   });
 });
 

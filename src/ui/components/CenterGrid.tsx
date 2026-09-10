@@ -1,10 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { CardView } from './CardView';
+import { CardBack, CardView } from './CardView';
 import { depthLayers } from './PileStack';
 import { cardId, type Card, type CenterSpace } from '../../game/types';
 import { EMOJI, type BadgeId } from '../../game/badges';
 import { orderlyColumns } from '../../game/rules';
 import { faceDelay, faceOffset, type RaceFlash } from '../raceFlash';
+import { finishesSince, historyCounts, type Finish } from '../finishedPiles';
 import type { Opening } from '../openings';
 
 /** The box the grid has to fill, in CSS pixels. */
@@ -105,6 +106,83 @@ function useGridBox() {
   return [ref, box] as const;
 }
 
+/**
+ * The finish: how long the tenth card takes to turn over, and how long it then
+ * sits there showing whose it was.
+ *
+ * Asked for on 2026-09-10, and the hold is the part that was asked for by number.
+ * A pile completing is the most satisfying thing that happens on this board and it
+ * used to happen entirely off screen - `centerPlayTxn` archives the run and clears
+ * the space inside the transaction, so the tenth card landed and the space was
+ * empty a frame later.
+ *
+ * Handed to the stylesheet as custom properties, so the timer that takes the card
+ * away and the animation that turns it over cannot drift apart. Same rule as
+ * WOOD_TIMING in TableauView.
+ */
+export const PILE_FLIP_MS = 420;
+export const PILE_HOLD_MS = 800;
+/** And the clearing away afterwards, which the element has to outlive. */
+export const PILE_GO_MS = 220;
+/**
+ * All three. Getting this wrong is silent: at flip + hold the element unmounted
+ * exactly as its exit animation began, so the pile vanished rather than clearing
+ * away, and nothing failed - the browser had computed the right animation and
+ * simply never got to run it.
+ */
+export const PILE_FINISH_MS = PILE_FLIP_MS + PILE_HOLD_MS + PILE_GO_MS;
+
+/**
+ * The piles currently turning over, keyed by space.
+ *
+ * Seeded from the board AT MOUNT so that walking into a game in progress does not
+ * replay every pile already finished - see `finishesSince`. The counts live in a
+ * ref rather than in state because they are not rendered: only the finishes are.
+ */
+function useFinishes(spaces: CenterSpace[]): Record<number, Finish> {
+  const counts = useRef<number[] | null>(null);
+  const seq = useRef(1);
+  const [active, setActive] = useState<Record<number, Finish>>({});
+  /**
+   * The removal timers, held in a ref rather than cleared by the effect's own
+   * cleanup - and that distinction is load bearing.
+   *
+   * `spaces` is a fresh array on every snapshot (normalizeRoom rebuilds the
+   * board), so this effect re-runs constantly, and React runs the previous
+   * cleanup each time. A cleanup that cleared these would cancel the removal of a
+   * finish still on screen on the very next snapshot - which on a live board is
+   * tens of milliseconds later - and the run that cancelled it starts no new
+   * timer, because nothing finished on it. The pile would sit there face down for
+   * the rest of the round.
+   */
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  useEffect(() => () => { timers.current.forEach(clearTimeout); timers.current = []; }, []);
+  useEffect(() => {
+    if (counts.current === null) { counts.current = historyCounts(spaces); return; }
+    const next = finishesSince(counts.current, spaces, seq.current);
+    counts.current = next.counts;
+    seq.current = next.seq;
+    if (next.finished.length === 0) return;
+    setActive(prev => {
+      const out = { ...prev };
+      for (const f of next.finished) out[f.space] = f;
+      return out;
+    });
+    for (const f of next.finished) {
+      timers.current.push(setTimeout(() => setActive(prev => {
+        // Keyed on the NONCE and not just the space: the same space can finish
+        // again inside the hold, and the second finish must not be swept away by
+        // the first one's timer.
+        if (prev[f.space]?.seq !== f.seq) return prev;
+        const out = { ...prev };
+        delete out[f.space];
+        return out;
+      }), PILE_FINISH_MS));
+    }
+  }, [spaces]);
+  return active;
+}
+
 /** At most this many chips per rail before the overflow marker takes over. */
 const RAIL_CAP = 8;
 
@@ -180,6 +258,8 @@ export function CenterGrid(props: {
   // become one: this is a hook, and the board vanishing under a player who sits
   // out is exactly the case that tears the tree down otherwise. See the handoff.
   const [wrapRef, box] = useGridBox();
+  // Above every early return, like useGridBox and for the same reason.
+  const finishes = useFinishes(props.spaces);
   const cols = gridColumns(props.spaces.length, props.orderly, box);
   const done = props.spaces.flatMap(s => s.history);
   // split alternately so both rails grow together rather than one filling first
@@ -187,7 +267,12 @@ export function CenterGrid(props: {
   const right = done.filter((_, i) => i % 2 === 1);
 
   return (
-    <div className={`board${props.spaces.length > CROWDED_SPACES ? ' crowded' : ''}`}>
+    <div className={`board${props.spaces.length > CROWDED_SPACES ? ' crowded' : ''}`}
+      style={{
+        ['--pile-flip' as string]: `${PILE_FLIP_MS}ms`,
+        ['--pile-hold' as string]: `${PILE_HOLD_MS}ms`,
+        ['--pile-go' as string]: `${PILE_GO_MS}ms`,
+      }}>
       <DoneRail runs={left} />
       <div className="grid-wrap" ref={wrapRef}>
         {/* The drop zone is the WHOLE board area and the grid sits inside it, which
@@ -233,6 +318,29 @@ export function CenterGrid(props: {
                 {top && (
                   <CardView key={cardId(top)} card={top} badgeId={props.badgeOf(top.owner)}
                     layoutId={props.me != null && top.owner === props.me ? cardId(top) : undefined} />
+                )}
+                {/* A pile that has just been completed, turning face down.
+                    Absolutely positioned OVER the slot rather than in it: the
+                    space is free the instant the tenth card lands (the
+                    transaction clears it), so somebody may already have played an
+                    Ace into it, and the finish has to cover that rather than
+                    fight it for the slot. It is gone inside the second.
+
+                    Keyed on the nonce so the same space finishing twice turns
+                    over twice instead of sitting there already face down. */}
+                {finishes[i] && (
+                  <div className="pile-finish" key={finishes[i].seq} aria-hidden="true">
+                    <div className="pile-finish-face">
+                      <CardView card={finishes[i].card}
+                        badgeId={props.badgeOf(finishes[i].card.owner)} />
+                    </div>
+                    {/* The back, carrying the badge of whoever put the tenth card
+                        down. That is the whole point of the move: the pile going
+                        away should say who finished it. */}
+                    <div className="pile-finish-back">
+                      <CardBack badgeId={props.badgeOf(finishes[i].card.owner)} />
+                    </div>
+                  </div>
                 )}
                 {/* Keyed by the race, so a new one remounts the span and replays
                     the animation. The element then simply sits at opacity 0 - no

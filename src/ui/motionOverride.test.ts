@@ -38,6 +38,11 @@ const ANIMATED = [
   // block was first written and ran on 705 elements a phone had asked to hold
   // still.
   ['.candle i', 'candle-star'],
+  // A finished pile turning face down, and then leaving. Two animations on one
+  // element, so the computed name lists both. Note what reduced motion does here
+  // and does NOT do: the finish still happens, because whose badge is on the back
+  // of that pile is information rather than decoration - it just does not spin.
+  ['.pile-finish', 'pile-finish-turn, pile-finish-go'],
 ] as const;
 
 const PAGE = `<!doctype html><html><head><style>${CSS}</style></head><body>
@@ -47,6 +52,8 @@ const PAGE = `<!doctype html><html><head><style>${CSS}</style></head><body>
   <div class="sound-rain"><span class="sound-drop">X</span></div>
   <div class="fireworks"><span class="shell"><b></b><i></i><i class="glint"></i></span>
     <span class="candle"><i></i></span></div>
+  <div class="pile-space"><div class="pile-finish">
+    <div class="pile-finish-face"></div><div class="pile-finish-back"></div></div></div>
 </body></html>`;
 
 describe.runIf(process.env.LAYOUT === '1')('the reduced-motion override', () => {

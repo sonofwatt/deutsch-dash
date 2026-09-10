@@ -324,9 +324,41 @@ export function chooseBotAction(
   return lowestSpaceFor(t, spaces, best);
 }
 
+/**
+ * How often a bot hesitates before its turn, and for how long.
+ *
+ * Asked for on 2026-09-10, off a specific complaint: "I play a 5 from my wood
+ * pile, I also have a 6 on one of my middle piles. I don't have time to go for
+ * that 6 before the bot has already placed their 6." That is the moment this
+ * game is actually about - spotting your own follow-up and getting to it - and a
+ * bot that answers it instantly takes the moment away rather than contesting it.
+ *
+ * **Two thirds, not always**, and that was asked for in those words too: "it's
+ * fine if they're that fast on occasion". A bot that always hesitated would be a
+ * bot with a slower delay band, which is a thing the ladder already has four of.
+ * A bot that USUALLY hesitates and occasionally does not is a bot you cannot
+ * count on being slow, which is a different and better opponent - the same
+ * argument the profiles make for `dither` over a flat rate.
+ *
+ * It is deliberately NOT a profile knob. Every level gets it, at the same rate,
+ * because the complaint is not about difficulty: it is about a human having time
+ * to reach for a card they have already seen, and that is the same length of time
+ * whoever they are playing.
+ */
+export const HESITATE_CHANCE = 2 / 3;
+export const HESITATE_MS = 800;
+
+/**
+ * The wait before a bot's next turn.
+ *
+ * Draws from the level's own band and then, two thirds of the time, adds the
+ * hesitation on top. Both rolls come off the same `rng`, in that order, which is
+ * what makes a scripted rng in the tests able to say "this turn hesitates".
+ */
 export function botDelay(level: BotLevel, rng: Rng = Math.random): number {
   const p = BOT_PROFILES[level];
-  return Math.round(p.minDelay + rng() * (p.maxDelay - p.minDelay));
+  const base = Math.round(p.minDelay + rng() * (p.maxDelay - p.minDelay));
+  return rng() < HESITATE_CHANCE ? base + HESITATE_MS : base;
 }
 
 /**

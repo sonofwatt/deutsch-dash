@@ -235,6 +235,55 @@
    width/height must go to auto or .card's own width wins and the offset returns. */
 .pile-space .card { position: absolute; inset: calc(-1 * var(--slot-border));
   width: auto; height: auto; z-index: 1; }
+/* A finished pile, turning face down.
+   ------------------------------------
+   A pile of 1..10 is archived and its space cleared BY THE TRANSACTION the
+   instant the tenth card lands, so the most satisfying moment on this board used
+   to happen entirely off screen: the card landed, the space was empty a frame
+   later, and a chip appeared on the rail. This is that moment, drawn.
+
+   It turns over to its BACK, which carries the badge of whoever put the tenth
+   card down - the pile going away should say whose it was - holds there, and
+   goes. Durations come from CenterGrid as --pile-flip and --pile-hold, so the
+   timer that unmounts it and the animation cannot drift apart.
+
+   Over the slot, not in it: the space is free the moment the pile completes and
+   somebody may already have played an Ace into it, so this covers whatever is
+   there rather than fighting it for the grid cell. z-index above .card, which is
+   1. */
+.pile-finish { position: absolute; inset: calc(-1 * var(--slot-border)); z-index: 2;
+  transform-style: preserve-3d; pointer-events: none;
+  animation: pile-finish-turn var(--pile-flip, 420ms) cubic-bezier(.4, 0, .2, 1) both,
+             pile-finish-go var(--pile-go, 220ms) ease-in both;
+  animation-delay: 0ms, calc(var(--pile-flip, 420ms) + var(--pile-hold, 800ms)); }
+/* Both faces fill the slot and sit on top of each other; the back starts turned
+   away, so the one you can see swaps halfway through the turn. */
+.pile-finish-face, .pile-finish-back { position: absolute; inset: 0;
+  backface-visibility: hidden; display: grid; place-items: center; }
+.pile-finish-face .card, .pile-finish-back .card { position: absolute; inset: 0;
+  width: auto; height: auto; }
+.pile-finish-back { transform: rotateY(180deg); }
+@keyframes pile-finish-turn {
+  0%   { transform: rotateY(0deg); }
+  100% { transform: rotateY(180deg); }
+}
+/* Away to the rail. Not a real flight to the chip - the rails are outside the
+   grid and either side of it, and a card that flew to one of them would have to
+   know which - so it lifts and shrinks out, which reads as "gone that way"
+   without claiming a destination. */
+@keyframes pile-finish-go {
+  0%   { opacity: 1; }
+  100% { opacity: 0; transform: rotateY(180deg) scale(.72) translateY(-14%); }
+}
+/* Reduced motion: the finish still HAPPENS, because it is information - who
+   finished the pile - and not decoration. It simply does not spin: the back is
+   shown flat for the same length of time and then goes. */
+@media (prefers-reduced-motion: reduce) {
+  [data-platform] .pile-finish { animation-name: none; }
+  [data-platform] .pile-finish-face { display: none; }
+  [data-platform] .pile-finish-back { transform: none; }
+}
+
 /* Depth under a centre pile: outlines behind the card, stepping down into the
    grid gap. Deliberately NOT .pile-depth, which reserves peek height in the flow
    and would grow every row of a board already fighting for vertical space. */

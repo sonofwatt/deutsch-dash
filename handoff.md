@@ -53,7 +53,7 @@ both directions before releasing: the new client against the rules still live,
 and the PREVIOUS client against the new rules, which is the half this file's own
 warning cannot cover._
 
-_**726 tests** (575 unit and 99 in a real browser; 52 against the emulator, all
+_**745 tests** (591 unit and 102 in a real browser; 52 against the emulator, all
 green). This is the only place in the repo that quotes a count -
 it drifted three separate ways when it lived in four places, so keep it here and
 nowhere else. Both sides of the 2026-09-04 merge rewrote this line, which is the
@@ -1483,6 +1483,68 @@ became, written by the host in `commitScores` beside the rest of the tally.
   panel says so rather than rendering an empty box.
 - A round with a TOTAL but no DELTA is a round that player sat out. A round with
   no total for them at all is a round they were not in, and it is left out.
+
+### A finished pile turns over, and the bots hesitate _(2026-09-10)_
+
+**A completed pile now shows whose it was before it goes.** `centerPlayTxn`
+archives the run and clears the space INSIDE the transaction the instant the tenth
+card lands - which is right and must stay that way, it is what stops a stale
+client reviving a finished pile - but it meant the most satisfying moment on this
+board happened entirely off screen. The card landed, the space was empty a frame
+later, and a chip appeared on the rail.
+
+It now turns face down over the slot, showing the badge of whoever put the tenth
+card down, holds for **800ms** (asked for by number), and clears away.
+
+- **Drawn from the ARCHIVE, not the stack.** A run appearing in `space.history`
+  is the event, and the last card of that run is the 10 that completed the pile -
+  which carries its `owner`, and that is the only place the credit survives.
+  `finishedPiles.ts` is that, pure, for the reason `hitTest.ts` gives.
+- **Seeded at mount**, so walking into a game in progress does not replay every
+  pile already finished. Third time this rule has come up in two days - the
+  store's `saidAt`, the emoji rain, and now this. **Arriving somewhere is not an
+  event.**
+- **Over the slot, not in it.** The space is free the moment the pile completes,
+  so somebody may already have played an Ace into it; the finish covers that
+  rather than fighting it for the grid cell. `pointer-events: none`, because a
+  decoration that could eat a play is worse than no decoration.
+- **The removal timers live in a ref, not in the effect's cleanup.** `spaces` is a
+  fresh array on every snapshot, so the effect re-runs constantly and React runs
+  the previous cleanup each time. A cleanup that cleared them would cancel the
+  removal of a finish still on screen on the very next snapshot - tens of
+  milliseconds later on a live board - and that run starts no new timer, because
+  nothing finished on it. The pile would sit there face down for the rest of the
+  round.
+- **`PILE_FINISH_MS` covers all THREE phases**, turn and hold and clearing away.
+  At turn + hold the element unmounted exactly as its exit animation began, so the
+  pile vanished instead of clearing away - and nothing failed, because the browser
+  had computed the right animation and simply never got to run it. That is why
+  there is a browser suite for this as well as a unit one.
+- **Reduced motion keeps the finish** and drops the spin. Whose badge is on the
+  back of that pile is information, not decoration.
+
+**The bots hesitate two turns in three.** Off a specific complaint: "I play a 5
+from my wood pile, I also have a 6 on one of my middle piles. I don't have time to
+go for that 6 before the bot has already placed their 6." That moment - spotting
+your own follow-up and getting to it - is what this game is about, and a bot that
+answers it instantly takes the moment away rather than contesting it.
+
+`HESITATE_CHANCE` is two thirds and `HESITATE_MS` is 800, both in `botDelay`.
+
+- **Two thirds and not always**, which was asked for in those words: "it's fine if
+  they're that fast on occasion". A bot that always hesitated would just be a bot
+  with a slower band, and the ladder already has four of those. One you cannot
+  count on being slow is a different opponent - the same argument the profiles
+  make for `dither` over a flat rate.
+- **Not a profile knob.** Every level gets it at the same rate, because the
+  complaint is not about difficulty: it is about a human having time to reach for
+  a card they have already seen, and that is the same length of time whoever they
+  are playing. `bot.test.ts` pins that the ladder's order survives it.
+- **It does NOT reach the Genius race edge**, which is a separate cheat that was
+  asked for by name and fires on its own 100ms path without going through
+  `botDelay` (see `armRaceEdge`). So a Genius bot still snipes a space the moment
+  a person plays. That is a deliberate choice between two instructions that pull
+  opposite ways, and it is the one to revisit first if the complaint comes back.
 
 ### Six things the first table found in the soundbites _(2026-09-10)_
 
@@ -3666,6 +3728,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `951705e` | A drift sweep over this file: createRoom is one write and had been for a while, the wood nonce is woodTurnover, and the lint tally is eight |
 | `0e1adb7` | Six soundbite fixes: the first press, the queue, the sticky menu, the stack, the chime |
 | `1e1a4d8` | Another 50ms off the wood step, so the cards overlap by 100ms |
+| _pending_ | A finished pile turns over to show whose it was; the bots hesitate |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
