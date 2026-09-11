@@ -4022,8 +4022,8 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `f6c8ffd` | The pile flip never flipped; card backs match, and cards get a white edge |
 | `b953122` | The dasher gets the trophy too when they lead on the round |
 | `4dcf24c` | The host's phone stops counting the round twice on the splash |
-| _pending-a_ | The host hears its own first countdown tick |
-| _pending-b_ | A short final wood deal shows the empty top spot, 100ms, then the gather |
+| `3031dfb` | The host hears its own first countdown tick |
+| `44c50f1` | A short final wood deal shows the empty top spot, 100ms, then the gather |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
