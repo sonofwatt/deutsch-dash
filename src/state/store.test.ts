@@ -1082,21 +1082,27 @@ describe('AI players', () => {
     });
     const store = createGameStore(deps);
     await store.getState().enterRoom('ABCDEF', 'D', 'tulip');
+    // Math.random pinned to the top of every band, like pinRandom in the Genius
+    // tests below: a hard bot's longest delay, no hesitation, and never a dithered
+    // or sloppy roll. Left to chance, nine seconds is two to six hard turns, and
+    // once bots began hesitating on two turns in three, every one of them came up
+    // empty about one run in seventy (6 in 400, measured). CI hit it on 2026-09-11.
+    const rand = vi.spyOn(Math, 'random').mockReturnValue(1);
     vi.useFakeTimers();
     cb(roomWithBot(hostId));
-    await vi.advanceTimersByTimeAsync(9000); // bots are slower now: ~6 hard turns
+    await vi.advanceTimersByTimeAsync(9000); // three pinned hard turns, 2600ms apart
     store.getState().leave();
     vi.useRealTimers();
+    rand.mockRestore();
     return deps;
   }
 
   it('the host plays the bot hand on a timer', async () => {
     const deps = await run('me');
     // deal(buildDeck) puts blue 1 on the bot's first post, the only card it can
-    // legally place with the centre empty. WHICH space it lands in is deliberately
-    // left open: on a sloppy roll the bot takes a random legal move, and with an
-    // empty centre every space is legal for an Ace. Pinning it to space 0 made
-    // this test fail about one run in six.
+    // legally place with the centre empty. WHICH space it lands in is left open:
+    // that is the bot's aiming, and this test is about its timer. Pinning it to
+    // space 0 back when the roll was left to chance failed about one run in six.
     expect(deps.playToCenter).toHaveBeenCalledWith(
       'ABCDEF', expect.any(Number), { v: 1, suit: 'blue', owner: 'bot_star' });
     const picked = vi.mocked(deps.playToCenter).mock.calls.map(call => call[1]);

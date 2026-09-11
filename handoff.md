@@ -4036,6 +4036,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `3031dfb` | The host hears its own first countdown tick |
 | `44c50f1` | A short final wood deal shows the empty top spot, 100ms, then the gather |
 | `40c3442` | A stuck opponent says "stuck" in a pill, not an hourglass that read as Away |
+| _pending_ | The host-plays-the-bot test pins Math.random; it failed CI about one run in seventy once bots hesitated |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
