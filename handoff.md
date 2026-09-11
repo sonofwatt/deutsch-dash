@@ -3957,7 +3957,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `83f1979` | The carousel cycles its remarks instead of repeating them |
 | `f6c8ffd` | The pile flip never flipped; card backs match, and cards get a white edge |
 | `b953122` | The dasher gets the trophy too when they lead on the round |
-| _pending_ | The host's phone stops counting the round twice on the splash |
+| `4dcf24c` | The host's phone stops counting the round twice on the splash |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
