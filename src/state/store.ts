@@ -841,6 +841,28 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
       // Firebase raises local onValue events SYNCHRONOUSLY from inside set()/update(),
       // so the side effects below can re-enter this handler before it returns.
       // Re-entrant snapshots still update state (above) but must not re-run side effects.
+      // The countdown's own tones: three ticks and a GO, one per digit - and ABOVE
+      // the re-entrancy guard below, which is the whole of the fix for a missing
+      // beep.
+      //
+      // Played off the DIGIT rather than off a timer of this client's own, so the
+      // sound cannot drift from the number on screen: they are the same event, and
+      // the host's write is the single clock (see RoomMeta.countdown). But the host
+      // writes the FIRST digit from inside a snapshot - syncCountdown, below - and
+      // RTDB raises the snapshot for a local write synchronously, from inside the
+      // write, so it arrives re-entrant and everything under the guard is skipped
+      // for it. The later digits are written from a timer and were heard. The
+      // first was not, on the host's phone only, which is the phone every
+      // playtest here is run from. Reported 2026-09-11 as two ticks and a GO.
+      //
+      // This only plays a sound. It writes nothing and raises nothing, so it is
+      // safe on a re-entrant snapshot - which is exactly where that digit arrives.
+      const digit = room.meta.countdown ?? null;
+      if (lastCountdown === undefined) lastCountdown = digit;
+      else if (digit !== lastCountdown) {
+        lastCountdown = digit;
+        if (digit != null) deps.playCountdown(digit);
+      }
       if (inSnapshot) return;
       inSnapshot = true;
       try {
@@ -883,17 +905,6 @@ export function createGameStore(deps: Deps): StoreApi<GameStore> {
           saidAt.set(who, said.at);
           if (who === me || seen === undefined || seen === said.at) continue;
           if (deps.playSoundbite(said.id)) set({ lastSound: { id: said.id, seq: ++soundSeq } });
-        }
-        // (2b) The countdown's own tones: three ticks and a GO, one per digit.
-        //
-        // Played off the DIGIT rather than off a timer of this client's own, so
-        // the sound cannot drift from the number on screen - they are the same
-        // event. The host's write is the single clock; see RoomMeta.countdown.
-        const digit = room.meta.countdown ?? null;
-        if (lastCountdown === undefined) lastCountdown = digit;
-        else if (digit !== lastCountdown) {
-          lastCountdown = digit;
-          if (digit != null) deps.playCountdown(digit);
         }
         syncCountdown(room); // somebody readied, un-readied, joined or wandered off
         syncAllStuck(); // the centre moved: someone may have just been freed, or trapped

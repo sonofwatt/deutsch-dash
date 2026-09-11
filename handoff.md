@@ -1484,6 +1484,38 @@ became, written by the host in `commitScores` beside the rest of the tally.
 - A round with a TOTAL but no DELTA is a round that player sat out. A round with
   no total for them at all is a round they were not in, and it is left out.
 
+### The host never heard its own 3 _(2026-09-11)_
+
+Reported as "no beep for the 1 - only 2 and 3, then a boop for GO". Reproduced
+rather than read: on the host the countdown played **2, 1, 0**. The tick that was
+missing was the FIRST one, and two ticks and a GO simply sound as though the last
+tick is the one that went.
+
+**Re-entrancy, again.** The host writes the first digit from inside a snapshot
+(`syncCountdown`, called from the snapshot handler), and RTDB raises the snapshot
+for a local write synchronously, from inside the write. So the snapshot carrying
+the 3 arrives while `inSnapshot` is still true, and everything under the guard is
+skipped for it - the tone included. The 2, the 1 and the GO are written from a
+timer, arrive clean, and were always heard. Every other phone got all four off the
+network.
+
+- **The tone check sits ABOVE the guard now.** It only plays a sound - it writes
+  nothing and raises nothing - so it is safe to run on a re-entrant snapshot, which
+  is exactly where the missing digit arrives.
+- **Why no test heard it:** a plain mock never raises a snapshot from inside a
+  write. `countingTable` in `store.test.ts` is a fake `setCountdown` that does what
+  Firebase does and calls the snapshot back synchronously. Reach for that shape
+  whenever a store test involves the host writing from inside the handler.
+- **What else could hide the same way:** anything under the guard that must happen
+  for a value that only ever appears in a re-entrant snapshot. Soundbites are safe
+  because they compare against the last value SEEN, so one skipped is heard on the
+  next snapshot - late, not lost. The countdown was not, because the next snapshot
+  carries the next digit and the 3 is never seen at all.
+- **The second host-only bug in two days**, after the splash counting the round
+  twice. The host is the one phone every playtest here is run from, and the one
+  phone where its own writes land inside the handler that made them. A report from
+  the host is worth checking against that before anything else.
+
 ### The host's own phone counted the round twice _(2026-09-11)_
 
 Reported from a table the day after the dasher's trophy went in: the host led
@@ -3958,6 +3990,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `f6c8ffd` | The pile flip never flipped; card backs match, and cards get a white edge |
 | `b953122` | The dasher gets the trophy too when they lead on the round |
 | `4dcf24c` | The host's phone stops counting the round twice on the splash |
+| _pending-a_ | The host hears its own first countdown tick |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.

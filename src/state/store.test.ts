@@ -513,6 +513,65 @@ describe('the lobby ready gate', () => {
     store.getState().leave();
   });
 
+  /**
+   * RTDB raises the snapshot for a local write SYNCHRONOUSLY, from inside the
+   * write. A plain mock never does, which is why no test here ever heard a tone go
+   * missing: the host writes the first digit from INSIDE a snapshot, so the one
+   * carrying it arrives re-entrant. This fake does what Firebase does.
+   */
+  const countingTable = async (who = 'me') => {
+    let cb!: (room: Room | null) => void;
+    const ready = { me: human({ ready: true }), b: bot() };
+    const deps = fakeDeps({
+      ensureSignedIn: vi.fn(async () => who),
+      watchRoom: vi.fn((_c: string, f: (room: Room | null) => void) => { cb = f; return () => {}; }),
+      setCountdown: vi.fn(async (_c: string, n: number | null) => { cb(lobby(ready, n ?? undefined)); }),
+    });
+    const store = createGameStore(deps);
+    await store.getState().enterRoom('ABCDEF', 'D', 'tulip');
+    const heard = () => vi.mocked(deps.playCountdown).mock.calls.map(call => call[0]);
+    return { store, ready, heard, snapshot: (r: Room) => cb(r) };
+  };
+
+  it('the host hears every digit of its own countdown, the first one included', async () => {
+    const { store, ready, heard, snapshot } = await countingTable();
+    vi.useFakeTimers();
+    snapshot(lobby(ready));            // the table readies, and the host writes 3
+    vi.advanceTimersByTime(1000);      // 2
+    vi.advanceTimersByTime(1000);      // 1
+    vi.advanceTimersByTime(1000);      // 0, which reads GO
+    store.getState().leave();
+    vi.useRealTimers();
+    expect(heard()).toEqual([3, 2, 1, 0]);
+  });
+
+  it('hears each digit once, however many snapshots carry it', async () => {
+    const { store, ready, heard, snapshot } = await countingTable();
+    vi.useFakeTimers();
+    snapshot(lobby(ready));
+    snapshot(lobby(ready, 3));         // any other traffic while it reads 3
+    snapshot(lobby(ready, 3));
+    vi.advanceTimersByTime(1000);
+    snapshot(lobby(ready, 2));
+    store.getState().leave();
+    vi.useRealTimers();
+    expect(heard()).toEqual([3, 2]);
+  });
+
+  it('a player who is not host hears every digit off the network', async () => {
+    let cb!: (room: Room | null) => void;
+    const deps = fakeDeps({
+      ensureSignedIn: vi.fn(async () => 'you'),
+      watchRoom: vi.fn((_c: string, f: (room: Room | null) => void) => { cb = f; return () => {}; }),
+    });
+    const store = createGameStore(deps);
+    await store.getState().enterRoom('ABCDEF', 'D', 'tulip');
+    const players = { me: human({ ready: true }), you: human({ ready: true }) };
+    for (const n of [undefined, 3, 2, 1, 0]) cb(lobby(players, n));
+    store.getState().leave();
+    expect(vi.mocked(deps.playCountdown).mock.calls.map(call => call[0])).toEqual([3, 2, 1, 0]);
+  });
+
   it('cancels a running countdown the moment somebody un-readies', async () => {
     let cb!: (room: Room | null) => void;
     const deps = fakeDeps({
