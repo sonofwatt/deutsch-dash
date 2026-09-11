@@ -9,14 +9,15 @@ import { dealTimeline, WOOD_TIMING } from './TableauView';
  * values twice in a day, and a suite that has to be re-pinned on every tune is one
  * somebody will eventually retune without running.
  */
-const { flip, step, collect } = WOOD_TIMING;
+const { flip, step, collect, gap } = WOOD_TIMING;
 
 describe('dealTimeline', () => {
   it('is tuned to the numbers the table last asked for', () => {
     // The one place the values are written out. 200/200/180 to begin with, then
     // 400/400/180 ("twice as long"), then 300/250/250 with the cards overlapping,
-    // now 300/200/250 with 50ms more off the step.
-    expect(WOOD_TIMING).toEqual({ flip: 300, step: 200, collect: 250 });
+    // then 300/200/250 with 50ms more off the step, and a 100ms gap for the top
+    // spot to sit visibly empty before a short final deal is gathered back.
+    expect(WOOD_TIMING).toEqual({ flip: 300, step: 200, collect: 250, gap: 100 });
   });
 
   it('overlaps the cards, which is what a shorter step than flip means', () => {
@@ -36,16 +37,16 @@ describe('dealTimeline', () => {
   it('deals the cards the pile has left, THEN gathers, then deals the rest', () => {
     const two = dealTimeline(3, 2);
     expect(two.delays.slice(0, 2)).toEqual([0, step]);       // both come off at once
-    expect(two.collectAt).toBe(step + flip);                 // once the second LANDS
+    expect(two.collectAt).toBe(step + flip + gap);           // the second LANDS, then the gap
     expect(two.delays[2]).toBe(two.collectAt + collect);     // the third waits it out
   });
 
   it('does the same with one card left and two dealt after the gather', () => {
     const one = dealTimeline(3, 1);
     expect(one.delays[0]).toBe(0);
-    expect(one.collectAt).toBe(flip);
-    expect(one.delays[1]).toBe(flip + collect);
-    expect(one.delays[2]).toBe(flip + collect + step);
+    expect(one.collectAt).toBe(flip + gap);
+    expect(one.delays[1]).toBe(flip + gap + collect);
+    expect(one.delays[2]).toBe(flip + gap + collect + step);
   });
 
   it('waits for the card ahead of the gather to LAND, not merely to start', () => {
@@ -54,7 +55,7 @@ describe('dealTimeline', () => {
     // equal - it would now start the gather 50ms before the card came down.
     for (const before of [1, 2]) {
       const { delays, collectAt } = dealTimeline(3, before);
-      expect(collectAt).toBe(delays[before - 1] + flip);
+      expect(collectAt).toBe(delays[before - 1] + flip + gap);
       expect(collectAt).toBeGreaterThan(before * step);
     }
   });
@@ -115,7 +116,35 @@ describe('dealTimeline', () => {
 
   it('handles a short turn, which is what a pile smaller than a turn deals', () => {
     expect(dealTimeline(1, 1).delays).toEqual([0]);
-    expect(dealTimeline(2, 1).delays).toEqual([0, flip + collect]);
+    expect(dealTimeline(2, 1).delays).toEqual([0, flip + gap + collect]);
     expect(dealTimeline(0, 0).total).toBeGreaterThan(0);
+  });
+
+  it('leaves the top spot visibly empty for the gap before a short deal is gathered', () => {
+    // 2026-09-11: dealing the last one or two cards empties the draw pile, and the
+    // player should SEE it empty - for 100ms after the last of them lands, before
+    // the gather fills it back in - the way a pile of 27 always showed it.
+    expect(gap).toBe(100);
+    for (const before of [1, 2]) {
+      const { delays, collectAt } = dealTimeline(3, before);
+      expect(collectAt - (delays[before - 1] + flip)).toBe(gap);
+    }
+  });
+
+  it('fills the top spot back in when the gathered pile lands, and not before', () => {
+    for (const before of [0, 1, 2]) {
+      const { collectAt, drawAt } = dealTimeline(3, before);
+      expect(drawAt).toBe(collectAt + collect);
+    }
+  });
+
+  it('never empties the top spot on a turn with nothing to gather', () => {
+    expect(dealTimeline(3, 3).drawAt).toBe(0);
+  });
+
+  it('adds no gap after a pile that was already all face up', () => {
+    // That blank has been on screen since the last turn; holding it longer would
+    // only be a slower response to the tap that recycles it.
+    expect(dealTimeline(3, 0).collectAt).toBe(0);
   });
 });

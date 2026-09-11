@@ -92,7 +92,7 @@ describe.runIf(process.env.LAYOUT === '1')('the wood turn a player watches', () 
     }, plan);
   };
 
-  const { flip, step, collect } = WOOD_TIMING;
+  const { flip, step, collect, gap } = WOOD_TIMING;
 
   it('runs each card for as long as the tuning says', async () => {
     const { cards } = await timings(null);
@@ -112,8 +112,9 @@ describe.runIf(process.env.LAYOUT === '1')('the wood turn a player watches', () 
   it('deals the two the pile had left, then holds the third for the gather', async () => {
     const { cards, gather } = await timings(2);
     expect(cards.map(c2 => c2.delay)).toEqual(dealTimeline(3, 2).delays);
-    // the gather runs once the second has LANDED, and the third waits it out
-    expect(gather!.delay).toBe(cards[1].delay + cards[1].duration);
+    // the gather runs once the second has LANDED and the gap has run, and the
+    // third waits it out
+    expect(gather!.delay).toBe(cards[1].delay + cards[1].duration + gap);
     expect(gather!.duration).toBe(collect);
     expect(cards[2].delay).toBe(gather!.delay + gather!.duration);
   });
@@ -121,7 +122,7 @@ describe.runIf(process.env.LAYOUT === '1')('the wood turn a player watches', () 
   it('holds two cards back when the pile had only one left', async () => {
     const { cards, gather } = await timings(1);
     expect(cards.map(c2 => c2.delay)).toEqual(dealTimeline(3, 1).delays);
-    expect(gather!.delay).toBe(cards[0].delay + cards[0].duration);
+    expect(gather!.delay).toBe(cards[0].delay + cards[0].duration + gap);
     expect(cards[1].delay).toBe(gather!.delay + gather!.duration);
   });
 
@@ -134,6 +135,46 @@ describe.runIf(process.env.LAYOUT === '1')('the wood turn a player watches', () 
       expect(cards.slice(0, before)
         .every(c2 => c2.delay + c2.duration <= gather!.delay)).toBe(true);
       expect(cards.slice(before).every(c2 => c2.delay >= ends)).toBe(true);
+    }
+  });
+
+  it('shows the top spot empty until the gathered pile lands on it', async () => {
+    // Scrubbed through the real stylesheet, like the finished-pile flip: what the
+    // player sees is decided by the animation's fill, and a property read cannot
+    // tell a hidden card from a visible one mid-delay.
+    for (const before of [0, 1, 2]) {
+      const { drawAt } = dealTimeline(3, before);
+      const p = await browser.newPage({ viewport: { width: 420, height: 900 } });
+      await p.setContent(page(null), { waitUntil: 'load' });
+      const out = await p.evaluate((ms) => {
+        const draw = document.querySelector('.wood-draw') as HTMLElement;
+        (draw.closest('.wood-col') as HTMLElement).style.setProperty('--draw-at', `${ms}ms`);
+        // what TableauView renders while `blanking`; effects do not run statically
+        draw.classList.add('turning');
+        const blank = document.createElement('div');
+        blank.className = 'pile-space recycle-slot wood-blank';
+        (draw.querySelector('.pile-top') as HTMLElement).prepend(blank);
+        const back = draw.querySelector('.wood-back') as HTMLElement;
+        const layer = draw.querySelector(':scope > .pile-layer') as HTMLElement | null;
+        const read = () => ({
+          back: getComputedStyle(back).visibility,
+          blank: getComputedStyle(blank).visibility,
+          layer: layer ? getComputedStyle(layer).visibility : 'none',
+        });
+        const at = (t: number) => {
+          document.getAnimations().forEach(a => { a.pause(); a.currentTime = t; });
+          return read();
+        };
+        return { early: at(Math.max(0, ms - 20)), late: at(ms + 20), hasLayer: !!layer };
+      }, drawAt);
+      expect(out.early.back).toBe('hidden');
+      expect(out.early.blank).toBe('visible');
+      expect(out.late.back).toBe('visible');
+      expect(out.late.blank).toBe('hidden');
+      if (out.hasLayer) {
+        expect(out.early.layer).toBe('hidden');   // no depth under an empty spot
+        expect(out.late.layer).toBe('visible');
+      }
     }
   });
 });

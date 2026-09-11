@@ -24,6 +24,10 @@ import type { WoodTurnover } from '../../state/store';
  *  - 300 / 250 / 250 the same day, having watched it at half speed.
  *  - 300 / 200 / 250, another 50ms off the step, having watched that.
  *
+ * `gap` is not a card at all. It is the 100ms the TOP spot sits visibly empty
+ * between the last card of a short final deal landing and the pile being gathered
+ * back onto it (2026-09-11). See dealTimeline.
+ *
  * **`step` is now SHORTER than `flip`, so the cards overlap by 100ms** - the next
  * one starts turning a third of the way into the one before it. Overlap was
  * tried once before and reported as hard to watch, and that is worth knowing
@@ -36,8 +40,8 @@ import type { WoodTurnover } from '../../state/store';
  * `collectAt` as `before * step`, which is "when the last card ahead of the gather
  * lands" only while `step` and `flip` are equal - and they no longer are.
  */
-export const WOOD_TIMING = { flip: 300, step: 200, collect: 250 } as const;
-const { flip: FLIP_MS, step: DEAL_STEP_MS, collect: COLLECT_MS } = WOOD_TIMING;
+export const WOOD_TIMING = { flip: 300, step: 200, collect: 250, gap: 100 } as const;
+const { flip: FLIP_MS, step: DEAL_STEP_MS, collect: COLLECT_MS, gap: GAP_MS } = WOOD_TIMING;
 
 /**
  * When each card of a turn starts turning over, and when the gather runs.
@@ -68,9 +72,15 @@ export function dealTimeline(count: number, before: number) {
   const gathers = first < count;
   // The cards the pile had left, dealt at the ordinary rate.
   const ahead = Array.from({ length: first }, (_, i) => i * DEAL_STEP_MS);
-  // The gather starts when the last of them has landed, which is a flip after the
-  // last one started - not a step.
-  const collectAt = first === 0 ? 0 : ahead[first - 1] + FLIP_MS;
+  // The gather starts when the last of them has landed - a flip after the last
+  // one started, not a step - and then a GAP more. Dealing out the last one or two
+  // cards EMPTIES the top pile, and the table asked to see it empty before the pile
+  // is gathered back onto it (2026-09-11): a pile whose length is a multiple of
+  // three always showed that blank spot at the end of a lap, and one that was not
+  // filled it in the same instant it emptied, so half the piles never showed it.
+  // No gap when nothing was left to deal (`first === 0`): that spot has already
+  // been visibly empty since the last turn, for as long as the player looked at it.
+  const collectAt = first === 0 ? 0 : ahead[first - 1] + FLIP_MS + GAP_MS;
   const resumeAt = collectAt + COLLECT_MS;
   const delays = Array.from({ length: count }, (_, i) =>
     i < first ? ahead[i]
@@ -80,8 +90,14 @@ export function dealTimeline(count: number, before: number) {
   return {
     /** Per card, oldest first: when it starts turning over. */
     delays,
-    /** The gather waits for the cards ahead of it to land. */
+    /** The gather waits for the cards ahead of it to land, and then the gap. */
     collectAt,
+    /**
+     * When the gathered pile lands on the top spot, which stops being empty. Until
+     * then the draw pile shows the blank it would show if the pile had simply run
+     * out - which it did. Zero on a turn with no gather, which never empties it.
+     */
+    drawAt: gathers ? resumeAt : 0,
     /**
      * The whole move, which is what the `collecting` class has to outlast. It used
      * to be cleared after COLLECT_MS alone, which took the class off while the
@@ -197,6 +213,9 @@ export function TableauView(props: {
   // The timeline this turn is being played on. A hand that is not mid-turn deals
   // its cards straight in, which is what an ordinary turn of three looks like.
   const timeline = dealTimeline(dealt.length, collecting ? turning - 1 : dealt.length);
+  // The top spot is blank while a gathered pile is on its way back to it. Only
+  // when there IS a draw pile to come back: a pile dealt right out has no gather.
+  const blanking = collecting && timeline.drawAt > 0 && faceDown > 0;
 
   // Wood is the pile a player touches most - every flip of three is another tap -
   // so it sits under a thumb, and which thumb is a preference (see prefs.ts).
@@ -259,10 +278,21 @@ export function TableauView(props: {
         <div className="wood-col" style={{
           '--collect-ms': `${COLLECT_MS}ms`, '--flip-ms': `${FLIP_MS}ms`,
           '--collect-at': `${timeline.collectAt}ms`,
+          '--draw-at': `${timeline.drawAt}ms`,
         } as React.CSSProperties}>
-          <PileStack layers={depthLayers(faceDown)}>
+          {/* While a turn that took the pile over is playing, the top spot shows
+              the blank a pile that has run out shows - because it did - until the
+              gathered cards land back on it at `drawAt`. The card back and its
+              depth stay RENDERED underneath the rule that hides them rather than
+              being swapped in by a timer, so the moment the pile reappears is the
+              stylesheet's clock and cannot drift from the gather that delivers
+              it. See `.wood-draw.turning` in game.css. */}
+          <PileStack layers={depthLayers(faceDown)} className={`wood-draw${blanking ? ' turning' : ''}`}>
+            {blanking && (
+              <div className="pile-space recycle-slot wood-blank" onClick={props.onFlip} aria-hidden="true" />
+            )}
             {faceDown > 0
-              ? <div onClick={props.onFlip}><CardBack badgeId={badgeId} /></div>
+              ? <div className="wood-back" onClick={props.onFlip}><CardBack badgeId={badgeId} /></div>
               : <div className={`pile-space${canRecycle ? ' recycle-slot' : ''}`}
                   onClick={props.onFlip} title={canRecycle ? 'Recycle wood' : undefined} />}
           </PileStack>

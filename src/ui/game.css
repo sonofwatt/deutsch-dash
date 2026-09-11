@@ -640,6 +640,28 @@
    length: the deal never really waited except for its first card. The class now
    lasts the whole move and carries no timing of its own. */
 
+/* The top spot during a turn that took the pile over.
+   ------------------------------------------------
+   Dealing the last one or two cards of a short final deal EMPTIES the draw pile,
+   exactly as the last full deal of a pile of 27 does, and the table asked for it to
+   look that way (2026-09-11). A pile whose length is a multiple of three always
+   showed a blank top spot at the end of a lap; one that was not filled the spot in
+   the same frame it emptied, so half the piles in the game never showed it.
+
+   So while `.turning`, the blank sits in the top spot and the card back and its
+   depth are hidden over it until `--draw-at`, when the gathered pile lands (see
+   dealTimeline). Hidden by an animation and not a timer, so the pile reappears on
+   the same clock as the gather that delivers it. The blank goes at the same
+   instant, so its border never shows round the edge of the card back. Visibility
+   steps rather than fades - the fill holds the `from` value through the delay. */
+.wood-draw .wood-blank { position: absolute; top: 0; left: 0; }
+.wood-draw.turning > .pile-layer, .wood-draw.turning .wood-back {
+  animation: wood-draw-back 1ms linear var(--draw-at, 0ms) both; }
+.wood-draw.turning .wood-blank {
+  animation: wood-draw-blank 1ms linear var(--draw-at, 0ms) both; }
+@keyframes wood-draw-back { from { visibility: hidden; } to { visibility: visible; } }
+@keyframes wood-draw-blank { from { visibility: visible; } to { visibility: hidden; } }
+
 /* The cards still arrive and still land in order; they just stop turning. And the
    pile going back is not drawn at all rather than sitting there as a still
    outline for the length of a move nobody asked to see. */
@@ -647,6 +669,10 @@
   [data-platform] .wood-deal > * { animation-name: none; }
   [data-platform] .wood-deal > *, [data-platform] .wood-deal.collecting > * { animation-delay: 0ms; }
   [data-platform] .wood-collect { animation-name: none; display: none; }
+  /* No choreography, so no blank spot held open for a gather nobody is shown. */
+  [data-platform] .wood-draw.turning > .pile-layer,
+  [data-platform] .wood-draw.turning .wood-back { animation-name: none; }
+  [data-platform] .wood-draw.turning .wood-blank { animation-name: none; display: none; }
 }
 
 /* The way back in for a player a forced start left behind. It sits in the track

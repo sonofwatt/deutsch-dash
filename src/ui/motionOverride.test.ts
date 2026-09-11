@@ -44,11 +44,18 @@ const ANIMATED = [
   // of that pile is information rather than decoration - it just does not spin.
   ['.pile-finish', 'pile-finish-go'],
   ['.pile-finish-turn', 'pile-finish-turn'],
+  // The top spot held blank while a short final deal is gathered back onto it.
+  // A visibility step rather than movement, but it is choreography, and a phone
+  // that asked for stillness gets the pile back the instant the turn is made.
+  ['.wood-draw.turning .wood-back', 'wood-draw-back'],
+  ['.wood-draw.turning .wood-blank', 'wood-draw-blank'],
 ] as const;
 
 const PAGE = `<!doctype html><html><head><style>${CSS}</style></head><body>
   <div class="wood-deal"><div class="card">7</div></div>
   <div class="wood-collect"></div>
+  <div class="pile-depth wood-draw turning"><div class="pile-top">
+    <div class="wood-blank"></div><div class="wood-back"></div></div></div>
   <div class="faller">X</div>
   <div class="sound-rain"><span class="sound-drop">X</span></div>
   <div class="fireworks"><span class="shell"><b></b><i></i><i class="glint"></i></span>

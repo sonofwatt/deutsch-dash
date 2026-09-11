@@ -53,7 +53,7 @@ both directions before releasing: the new client against the rules still live,
 and the PREVIOUS client against the new rules, which is the half this file's own
 warning cannot cover._
 
-_**785 tests** (628 unit and 105 in a real browser; 52 against the emulator, all
+_**793 tests** (635 unit and 106 in a real browser; 52 against the emulator, all
 green). This is the only place in the repo that quotes a count -
 it drifted three separate ways when it lived in four places, so keep it here and
 nowhere else. Both sides of the 2026-09-04 merge rewrote this line, which is the
@@ -1483,6 +1483,38 @@ became, written by the host in `commitScores` beside the rest of the tally.
   panel says so rather than rendering an empty box.
 - A round with a TOTAL but no DELTA is a round that player sat out. A round with
   no total for them at all is a round they were not in, and it is left out.
+
+### A short final deal empties the top spot too _(2026-09-11)_
+
+A pile whose length is a multiple of three shows a blank top spot at the end of a
+lap: the last deal takes all three and the draw pile is empty until the next tap
+recycles it. A pile that is NOT a multiple never did, because `flipWood` deals the
+last one or two, gathers the rest and deals the remainder in one move - the spot
+emptied and refilled in the same frame. Half the piles in the game never showed
+the blank at all. The table asked for them to look the same, and for the empty
+spot to be seen: **100ms of it, after the last card of the short deal lands and
+before the pile is gathered back onto it.**
+
+- **`flipWood` did not change**, for the third time running on this animation.
+  The card order was already exactly what was asked for; only the clock moved.
+  `WOOD_TIMING.gap` is the new 100ms, and `dealTimeline` returns `drawAt` - when
+  the gathered pile lands and the top spot stops being empty.
+- **Hidden by the stylesheet, not by a timer.** While `.turning`, the blank sits in
+  the top spot and the card back and its depth are held invisible over it by a
+  visibility step on `--draw-at`: the same clock as the gather that delivers the
+  pile, so the two cannot drift. The blank goes at the same instant, so its border
+  never shows round the card back.
+- **The blank shows from the tap**, not from when the last card leaves the pile,
+  which is what a pile of 27 already did: its last deal empties the slot at the tap
+  while three cards are still turning over.
+- **No gap after a pile that was already all face up.** That blank has been on
+  screen since the last turn, and holding it longer would only slow the tap that
+  recycles it. That tap does now keep the spot blank until the gather lands,
+  where before the new card back appeared while the gather was still on its way
+  to it - a small change in that case too, and the right one.
+- Reduced motion drops it with the rest of the turnover's choreography.
+- Verified by rendering the turnover frame by frame, and by a browser test that
+  scrubs the real animation either side of `drawAt`.
 
 ### The host never heard its own 3 _(2026-09-11)_
 
@@ -3991,6 +4023,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `b953122` | The dasher gets the trophy too when they lead on the round |
 | `4dcf24c` | The host's phone stops counting the round twice on the splash |
 | _pending-a_ | The host hears its own first countdown tick |
+| _pending-b_ | A short final wood deal shows the empty top spot, 100ms, then the gather |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.
