@@ -53,7 +53,7 @@ both directions before releasing: the new client against the rules still live,
 and the PREVIOUS client against the new rules, which is the half this file's own
 warning cannot cover._
 
-_**781 tests** (624 unit and 105 in a real browser; 52 against the emulator, all
+_**785 tests** (628 unit and 105 in a real browser; 52 against the emulator, all
 green). This is the only place in the repo that quotes a count -
 it drifted three separate ways when it lived in four places, so keep it here and
 nowhere else. Both sides of the 2026-09-04 merge rewrote this line, which is the
@@ -1483,6 +1483,37 @@ became, written by the host in `commitScores` beside the rest of the tally.
   panel says so rather than rendering an empty box.
 - A round with a TOTAL but no DELTA is a round that player sat out. A round with
   no total for them at all is a round they were not in, and it is left out.
+
+### The host's own phone counted the round twice _(2026-09-11)_
+
+Reported from a table the day after the dasher's trophy went in: the host led
+21 to 17 when Bram dashed, and got tears with no trophy. **It was not the new
+code, and it was never only the trophy** - every face the splash hands a
+non-dasher was being read off the wrong standings on the host's phone, and had
+been since the faces were written.
+
+`splashVariant` PROJECTED the round on top of `player.score`, on the reasoning
+that the splash fires before the host has committed anything. That is true on
+every phone except one. `commitScores` writes `round/scores` and every
+`players/$uid/score` in one atomic update, RTDB applies it to the local cache
+synchronously, and the host's store runs the commit from inside the very snapshot
+that turns the phase - so by the time `GameRoute`'s effect samples the store, the
+host's totals already include the round. Projecting on top counted it twice: 24
+against 28, and the leader was handed the wrong glyph.
+
+- **The discriminator is `round.scores`, and it is exact.** The one atomic write
+  carries both, so scores present means totals include them; absent means not.
+  Committed, the totals ARE the after and the before is them less the round.
+- **The tests keep the BOARD on the committed fixture.** The first cut of them
+  used an empty board, and a re-projection of an empty board adds zero - so every
+  one of them passed over the bug they were written for. They are built through
+  `scoreRound` now, so the scores always match the cards still in the spaces, and
+  restoring the old read fails them.
+- **Why the dasher's trophy test missed this yesterday:** the splash tests had
+  only ever been handed uncommitted rounds, which is the case every phone but the
+  host's sees - and the host is the one phone every playtest here is run from.
+- `dashStreak` is unaffected: the stats go in a SECOND write after the scores, so
+  they are not in the sampled snapshot even on the host.
 
 ### The dasher can win the trophy too _(2026-09-10)_
 
@@ -3926,6 +3957,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `83f1979` | The carousel cycles its remarks instead of repeating them |
 | `f6c8ffd` | The pile flip never flipped; card backs match, and cards get a white edge |
 | `b953122` | The dasher gets the trophy too when they lead on the round |
+| _pending_ | The host's phone stops counting the round twice on the splash |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.

@@ -16,6 +16,7 @@ import { RACE_GRACE_MS } from '../../state/store';
 import { orderlySpaces } from '../../game/center';
 import { orderlyColumns, spaceCountForPlayers } from '../../game/rules';
 import { splashVariant, type Splash, type SplashBase } from '../splashVariant';
+import { scoreRound } from '../../game/scoring';
 import { NO_PLAYER_STATS, type GameStats } from '../../game/stats';
 import type { Card, CenterSpace, PlayerInfo, PlaySource, RoundScore, Suit, Tableau } from '../../game/types';
 
@@ -578,6 +579,60 @@ describe('DashSplash', () => {
     const t = table(10, 30, 12);
     expect(splashVariant(t, 'p0', 'p1', board('p0', 3)))
       .toEqual({ base: 'crying', trophy: true, fire: false });
+  });
+
+  // A round the host has ALREADY committed, which is what the splash sees on the
+  // host's own phone: the totals include this round and round.scores says so.
+  //
+  // The BOARD stays on the fixture, and that is the point of these. The bug was
+  // re-projecting a round whose cards are still sitting in round.spaces; with an
+  // empty board a re-projection adds zero and every one of these would pass over
+  // the bug. `scoreRound` supplies the scores, so they always match the board.
+  const run = (n: number, owner: string, suit: Suit = 'red') =>
+    Array.from({ length: n }, (_, i) => c(i + 1, suit, owner));
+  const played = (runs: Card[][], who: string[]) => {
+    const spaces = runs.map(stack => ({ stack, history: [] }));
+    const tableaus = Object.fromEntries(who.map(id => [id, empty()])) as Record<string, Tableau>;
+    return { spaces, tableaus };
+  };
+  const committed = (r: ReturnType<typeof played>) =>
+    ({ ...r, scores: scoreRound(r.spaces, r.tableaus) });
+  const four = ['p0', 'p1', 'p2', 'p3'];
+
+  it('does not count a committed round twice - the table that reported it', () => {
+    // 2026-09-11, the host's phone. The leader on 21 took three and Bram, on 17,
+    // dashed with eleven. Re-projected on totals that already held the round, it
+    // read 24 against 28: tears for the leader, and no trophy.
+    const r = committed(played([run(3, 'p0'), run(9, 'p1', 'blue'), run(2, 'p1', 'green')], four));
+    expect(r.scores.p0.delta).toBe(3);
+    expect(r.scores.p1.delta).toBe(11);
+    expect(splashVariant(table(21, 17, -8, -33), 'p1', 'p0', r))
+      .toEqual({ base: 'crying', trophy: true, fire: false });
+  });
+
+  it('reads the same round the same way whether or not it has been committed', () => {
+    // Every phone but the host's sees it uncommitted; the host sees it committed.
+    // One round, one answer, at every seat.
+    const board3 = played([run(3, 'p0'), run(9, 'p1', 'blue'), run(2, 'p1', 'green')], four);
+    const early = splashVariant(table(18, 6, -8, -33), 'p1', 'p0', board3);
+    const late = splashVariant(table(21, 17, -8, -33), 'p1', 'p0', committed(board3));
+    expect(late).toEqual(early);
+    expect(late.trophy).toBe(true);
+  });
+
+  it('takes the round back OUT for the before, so a drop still reads as a drop', () => {
+    // p2 was last on 18 and takes nine to 27: p1, on 20, has just dropped into
+    // last. Re-projected, p2 reads 36 and p1 looks like they were ALWAYS last.
+    const r = committed(played([run(9, 'p2')], ['p0', 'p1', 'p2']));
+    expect(splashVariant(table(40, 20, 27), 'p0', 'p1', r))
+      .toEqual({ base: 'toilet', trophy: false, fire: false });
+  });
+
+  it('hands a committed dasher the trophy when they lead by less than the round', () => {
+    // 20 against 19 with the round in: a lead. Counted twice it is 25 against 28.
+    const r = committed(played([run(5, 'p0'), run(9, 'p1', 'blue')], ['p0', 'p1', 'p2']));
+    expect(splashVariant(table(20, 19, 12), 'p0', 'p0', r))
+      .toEqual({ base: 'glitter', trophy: true, fire: false });
   });
   it('hands nobody a trophy on a level table', () => {
     expect(splashVariant(table(10, 10, 10), 'p0', 'p1').trophy).toBe(false);

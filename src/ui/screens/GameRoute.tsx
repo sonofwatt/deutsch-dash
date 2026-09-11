@@ -34,6 +34,11 @@ export default function GameRoute() {
   // can change glyph halfway through its own animation - tears turning to
   // something worse as the new totals land. The splash is a snapshot of the moment
   // it fired, and the sheet behind it carries the new numbers.
+  //
+  // "Before the commit" is true on every phone EXCEPT the host's: there the commit
+  // is applied to the local cache inside the snapshot that turns the phase, so the
+  // sample below already holds the new totals. splashVariant tells the two apart
+  // by `round.scores` and must be handed the round for that reason.
   const [splash, setSplash] = useState<{ until: number; variant: Splash } | null>(null);
 
   useEffect(() => {

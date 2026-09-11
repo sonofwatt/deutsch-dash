@@ -1,6 +1,6 @@
 import { scoreRound } from '../game/scoring';
 import { statsFor, type GameStats } from '../game/stats';
-import type { CenterSpace, PlayerInfo, Tableau } from '../game/types';
+import type { CenterSpace, PlayerInfo, RoundScore, Tableau } from '../game/types';
 
 /** What falls on this particular viewer, and what falls alongside it. */
 export type SplashBase = 'glitter' | 'poo' | 'crying' | 'relief' | 'toilet';
@@ -39,15 +39,28 @@ export interface Splash { base: SplashBase; trophy: boolean; fire: boolean }
  * the one that can now land on any of them, dasher included - three glyphs is the
  * most anybody can get, and only by dashing, leading and being on a run at once.
  *
- * **Both the standings and the streak are PROJECTED**, for the same reason: the
- * splash fires the moment dash is announced, which is before the host has
- * committed anything. So `player.score` is still last round's total while
- * "dropped into last" is a question about THIS round, and `dashStreak` is the
- * run as it stood BEFORE this dash. `scoreRound` is the same pure function the
- * host is about to run on the same board, so the standings are the host's
- * arithmetic done early rather than a guess; the streak needs no arithmetic at
- * all, only the offset by one that the test below spells out. Either can differ
- * only where a play is still being reconciled.
+ * **The standings are read in one of two ways, and choosing wrong double-counts
+ * the round.** On most phones the splash fires before the host has committed
+ * anything, so `player.score` is still last round's total and this round has to
+ * be PROJECTED - `scoreRound` is the same pure function the host is about to run
+ * on the same board, so that is the host's arithmetic done early, not a guess.
+ *
+ * **On the host's own phone it has already happened.** `commitScores` writes
+ * `round/scores` and every `players/$uid/score` in one atomic update, RTDB applies
+ * it to the local cache synchronously, and the host's store runs the commit from
+ * inside the very snapshot that turns the phase - so by the time the splash
+ * samples the store, the totals already include this round. Projecting on top of
+ * that counted the round twice: a player leading 21 to 17 read as 24 to 28, and
+ * the leader was handed tears without the trophy. Reported from a table on
+ * 2026-09-11, by the host, which is the one phone this always happened on.
+ *
+ * The discriminator is `round.scores`, and it is exact rather than a heuristic:
+ * the one atomic write carries both, so if the scores are there the totals
+ * include them, and if they are not the totals do not.
+ *
+ * `dashStreak` is the run as it stood BEFORE this dash - the stats go in a
+ * SECOND write after the scores, so they are not in the sampled snapshot even on
+ * the host - and needs only the offset by one that the test below spells out.
  *
  * Stats are a best-effort write whose failure is swallowed (see `commitScores`),
  * so a lost one shows a fire a round late or not at all. That is the right way
@@ -56,14 +69,24 @@ export interface Splash { base: SplashBase; trophy: boolean; fire: boolean }
  */
 export function splashVariant(
   players: Record<string, PlayerInfo>, dashedBy: string, uid: string | null,
-  round?: { spaces: CenterSpace[]; tableaus: Record<string, Tableau> } | null,
+  round?: {
+    spaces: CenterSpace[]; tableaus: Record<string, Tableau>;
+    scores?: Record<string, RoundScore> | null;
+  } | null,
   stats?: GameStats | null,
 ): Splash {
   const me = uid ? players[uid] : undefined;
   const ids = Object.keys(players);
-  const deltas = round ? scoreRound(round.spaces, round.tableaus) : {};
-  const before = (id: string) => players[id].score;
-  const after = (id: string) => players[id].score + (deltas[id]?.delta ?? 0);
+  // Committed already (always, on the host's own phone): the totals include this
+  // round, so they ARE the after, and the before is them less the round. Not yet:
+  // the totals are last round's, and this round is projected on top. See above -
+  // doing the second when the first is true counts the round twice.
+  const committed = round?.scores ?? null;
+  const deltas = committed ?? (round ? scoreRound(round.spaces, round.tableaus) : {});
+  const before = (id: string) =>
+    players[id].score - (committed ? committed[id]?.delta ?? 0 : 0);
+  const after = (id: string) =>
+    players[id].score + (committed ? 0 : deltas[id]?.delta ?? 0);
 
   const lowest = (at: (id: string) => number) => Math.min(...ids.map(at));
   const highest = (at: (id: string) => number) => Math.max(...ids.map(at));
