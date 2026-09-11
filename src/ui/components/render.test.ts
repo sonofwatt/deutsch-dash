@@ -438,6 +438,23 @@ describe('OpponentStrip', () => {
     const slotsBeforeCount = html.slice(0, html.indexOf('opp-count')).split('opp-slot').length - 1;
     expect(slotsBeforeCount).toBe(1);
   });
+
+  it('says a stuck opponent is stuck in words, never with an hourglass', () => {
+    // An hourglass reads as "the table is waiting on this player", which is the
+    // opposite of stuck, and a playtest on 2026-09-11 read a stuck bot as Away.
+    // The word is the fix, so the word is what is pinned.
+    const render = (you: Partial<PlayerInfo>) => renderToStaticMarkup(createElement(OpponentStrip, {
+      me: 'me', players: { ...twoPlayers, you: { ...twoPlayers.you, ...you } }, tableaus: { you: tableau() },
+    }));
+    const stuck = render({ stuckAt: 5 });
+    expect(stuck).toContain('>stuck<');
+    expect(stuck).not.toContain('⏳');
+    expect(render({})).not.toContain('opp-stuck');
+    // Sitting out outranks it: a player who is not in the round has nothing to be stuck in.
+    const out = render({ stuckAt: 5, sittingOut: true });
+    expect(out).toContain('>out<');
+    expect(out).not.toContain('opp-stuck');
+  });
 });
 
 describe('ScoreRow', () => {

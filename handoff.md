@@ -53,7 +53,7 @@ both directions before releasing: the new client against the rules still live,
 and the PREVIOUS client against the new rules, which is the half this file's own
 warning cannot cover._
 
-_**793 tests** (635 unit and 106 in a real browser; 52 against the emulator, all
+_**794 tests** (636 unit and 106 in a real browser; 52 against the emulator, all
 green). This is the only place in the repo that quotes a count -
 it drifted three separate ways when it lived in four places, so keep it here and
 nowhere else. Both sides of the 2026-09-04 merge rewrote this line, which is the
@@ -2885,13 +2885,24 @@ shot no longer leaves the wood card frozen edge-on at `rotateY(90)`.
 - **Sitting out is a door** (🚪), not `‖`. The armed second tap still reads
   "out?", because that is the one that costs a round.
 
-### What the hourglass means, and what the post piles allow
+### What the stuck tag means, and what the post piles allow
 
 Two questions from the table, answered here because they will be asked again.
 
-**⏳ beside a player in the opponent strip means STUCK** - the same state your own
-board calls "No moves left". It had only a `title`, which a phone never shows, so
-it now carries an `aria-label` with the board's own wording.
+**"stuck" beside a player in the opponent strip means STUCK** - the same state
+your own board calls "No moves left". It was an ⏳ until 2026-09-11 and was
+misread twice. First nobody could find out what it meant: it had only a `title`,
+which a phone never shows, and the `aria-label` added for that helped a screen
+reader and nobody else. Then a playtest with two bots read it as **Away**. An
+hourglass says "the table is waiting on this player", which is the opposite of
+stuck. It is now the word, in the same pill as "out" and "AI", and
+`render.test.ts` pins the word and the absence of the glyph.
+
+It clears the moment a play frees them, or when every present player is stuck
+and the table rotates, which clears every flag at once and turns every wood pile
+together - the "screen refreshed" in that report. **A bot is never away**:
+`addBot` writes `connected: true` once and nothing writes a bot's `awayAt`. Absent
+is a FADED row (`.opp.absent`), and a faded bot would be a real bug.
 
 **Post piles build DOWN only**, and always have: `canBuildOnPost` takes a card one
 lower of the other gender and nothing else. Reported as allowing both directions;
@@ -4024,6 +4035,7 @@ the ledgered pointer-capture re-select check on mouse drags.
 | `4dcf24c` | The host's phone stops counting the round twice on the splash |
 | `3031dfb` | The host hears its own first countdown tick |
 | `44c50f1` | A short final wood deal shows the empty top spot, 100ms, then the gather |
+| _pending_ | A stuck opponent says "stuck" in a pill, not an hourglass that read as Away |
 
 Earlier history, the approved design spec and the original 15-task execution
 ledger are in `docs/superpowers/`.

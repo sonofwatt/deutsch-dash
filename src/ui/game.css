@@ -410,8 +410,9 @@
 .opp-ai { font-size: 9px; font-weight: 800; letter-spacing: .06em; color: var(--ink-soft);
   border: 1px solid var(--line); border-radius: 999px; padding: 0 5px; }
 /* Same shape as the AI tag, because it answers the same question at a glance:
-   what kind of player is this, and should I be waiting for them. */
-.opp-out { font-size: 9px; font-weight: 800; letter-spacing: .06em; color: var(--ink-soft);
+   what kind of player is this, and should I be waiting for them. Stuck answers it
+   too, so it is the same pill. It was an hourglass, which answered it backwards. */
+.opp-out, .opp-stuck { font-size: 9px; font-weight: 800; letter-spacing: .06em; color: var(--ink-soft);
   border: 1px solid var(--line); border-radius: 999px; padding: 0 5px; }
 .opp-cards { display: flex; gap: 3px; align-items: flex-end;
   --card-w: clamp(22px, min(7vw, 3.4vh), 32px); }

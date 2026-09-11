@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { badgeFor, EMOJI, type BadgeId } from '../../game/badges';
+import { badgeFor, type BadgeId } from '../../game/badges';
 import { CardView } from './CardView';
 import type { WoodSide } from '../prefs';
 import type { Card, PlayerInfo, Tableau } from '../../game/types';
@@ -82,11 +82,11 @@ export function OpponentStrip(props: {
               {p.sittingOut
                 ? <span className="opp-out" title="sitting out">out</span>
                 : p.stuckAt != null && (
-                    /* The same state your own board calls "No moves left", said
-                       in the space a name leaves. It had only a title, which a
-                       phone never shows, so nobody could find out what it meant. */
-                    <span className="opp-stuck" title="No moves left"
-                      aria-label="No moves left">{'\u23f3' + EMOJI}</span>
+                    /* The same state your own board calls "No moves left", as a
+                       word in the same tag as "out". It was an hourglass, which
+                       reads as "the table is waiting on them" - the opposite of
+                       stuck - and a playtest took a stuck bot for an away one. */
+                    <span className="opp-stuck" title="No moves left">stuck</span>
                   )}
             </div>
             {/* Same left-to-right order as your own tableau, so a glance across
