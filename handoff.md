@@ -3581,6 +3581,41 @@ the ledgered pointer-capture re-select check on mouse drags.
 
 ## Known gaps, not blocking
 
+- **A dead hand after being away, reported 2026-09-10 and NOT fixed.** Host with
+  two bots, away a few minutes, came back to a board that looked normal and did
+  nothing: the draw pile was empty (all 21 face up), tapping it did nothing at
+  all, and a card tapped out of the flipped pile came straight back. Going away
+  again and returning cleared it. Judged rare enough to leave, deliberately, but
+  here is where the search starts because the next person will not have this
+  paragraph unless it is written down.
+
+  **The diagnosis is half done.** `flip()` has exactly two ways to do nothing:
+  offline, or no local `tableau`. **There was no "reconnecting…" pill**, which is
+  the same `.info/connected` the store's `online` flag reads - so it was not
+  offline, and it was the hand. And a null hand does not show as a missing board,
+  because `const hand = tableau ?? round?.tableaus[uid]` in `Game.tsx` falls back
+  to the server's copy **without checking the phase**. That fallback was written
+  for the gap between rounds, where "nothing can be played from it" is true
+  because `playTo` refuses outside `playing`. During a round it renders a
+  complete, ordinary-looking hand in which `flip` and `playTo` both refuse and
+  only `select` still works - so cards highlight and nothing else happens. That
+  is the reported symptom exactly, and a reload fixes it, which is what going away
+  again did.
+
+  **What is still unexplained is how the hand became null while the phase stayed
+  `playing`.** The only line that clears it requires the phase to have LEFT
+  `playing` (`store.ts`, the clear that makes the next round adopt a fresh one),
+  and the report is from round 1. So there is a step missing. Two things are worth
+  suspecting: the `inSnapshot` re-entrancy guard, which skips every side effect on
+  a snapshot raised from inside another one - including the adoption - and a tab
+  that froze and thawed mid-write.
+
+  **Two things are worth fixing whatever the trigger turns out to be**: that
+  fallback should not present an unplayable hand as a playable one during a round,
+  and the local hand is adopted only when there is none (`!get().tableau`), so it
+  is never re-synced from the server for the rest of a round however far it
+  drifts.
+
 - Test counts are quoted in the header of this file and nowhere else, because
   they drifted three separate ways when they lived in four places. If you add
   tests, update that one line or delete the number.
